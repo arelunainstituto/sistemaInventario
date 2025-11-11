@@ -261,13 +261,17 @@
                 }
                 
                 // Adicionar listener para mudanças de autenticação
+                let isRedirecting = false; // Prevenir múltiplos redirecionamentos
                 supabase.auth.onAuthStateChange((event, session) => {
                     console.log('🔐 Auth state changed:', event);
                     
                     // Se foi deslogado, redirecionar para login
-                    if (event === 'SIGNED_OUT' || !session) {
+                    if ((event === 'SIGNED_OUT' || !session) && !isRedirecting) {
+                        isRedirecting = true;
                         console.log('🚪 Sessão encerrada - redirecionando para login...');
-                        window.location.href = '/login.html';
+                        setTimeout(() => {
+                            window.location.href = '/login.html';
+                        }, 100);
                     }
                 });
                 
