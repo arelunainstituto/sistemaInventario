@@ -22,6 +22,9 @@ const { authenticateToken, requirePermission, requireRole, requireAdmin, getCurr
 const prostoralOrders = require('./prostoral-ordens');
 const prostoralClients = require('./prostoral-clientes');
 
+// Importar rotas de Token Exchange
+const tokenExchangeRoutes = require('./routes/token-exchange');
+
 const app = express();
 const PORT = process.env.PORT || 3002;
 
@@ -157,7 +160,39 @@ app.use(helmet({
         }
     }
 }));
-app.use(cors());
+// Configuração CORS para integração com múltiplos sistemas
+const allowedOrigins = [
+    'http://localhost:3002',
+    'https://audio-ai-app.vercel.app',
+    'http://127.0.0.1:3002',
+    'https://erp.institutoareluna.pt',
+    'https://*.vercel.app' // Permitir preview deployments do Vercel
+];
+
+app.use(cors({
+    origin: function (origin, callback) {
+        // Permitir requisições sem origin (mobile apps, Postman)
+        if (!origin) return callback(null, true);
+
+        // Verificar se origin está na lista ou é um domínio Vercel
+        if (allowedOrigins.some(allowed => {
+            if (allowed.includes('*')) {
+                const pattern = allowed.replace('*.', '');
+                return origin.endsWith(pattern);
+            }
+            return origin === allowed;
+        })) {
+            callback(null, true);
+        } else {
+            console.warn(`⚠️  CORS bloqueou origem: ${origin}`);
+            callback(null, true); // Por enquanto permitir (em produção, use: callback(new Error('Not allowed by CORS')))
+        }
+    },
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+    exposedHeaders: ['Content-Range', 'X-Content-Range']
+}));
 app.use(compression());
 
 // Middleware condicional para parsing JSON/URL - apenas para rotas que não usam multipart
@@ -184,6 +219,9 @@ app.use((req, res, next) => {
 
 // Endpoint para autenticação e informações do usuário
 app.get('/api/auth/me', authenticateToken, getCurrentUser);
+
+// Rotas de Token Exchange (autenticação segura cross-origin)
+app.use('/api/auth', tokenExchangeRoutes);
 
 // Rotas da API
 

@@ -3,18 +3,13 @@
  * Grupo AreLuna - Sistema de Inventário
  */
 
-// Inicializar cliente Supabase usando configurações globais
-const supabaseAuth = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
 /**
  * Classe para gerenciar autenticação
  */
 class AuthManager {
     constructor() {
-        this.supabase = window.supabase.createClient(
-            'https://hvqckoajxhdqaxfawisd.supabase.co',
-            'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh2cWNrb2FqeGhkcWF4ZmF3aXNkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTg4OTMyMDksImV4cCI6MjA3NDQ2OTIwOX0.r260qHrvkLMHG60Pbld2zyjwXBY3B94Edk51YDpLXM4'
-        );
+        // Usar APENAS um cliente Supabase com as configurações globais
+        this.supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
         this.currentUser = null;
         this.session = null;
         this.isAuthenticated = false;
@@ -28,7 +23,7 @@ class AuthManager {
     async init() {
         try {
             // Verificar sessão atual
-            const { data: { session }, error } = await supabaseAuth.auth.getSession();
+            const { data: { session }, error } = await this.supabase.auth.getSession();
             
             if (error) {
                 console.error('Erro ao verificar sessão:', error);
@@ -40,9 +35,9 @@ class AuthManager {
             }
 
             // Escutar mudanças de autenticação
-            supabaseAuth.auth.onAuthStateChange((event, session) => {
+            this.supabase.auth.onAuthStateChange((event, session) => {
                 console.log('Auth state changed:', event, session);
-                
+
                 if (event === 'SIGNED_IN' && session) {
                     this.setSession(session);
                 } else if (event === 'SIGNED_OUT') {
@@ -63,11 +58,13 @@ class AuthManager {
         this.currentUser = session.user;
         this.isAuthenticated = true;
         
-        // Armazenar informações do usuário
+        // Armazenar informações do usuário E TOKEN
         localStorage.setItem('user', JSON.stringify(this.currentUser));
         localStorage.setItem('isAuthenticated', 'true');
+        localStorage.setItem('access_token', session.access_token); // ✅ Armazenar token
         
         console.log('Usuário autenticado:', this.currentUser.email);
+        console.log('✅ Token armazenado no localStorage');
     }
 
     /**
@@ -81,6 +78,7 @@ class AuthManager {
         // Limpar localStorage
         localStorage.removeItem('user');
         localStorage.removeItem('isAuthenticated');
+        localStorage.removeItem('access_token'); // ✅ Limpar token também
         localStorage.removeItem('rememberMe');
         
         console.log('Sessão limpa');
@@ -91,7 +89,7 @@ class AuthManager {
      */
     async signIn(email, password) {
         try {
-            const { data, error } = await supabaseAuth.auth.signInWithPassword({
+            const { data, error } = await this.supabase.auth.signInWithPassword({
                 email: email,
                 password: password
             });
@@ -113,17 +111,17 @@ class AuthManager {
      */
     async signOut() {
         try {
-            const { error } = await supabaseAuth.auth.signOut();
-            
+            const { error } = await this.supabase.auth.signOut();
+
             if (error) {
                 throw error;
             }
 
             this.clearSession();
-            
+
             // Redirecionar para login
             window.location.href = 'login.html';
-            
+
             return { success: true };
 
         } catch (error) {
@@ -144,7 +142,7 @@ class AuthManager {
 
             // Primeiro, verificar se a senha atual está correta
             // fazendo um novo login com as credenciais atuais
-            const { data: signInData, error: signInError } = await supabaseAuth.auth.signInWithPassword({
+            const { data: signInData, error: signInError } = await this.supabase.auth.signInWithPassword({
                 email: this.currentUser.email,
                 password: currentPassword
             });
@@ -154,7 +152,7 @@ class AuthManager {
             }
 
             // Se o login foi bem-sucedido, alterar a senha
-            const { data, error } = await supabaseAuth.auth.updateUser({
+            const { data, error } = await this.supabase.auth.updateUser({
                 password: newPassword
             });
 
@@ -241,8 +239,8 @@ class AuthManager {
         }
 
         try {
-            const { data, error } = await supabaseAuth.auth.refreshSession();
-            
+            const { data, error } = await this.supabase.auth.refreshSession();
+
             if (error) {
                 throw error;
             }
@@ -525,10 +523,12 @@ async function authenticatedFetch(url, options = {}) {
         ...options.headers
     };
 
-    return fetch(url, {
+    const response = await fetch(url, {
         ...options,
         headers
     });
+    
+    return response;
 }
 
 /**

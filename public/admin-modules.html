@@ -322,8 +322,9 @@
             
             // Logout
             document.getElementById('logoutBtn').addEventListener('click', async () => {
-                await supabase.auth.signOut();
-                window.location.href = '/login.html';
+                if (confirm('Tem certeza que deseja sair?')) {
+                    await logout(); // Usar função do authManager
+                }
             });
             
             // Module modal
