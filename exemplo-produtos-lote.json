@@ -1,0 +1,87 @@
+{
+  "produtos": [
+    {
+      "qr_code": "LAB-BD593CBB",
+      "codigo_barras": "7891234560001",
+      "categoria": "Resinas",
+      "nome_material": "Resina Acrílica Premium",
+      "marca": "Angelus",
+      "fornecedor": "Dental Supply Brasil",
+      "referencia_lote": "LT-2024-10-100",
+      "unidade_medida": "kg",
+      "localizacao": "Armário A - Prateleira 2",
+      "data_validade": "2026-06-30",
+      "descricao": "Resina acrílica autopolimerizável para base de próteses removíveis.",
+      "observacoes": "Manter em local fresco e seco.",
+      "ativo": true,
+      "quantidade_inicial": 15.0,
+      "quantidade_minima": 5.0,
+      "quantidade_maxima": 50.0,
+      "preco_unitario": 180.00
+    },
+    {
+      "qr_code": "LAB-32AF8038",
+      "codigo_barras": "7891234560002",
+      "categoria": "Gesso",
+      "nome_material": "Gesso Tipo IV - Extra Duro",
+      "marca": "Polidental",
+      "fornecedor": "Odonto Center",
+      "referencia_lote": "GS-2024-Q4-050",
+      "unidade_medida": "kg",
+      "localizacao": "Armário C - Prateleira 1",
+      "data_validade": "2027-12-31",
+      "descricao": "Gesso pedra tipo IV de alta resistência para modelos de trabalho.",
+      "observacoes": "Proporção água/pó: 19mL/100g.",
+      "ativo": true,
+      "quantidade_inicial": 25.0,
+      "quantidade_minima": 10.0,
+      "quantidade_maxima": 100.0,
+      "preco_unitario": 45.90
+    },
+    {
+      "qr_code": "LAB-40C4A045",
+      "codigo_barras": "7891234560003",
+      "categoria": "Metais",
+      "nome_material": "Liga Metálica CoCr",
+      "marca": "Dentaurum",
+      "fornecedor": "Importadora Dental Tech",
+      "referencia_lote": "COCR-2024-500",
+      "unidade_medida": "kg",
+      "localizacao": "Cofre - Metais Preciosos",
+      "descricao": "Liga de Cromo-Cobalto para estruturas metálicas de próteses.",
+      "observacoes": "Temperatura de fusão: 1350°C.",
+      "ativo": true,
+      "quantidade_inicial": 5.0,
+      "quantidade_minima": 1.0,
+      "quantidade_maxima": 10.0,
+      "preco_unitario": 850.00
+    },
+    {
+      "qr_code": "LAB-09BCCD43",
+      "categoria": "Silicones",
+      "nome_material": "Silicone de Moldagem",
+      "marca": "Zhermack",
+      "fornecedor": "Dental Med",
+      "unidade_medida": "un",
+      "localizacao": "Armário D - Gaveta 2",
+      "data_validade": "2025-08-15",
+      "descricao": "Silicone de adição para moldagens de precisão.",
+      "ativo": true,
+      "quantidade_inicial": 20,
+      "quantidade_minima": 5,
+      "quantidade_maxima": 50,
+      "preco_unitario": 120.00
+    },
+    {
+      "qr_code": "LAB-365F6823",
+      "nome_material": "Disco de Polimento",
+      "categoria": "Consumíveis",
+      "unidade_medida": "un",
+      "quantidade_inicial": 100,
+      "quantidade_minima": 20,
+      "quantidade_maxima": 200,
+      "preco_unitario": 5.50
+    }
+  ]
+}
+

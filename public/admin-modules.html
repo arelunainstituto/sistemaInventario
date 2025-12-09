@@ -1,0 +1,648 @@
+<!DOCTYPE html>
+<html lang="pt" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🛡️ Admin - Gerenciar Módulos</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Supabase -->
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    
+    <!-- Scripts -->
+    <script src="config.js"></script>
+    <script src="auth.js"></script>
+    
+    <style>
+        .gradient-bg {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        
+        .tab-button {
+            transition: all 0.3s ease;
+        }
+        
+        .tab-button.active {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        
+        .loading-spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .module-badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.875rem;
+            font-weight: 500;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    
+    <!-- Header -->
+    <header class="gradient-bg text-white shadow-lg">
+        <div class="container mx-auto px-4 py-6">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-4">
+                    <a href="/dashboard.html" class="text-white hover:text-purple-200 transition">
+                        <i class="fas fa-arrow-left text-2xl"></i>
+                    </a>
+                    <div>
+                        <h1 class="text-3xl font-bold">🛡️ Painel Administrativo</h1>
+                        <p class="text-purple-200 text-sm">Gerenciamento de Módulos e Acessos</p>
+                    </div>
+                </div>
+                
+                <div class="flex items-center space-x-4">
+                    <button id="logoutBtn" class="bg-white bg-opacity-20 hover:bg-opacity-30 rounded-lg px-4 py-2 transition">
+                        <i class="fas fa-sign-out-alt mr-2"></i> Sair
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+    
+    <!-- Main Content -->
+    <main class="container mx-auto px-4 py-8">
+        
+        <!-- Tabs -->
+        <div class="bg-white rounded-lg shadow-lg mb-6">
+            <div class="flex border-b">
+                <button class="tab-button active flex-1 py-4 px-6 font-semibold" data-tab="modules">
+                    <i class="fas fa-th-large mr-2"></i> Módulos
+                </button>
+                <button class="tab-button flex-1 py-4 px-6 font-semibold" data-tab="users">
+                    <i class="fas fa-users mr-2"></i> Usuários e Acessos
+                </button>
+            </div>
+        </div>
+        
+        <!-- Tab Content: Modules -->
+        <div id="modulesTab" class="tab-content">
+            <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+                <div class="flex items-center justify-between mb-6">
+                    <h2 class="text-2xl font-bold text-gray-800">
+                        <i class="fas fa-th-large mr-2 text-purple-600"></i>
+                        Gerenciar Módulos
+                    </h2>
+                    <button id="addModuleBtn" class="bg-gradient-to-r from-purple-500 to-purple-600 text-white px-6 py-2 rounded-lg hover:shadow-lg transition font-semibold">
+                        <i class="fas fa-plus mr-2"></i> Novo Módulo
+                    </button>
+                </div>
+                
+                <!-- Loading State -->
+                <div id="modulesLoading" class="flex justify-center py-12">
+                    <div class="loading-spinner"></div>
+                </div>
+                
+                <!-- Modules Table -->
+                <div id="modulesTable" class="hidden overflow-x-auto">
+                    <table class="w-full">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Módulo</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Código</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Rota</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ordem</th>
+                                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody id="modulesTableBody" class="bg-white divide-y divide-gray-200">
+                            <!-- Modules will be loaded here -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Tab Content: Users -->
+        <div id="usersTab" class="tab-content hidden">
+            <div class="bg-white rounded-lg shadow-lg p-6">
+                <h2 class="text-2xl font-bold text-gray-800 mb-6">
+                    <i class="fas fa-users mr-2 text-purple-600"></i>
+                    Gerenciar Acessos de Usuários
+                </h2>
+                
+                <!-- Loading State -->
+                <div id="usersLoading" class="flex justify-center py-12">
+                    <div class="loading-spinner"></div>
+                </div>
+                
+                <!-- Users List -->
+                <div id="usersList" class="hidden space-y-4">
+                    <!-- Users will be loaded here -->
+                </div>
+            </div>
+        </div>
+        
+    </main>
+    
+    <!-- Modal: Add/Edit Module -->
+    <div id="moduleModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div class="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+            <div class="gradient-bg text-white p-6 rounded-t-lg">
+                <h3 class="text-2xl font-bold" id="modalTitle">Novo Módulo</h3>
+            </div>
+            <form id="moduleForm" class="p-6 space-y-4">
+                <input type="hidden" id="moduleId">
+                
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Código *</label>
+                        <input type="text" id="moduleCode" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Nome *</label>
+                        <input type="text" id="moduleName" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+                    </div>
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Descrição</label>
+                    <textarea id="moduleDescription" rows="3" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"></textarea>
+                </div>
+                
+                <div class="grid grid-cols-3 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Ícone (Font Awesome)</label>
+                        <input type="text" id="moduleIcon" placeholder="fas fa-box" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Emoji</label>
+                        <input type="text" id="moduleEmoji" placeholder="📦" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Cor</label>
+                        <select id="moduleColor" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+                            <option value="blue">Azul</option>
+                            <option value="green">Verde</option>
+                            <option value="purple">Roxo</option>
+                            <option value="orange">Laranja</option>
+                            <option value="red">Vermelho</option>
+                            <option value="indigo">Índigo</option>
+                            <option value="teal">Teal</option>
+                            <option value="cyan">Ciano</option>
+                            <option value="yellow">Amarelo</option>
+                            <option value="pink">Rosa</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Rota</label>
+                        <input type="text" id="moduleRoute" placeholder="/inventory.html" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Ordem de Exibição</label>
+                        <input type="number" id="moduleOrder" value="0" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+                    </div>
+                </div>
+                
+                <div class="flex items-center">
+                    <input type="checkbox" id="moduleActive" checked class="w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500">
+                    <label for="moduleActive" class="ml-2 text-sm font-medium text-gray-700">Módulo Ativo</label>
+                </div>
+                
+                <div class="flex justify-end space-x-4 pt-4 border-t">
+                    <button type="button" id="cancelModuleBtn" class="px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition font-semibold">
+                        Cancelar
+                    </button>
+                    <button type="submit" class="bg-gradient-to-r from-purple-500 to-purple-600 text-white px-6 py-2 rounded-lg hover:shadow-lg transition font-semibold">
+                        <i class="fas fa-save mr-2"></i> Salvar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Modal: Manage User Access -->
+    <div id="userAccessModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div class="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+            <div class="gradient-bg text-white p-6 rounded-t-lg">
+                <h3 class="text-2xl font-bold" id="userAccessModalTitle">Gerenciar Acessos</h3>
+                <p class="text-purple-200 text-sm" id="userAccessModalSubtitle"></p>
+            </div>
+            <div class="p-6">
+                <input type="hidden" id="selectedUserId">
+                
+                <!-- Available Modules -->
+                <div id="availableModulesList" class="space-y-3">
+                    <!-- Modules will be loaded here -->
+                </div>
+                
+                <div class="flex justify-end space-x-4 pt-6 border-t mt-6">
+                    <button type="button" id="cancelUserAccessBtn" class="px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition font-semibold">
+                        Fechar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // Inicializar Supabase
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        let allModules = [];
+        let allUsers = [];
+        let currentTab = 'modules';
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', async () => {
+            await checkAuth();
+            await checkAdminRole();
+            setupEventListeners();
+            await loadModules();
+        });
+
+        // Check authentication
+        async function checkAuth() {
+            try {
+                const { data: { session }, error } = await supabase.auth.getSession();
+                if (error) {
+                    console.error('Erro ao verificar sessão:', error);
+                    window.location.href = '/login.html';
+                    return;
+                }
+                if (!session) {
+                    window.location.href = '/login.html';
+                    return;
+                }
+            } catch (error) {
+                console.error('Erro ao verificar autenticação:', error);
+                window.location.href = '/login.html';
+            }
+        }
+        
+        // Check if user is admin
+        async function checkAdminRole() {
+            try {
+                const response = await authenticatedFetch('/api/auth/me');
+                if (!response.roles.includes('Admin')) {
+                    alert('Acesso negado. Apenas administradores podem acessar esta página.');
+                    window.location.href = '/dashboard.html';
+                }
+            } catch (error) {
+                console.error('Erro ao verificar permissões:', error);
+                window.location.href = '/dashboard.html';
+            }
+        }
+        
+        // Setup event listeners
+        function setupEventListeners() {
+            // Tab switching
+            document.querySelectorAll('.tab-button').forEach(btn => {
+                btn.addEventListener('click', () => switchTab(btn.dataset.tab));
+            });
+            
+            // Logout
+            document.getElementById('logoutBtn').addEventListener('click', async () => {
+                if (confirm('Tem certeza que deseja sair?')) {
+                    await logout(); // Usar função do authManager
+                }
+            });
+            
+            // Module modal
+            document.getElementById('addModuleBtn').addEventListener('click', () => openModuleModal());
+            document.getElementById('cancelModuleBtn').addEventListener('click', () => closeModuleModal());
+            document.getElementById('moduleForm').addEventListener('submit', handleModuleSubmit);
+            
+            // User access modal
+            document.getElementById('cancelUserAccessBtn').addEventListener('click', () => closeUserAccessModal());
+        }
+        
+        // Switch tabs
+        function switchTab(tab) {
+            currentTab = tab;
+            
+            // Update tab buttons
+            document.querySelectorAll('.tab-button').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.tab === tab);
+            });
+            
+            // Update tab content
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.add('hidden');
+            });
+            
+            if (tab === 'modules') {
+                document.getElementById('modulesTab').classList.remove('hidden');
+            } else if (tab === 'users') {
+                document.getElementById('usersTab').classList.remove('hidden');
+                loadUsers();
+            }
+        }
+        
+        // Load modules
+        async function loadModules() {
+            try {
+                const response = await authenticatedFetch('/api/modules');
+                allModules = response.modules || [];
+                
+                document.getElementById('modulesLoading').classList.add('hidden');
+                document.getElementById('modulesTable').classList.remove('hidden');
+                
+                renderModulesTable();
+            } catch (error) {
+                console.error('Erro ao carregar módulos:', error);
+                alert('Erro ao carregar módulos');
+            }
+        }
+        
+        // Render modules table
+        function renderModulesTable() {
+            const tbody = document.getElementById('modulesTableBody');
+            tbody.innerHTML = '';
+            
+            allModules.forEach(module => {
+                const row = document.createElement('tr');
+                row.className = 'hover:bg-gray-50';
+                
+                row.innerHTML = `
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <div class="flex items-center">
+                            <span class="text-2xl mr-3">${module.emoji || '📦'}</span>
+                            <div>
+                                <div class="text-sm font-medium text-gray-900">${module.name}</div>
+                                <div class="text-sm text-gray-500">${module.description || '-'}</div>
+                            </div>
+                        </div>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <span class="text-sm font-mono text-gray-900">${module.code}</span>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <span class="text-sm text-gray-900">${module.route || '-'}</span>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <span class="module-badge ${module.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}">
+                            ${module.is_active ? 'Ativo' : 'Inativo'}
+                        </span>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        ${module.display_order}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                        <button onclick="editModule('${module.id}')" class="text-indigo-600 hover:text-indigo-900 mr-4">
+                            <i class="fas fa-edit"></i> Editar
+                        </button>
+                        <button onclick="deleteModule('${module.id}')" class="text-red-600 hover:text-red-900">
+                            <i class="fas fa-trash"></i> Excluir
+                        </button>
+                    </td>
+                `;
+                
+                tbody.appendChild(row);
+            });
+        }
+        
+        // Open module modal
+        function openModuleModal(moduleId = null) {
+            const modal = document.getElementById('moduleModal');
+            const form = document.getElementById('moduleForm');
+            form.reset();
+            
+            if (moduleId) {
+                const module = allModules.find(m => m.id === moduleId);
+                if (module) {
+                    document.getElementById('modalTitle').textContent = 'Editar Módulo';
+                    document.getElementById('moduleId').value = module.id;
+                    document.getElementById('moduleCode').value = module.code;
+                    document.getElementById('moduleCode').disabled = true;
+                    document.getElementById('moduleName').value = module.name;
+                    document.getElementById('moduleDescription').value = module.description || '';
+                    document.getElementById('moduleIcon').value = module.icon || '';
+                    document.getElementById('moduleEmoji').value = module.emoji || '';
+                    document.getElementById('moduleColor').value = module.color || 'blue';
+                    document.getElementById('moduleRoute').value = module.route || '';
+                    document.getElementById('moduleOrder').value = module.display_order || 0;
+                    document.getElementById('moduleActive').checked = module.is_active;
+                }
+            } else {
+                document.getElementById('modalTitle').textContent = 'Novo Módulo';
+                document.getElementById('moduleCode').disabled = false;
+            }
+            
+            modal.classList.remove('hidden');
+        }
+        
+        // Close module modal
+        function closeModuleModal() {
+            document.getElementById('moduleModal').classList.add('hidden');
+        }
+        
+        // Handle module form submit
+        async function handleModuleSubmit(e) {
+            e.preventDefault();
+            
+            const moduleId = document.getElementById('moduleId').value;
+            const data = {
+                code: document.getElementById('moduleCode').value,
+                name: document.getElementById('moduleName').value,
+                description: document.getElementById('moduleDescription').value,
+                icon: document.getElementById('moduleIcon').value,
+                emoji: document.getElementById('moduleEmoji').value,
+                color: document.getElementById('moduleColor').value,
+                route: document.getElementById('moduleRoute').value,
+                display_order: parseInt(document.getElementById('moduleOrder').value),
+                is_active: document.getElementById('moduleActive').checked
+            };
+            
+            try {
+                if (moduleId) {
+                    // Update
+                    await authenticatedFetch(`/api/modules/${moduleId}`, {
+                        method: 'PUT',
+                        body: JSON.stringify(data)
+                    });
+                } else {
+                    // Create
+                    await authenticatedFetch('/api/modules', {
+                        method: 'POST',
+                        body: JSON.stringify(data)
+                    });
+                }
+                
+                closeModuleModal();
+                await loadModules();
+                alert('Módulo salvo com sucesso!');
+            } catch (error) {
+                console.error('Erro ao salvar módulo:', error);
+                alert('Erro ao salvar módulo');
+            }
+        }
+        
+        // Edit module
+        function editModule(moduleId) {
+            openModuleModal(moduleId);
+        }
+        
+        // Delete module
+        async function deleteModule(moduleId) {
+            if (!confirm('Tem certeza que deseja excluir este módulo?')) return;
+            
+            try {
+                await authenticatedFetch(`/api/modules/${moduleId}`, {
+                    method: 'DELETE'
+                });
+                
+                await loadModules();
+                alert('Módulo excluído com sucesso!');
+            } catch (error) {
+                console.error('Erro ao excluir módulo:', error);
+                alert('Erro ao excluir módulo');
+            }
+        }
+        
+        // Load users
+        async function loadUsers() {
+            try {
+                document.getElementById('usersLoading').classList.remove('hidden');
+                document.getElementById('usersList').classList.add('hidden');
+                
+                const response = await authenticatedFetch('/api/modules/access/all-users');
+                allUsers = response.users || [];
+                
+                document.getElementById('usersLoading').classList.add('hidden');
+                document.getElementById('usersList').classList.remove('hidden');
+                
+                renderUsersList();
+            } catch (error) {
+                console.error('Erro ao carregar usuários:', error);
+                alert('Erro ao carregar usuários');
+            }
+        }
+        
+        // Render users list
+        function renderUsersList() {
+            const container = document.getElementById('usersList');
+            container.innerHTML = '';
+            
+            allUsers.forEach(user => {
+                const card = document.createElement('div');
+                card.className = 'border border-gray-200 rounded-lg p-4 hover:shadow-md transition';
+                
+                const accessCount = user.module_accesses.length;
+                
+                card.innerHTML = `
+                    <div class="flex items-center justify-between">
+                        <div class="flex-1">
+                            <h3 class="text-lg font-semibold text-gray-900">${user.full_name || user.email}</h3>
+                            <p class="text-sm text-gray-500">${user.email}</p>
+                            <div class="mt-2">
+                                <span class="module-badge bg-purple-100 text-purple-800">
+                                    ${accessCount} módulo${accessCount !== 1 ? 's' : ''}
+                                </span>
+                            </div>
+                        </div>
+                        <button onclick="manageUserAccess('${user.id}')" class="bg-gradient-to-r from-purple-500 to-purple-600 text-white px-4 py-2 rounded-lg hover:shadow-lg transition font-semibold">
+                            <i class="fas fa-key mr-2"></i> Gerenciar Acessos
+                        </button>
+                    </div>
+                `;
+                
+                container.appendChild(card);
+            });
+        }
+        
+        // Manage user access
+        async function manageUserAccess(userId) {
+            const user = allUsers.find(u => u.id === userId);
+            if (!user) return;
+            
+            document.getElementById('selectedUserId').value = userId;
+            document.getElementById('userAccessModalTitle').textContent = 'Gerenciar Acessos';
+            document.getElementById('userAccessModalSubtitle').textContent = user.full_name || user.email;
+            
+            const container = document.getElementById('availableModulesList');
+            container.innerHTML = '';
+            
+            allModules.forEach(module => {
+                const hasAccess = user.module_accesses.some(access => access.module_id === module.id);
+                
+                const item = document.createElement('div');
+                item.className = 'flex items-center justify-between p-4 border border-gray-200 rounded-lg';
+                
+                item.innerHTML = `
+                    <div class="flex items-center">
+                        <span class="text-2xl mr-3">${module.emoji || '📦'}</span>
+                        <div>
+                            <div class="font-semibold text-gray-900">${module.name}</div>
+                            <div class="text-sm text-gray-500">${module.description || '-'}</div>
+                        </div>
+                    </div>
+                    <label class="flex items-center cursor-pointer">
+                        <input 
+                            type="checkbox" 
+                            ${hasAccess ? 'checked' : ''} 
+                            onchange="toggleUserModuleAccess('${userId}', '${module.id}', this.checked)"
+                            class="w-5 h-5 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
+                        >
+                        <span class="ml-2 text-sm font-medium text-gray-700">
+                            ${hasAccess ? 'Acesso Concedido' : 'Sem Acesso'}
+                        </span>
+                    </label>
+                `;
+                
+                container.appendChild(item);
+            });
+            
+            document.getElementById('userAccessModal').classList.remove('hidden');
+        }
+        
+        // Close user access modal
+        function closeUserAccessModal() {
+            document.getElementById('userAccessModal').classList.add('hidden');
+        }
+        
+        // Toggle user module access
+        async function toggleUserModuleAccess(userId, moduleId, grant) {
+            try {
+                if (grant) {
+                    await authenticatedFetch('/api/modules/access/grant', {
+                        method: 'POST',
+                        body: JSON.stringify({ user_id: userId, module_id: moduleId })
+                    });
+                } else {
+                    await authenticatedFetch('/api/modules/access/revoke', {
+                        method: 'DELETE',
+                        body: JSON.stringify({ user_id: userId, module_id: moduleId })
+                    });
+                }
+                
+                // Reload users to update the list
+                await loadUsers();
+            } catch (error) {
+                console.error('Erro ao alterar acesso:', error);
+                alert('Erro ao alterar acesso');
+            }
+        }
+    </script>
+    
+</body>
+</html>

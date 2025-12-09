@@ -1,0 +1,10 @@
+{
+  "qr_code": "LAB-A1B2C3D4",
+  "nome_material": "Resina Acrílica Premium",
+  "categoria": "Resinas",
+  "unidade_medida": "kg",
+  "quantidade_inicial": 5.0,
+  "quantidade_minima": 2.0,
+  "quantidade_maxima": 20.0
+}
+

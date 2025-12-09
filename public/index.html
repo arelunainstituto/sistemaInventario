@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema de Inventário - Grupo AreLuna</title>
+    <script src="/config.js"></script>
+    <script>
+        // Redirecionar para a página de login ou seleção de módulos
+        // dependendo do estado de autenticação
+        document.addEventListener('DOMContentLoaded', async () => {
+            try {
+                const token = localStorage.getItem('access_token');
+                
+                if (!token) {
+                    // Sem token, ir para login
+                    window.location.href = '/login.html';
+                    return;
+                }
+
+                // Verificar se o token é válido
+                const response = await fetch(`${window.CONFIG.API_URL}/user`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+
+                if (response.ok) {
+                    // Token válido, ir para dashboard
+                    window.location.href = '/dashboard.html';
+                } else {
+                    // Token inválido, limpar e ir para login
+                    localStorage.clear();
+                    window.location.href = '/login.html';
+                }
+            } catch (error) {
+                console.error('Erro ao verificar autenticação:', error);
+                // Em caso de erro, ir para login
+                window.location.href = '/login.html';
+            }
+        });
+    </script>
+</head>
+<body>
+    <div style="display: flex; justify-content: center; align-items: center; height: 100vh; font-family: Arial, sans-serif;">
+        <div style="text-align: center;">
+            <div style="font-size: 48px; margin-bottom: 20px;">🏢</div>
+            <h1 style="color: #333; margin-bottom: 10px;">Sistema de Inventário</h1>
+            <p style="color: #666;">Grupo AreLuna</p>
+            <p style="color: #999; margin-top: 20px;">Carregando...</p>
+        </div>
+    </div>
+</body>
+</html>
+

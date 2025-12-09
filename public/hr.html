@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Recursos Humanos - AreLuna</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="rh.css">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+    <script src="https://cdn.jsdelivr.net/npm/d3-flextree@2.1.2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/d3-org-chart@3.1.0"></script>
+    <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+</head>
+
+<body class="bg-gray-50 font-inter">
+    <!-- Loading Overlay -->
+    <div id="loadingOverlay" class="fixed inset-0 bg-white bg-opacity-90 z-50 flex items-center justify-center hidden">
+        <div class="text-center">
+            <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto mb-4"></div>
+            <p class="text-gray-600 font-medium">Carregando...</p>
+        </div>
+    </div>
+
+    <div class="flex h-screen overflow-hidden">
+        <!-- Sidebar -->
+        <aside class="w-64 bg-white border-r border-gray-200 flex flex-col z-10">
+            <div class="p-6 border-b border-gray-100 flex items-center gap-3">
+                <div class="w-10 h-10 rounded-lg bg-purple-100 flex items-center justify-center text-purple-600">
+                    <i class="fas fa-users text-xl"></i>
+                </div>
+                <div>
+                    <h1 class="text-lg font-bold text-gray-800">Recursos Humanos</h1>
+                    <p class="text-xs text-gray-500">Gestão de Pessoas</p>
+                </div>
+            </div>
+
+            <nav class="flex-1 overflow-y-auto p-4 space-y-1">
+                <button data-tab="dashboard"
+                    class="nav-item active w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-lg transition-colors text-purple-600 bg-purple-50">
+                    <i class="fas fa-chart-pie w-5"></i>
+                    Dashboard
+                </button>
+
+                <button data-tab="employees"
+                    class="nav-item w-full flex items-center gap-3 px-4 py-3 text-sm font-medium text-gray-600 hover:bg-gray-50 rounded-lg transition-colors"
+                    data-permission="hr:read_all">
+                    <i class="fas fa-user-tie w-5"></i>
+                    Funcionários
+                </button>
+
+                <button data-tab="orgchart"
+                    class="nav-item w-full flex items-center gap-3 px-4 py-3 text-sm font-medium text-gray-600 hover:bg-gray-50 rounded-lg transition-colors">
+                    <i class="fas fa-sitemap w-5"></i>
+                    Organograma
+                </button>
+
+                <button data-tab="payroll"
+                    class="nav-item w-full flex items-center gap-3 px-4 py-3 text-sm font-medium text-gray-600 hover:bg-gray-50 rounded-lg transition-colors">
+                    <i class="fas fa-file-invoice-dollar w-5"></i>
+                    Folha de Pagamento
+                </button>
+
+                <button data-tab="documents"
+                    class="nav-item w-full flex items-center gap-3 px-4 py-3 text-sm font-medium text-gray-600 hover:bg-gray-50 rounded-lg transition-colors">
+                    <i class="fas fa-folder-open w-5"></i>
+                    Documentos
+                </button>
+
+                <button data-tab="absences"
+                    class="nav-item w-full flex items-center gap-3 px-4 py-3 text-sm font-medium text-gray-600 hover:bg-gray-50 rounded-lg transition-colors">
+                    <i class="fas fa-calendar-alt w-5"></i>
+                    Férias e Ausências
+                </button>
+
+                <button data-tab="performance"
+                    class="nav-item w-full flex items-center gap-3 px-4 py-3 text-sm font-medium text-gray-600 hover:bg-gray-50 rounded-lg transition-colors">
+                    <i class="fas fa-star w-5"></i>
+                    Avaliações
+                </button>
+
+                <button data-tab="reports"
+                    class="nav-item w-full flex items-center gap-3 px-4 py-3 text-sm font-medium text-gray-600 hover:bg-gray-50 rounded-lg transition-colors"
+                    data-permission="hr:view_reports">
+                    <i class="fas fa-file-alt w-5"></i>
+                    Relatórios
+                </button>
+            </nav>
+
+            <div class="p-4 border-t border-gray-100">
+                <button onclick="window.location.href='/module-selection.html'"
+                    class="w-full flex items-center gap-3 px-4 py-3 text-sm font-medium text-gray-600 hover:bg-gray-50 rounded-lg transition-colors">
+                    <i class="fas fa-arrow-left w-5"></i>
+                    Voltar ao Menu
+                </button>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="flex-1 overflow-y-auto bg-gray-50">
+            <!-- Header -->
+            <header
+                class="bg-white border-b border-gray-200 px-8 py-4 flex justify-between items-center sticky top-0 z-10">
+                <div>
+                    <h2 id="pageTitle" class="text-xl font-bold text-gray-800">Dashboard</h2>
+                    <p id="pageSubtitle" class="text-sm text-gray-500">Visão geral do departamento</p>
+                </div>
+                <div class="flex items-center gap-4">
+                    <div class="flex items-center gap-3 px-4 py-2 bg-gray-50 rounded-lg border border-gray-200">
+                        <div class="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center text-purple-600 font-bold"
+                            id="userAvatar">
+                            U
+                        </div>
+                        <div class="text-sm">
+                            <p class="font-medium text-gray-900" id="userName">Usuário</p>
+                            <p class="text-xs text-gray-500" id="userRole">Carregando...</p>
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Content Area -->
+            <div class="p-8">
+                <!-- Dashboard Tab -->
+                <div id="dashboard-tab" class="tab-content space-y-6">
+                    <!-- Stats Grid -->
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+                        <div class="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
+                            <div class="flex justify-between items-start mb-4">
+                                <div class="p-3 bg-blue-50 rounded-lg text-blue-600">
+                                    <i class="fas fa-users text-xl"></i>
+                                </div>
+                                <span
+                                    class="text-xs font-medium px-2 py-1 bg-green-100 text-green-700 rounded-full">Ativos</span>
+                            </div>
+                            <h3 class="text-gray-500 text-sm font-medium">Total Funcionários</h3>
+                            <p class="text-2xl font-bold text-gray-900 mt-1" id="kpi-total-employees">-</p>
+                        </div>
+
+                        <div class="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
+                            <div class="flex justify-between items-start mb-4">
+                                <div class="p-3 bg-yellow-50 rounded-lg text-yellow-600">
+                                    <i class="fas fa-calendar-check text-xl"></i>
+                                </div>
+                                <span
+                                    class="text-xs font-medium px-2 py-1 bg-yellow-100 text-yellow-700 rounded-full">Pendentes</span>
+                            </div>
+                            <h3 class="text-gray-500 text-sm font-medium">Ausências/Férias</h3>
+                            <p class="text-2xl font-bold text-gray-900 mt-1" id="kpi-pending-absences">-</p>
+                        </div>
+
+                        <div class="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
+                            <div class="flex justify-between items-start mb-4">
+                                <div class="p-3 bg-green-50 rounded-lg text-green-600">
+                                    <i class="fas fa-euro-sign text-xl"></i>
+                                </div>
+                                <span class="text-xs font-medium px-2 py-1 bg-gray-100 text-gray-600 rounded-full">Mês
+                                    Atual</span>
+                            </div>
+                            <h3 class="text-gray-500 text-sm font-medium">Custo Folha</h3>
+                            <p class="text-2xl font-bold text-gray-900 mt-1" id="kpi-payroll-cost">-</p>
+                        </div>
+
+                        <div class="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
+                            <div class="flex justify-between items-start mb-4">
+                                <div class="p-3 bg-red-50 rounded-lg text-red-600">
+                                    <i class="fas fa-exclamation-circle text-xl"></i>
+                                </div>
+                                <span class="text-xs font-medium px-2 py-1 bg-red-100 text-red-700 rounded-full">30
+                                    dias</span>
+                            </div>
+                            <h3 class="text-gray-500 text-sm font-medium">Docs Vencendo</h3>
+                            <p class="text-2xl font-bold text-gray-900 mt-1" id="kpi-expiring-docs">-</p>
+                        </div>
+                    </div>
+
+                    <!-- Charts Section -->
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <div class="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
+                            <h3 class="text-lg font-bold text-gray-800 mb-4">Funcionários por Departamento</h3>
+                            <div class="h-64 relative">
+                                <canvas id="departmentChart"></canvas>
+                            </div>
+                        </div>
+                        <div class="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
+                            <h3 class="text-lg font-bold text-gray-800 mb-4">Próximos Aniversariantes</h3>
+                            <div class="overflow-y-auto h-64">
+                                <table class="w-full text-sm text-left">
+                                    <thead class="text-xs text-gray-500 uppercase bg-gray-50 sticky top-0">
+                                        <tr>
+                                            <th class="px-4 py-2">Nome</th>
+                                            <th class="px-4 py-2">Data</th>
+                                            <th class="px-4 py-2">Departamento</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="birthdaysTableBody" class="divide-y divide-gray-100">
+                                        <!-- Populated by JS -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Employees Tab -->
+                <div id="employees-tab" class="tab-content hidden space-y-6">
+                    <!-- Content injected by rh-employees.js -->
+                    <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-6 text-center text-gray-500">
+                        Carregando módulo de funcionários...
+                    </div>
+                </div>
+
+                <!-- Org Chart Tab -->
+                <div id="orgchart-tab" class="tab-content hidden space-y-6">
+                    <!-- Content injected by rh-orgchart.js -->
+                    <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-6 text-center text-gray-500">
+                        Carregando organograma...
+                    </div>
+                </div>
+
+                <!-- Payroll Tab -->
+                <div id="payroll-tab" class="tab-content hidden space-y-6">
+                    <!-- Content injected by rh-payroll.js -->
+                    <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-6 text-center text-gray-500">
+                        Carregando módulo de folha de pagamento...
+                    </div>
+                </div>
+
+                <!-- Documents Tab -->
+                <div id="documents-tab" class="tab-content hidden space-y-6">
+                    <!-- Content injected by rh-documents.js -->
+                    <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-6 text-center text-gray-500">
+                        Carregando módulo de documentos...
+                    </div>
+                </div>
+
+                <!-- Absences Tab -->
+                <div id="absences-tab" class="tab-content hidden space-y-6">
+                    <!-- Content injected by rh-absences.js -->
+                    <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-6 text-center text-gray-500">
+                        Carregando módulo de férias...
+                    </div>
+                </div>
+
+                <!-- Performance Tab -->
+                <div id="performance-tab" class="tab-content hidden space-y-6">
+                    <!-- Content injected by rh-performance.js -->
+                    <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-6 text-center text-gray-500">
+                        Carregando módulo de avaliações...
+                    </div>
+                </div>
+
+                <!-- Reports Tab -->
+                <div id="reports-tab" class="tab-content hidden space-y-6">
+                    <!-- Content injected by rh-reports.js -->
+                    <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-6 text-center text-gray-500">
+                        Carregando módulo de relatórios...
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Scripts -->
+    <script src="config.js"></script>
+    <script src="auth.js"></script>
+    <script src="rh.js"></script>
+    <script src="rh-employees.js"></script>
+    <script src="rh-orgchart.js"></script>
+    <script src="rh-payroll.js"></script>
+    <script src="rh-documents.js"></script>
+    <script src="rh-absences.js"></script>
+    <script src="rh-performance.js"></script>
+    <script src="rh-reports.js"></script>
+</body>
+
+</html>

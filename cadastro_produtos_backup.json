@@ -1,0 +1,21 @@
+[
+    {
+      "id": 1,
+      "codigo_barras": null,
+      "categoria": "Componentes Protéticos",
+      "nome_material": "Pilar Provisório GM / MV",
+      "marca": "Neodent",
+      "fornecedor": "Neodent Portugal",
+      "referencia_lote": null,
+      "unidade_medida": "un",
+      "localizacao": "Gaveta: Pilares Provisórios GM / MV",
+      "data_validade": null,
+      "descricao": "Pilar provisório compatível com conexões GM e MV, utilizado na fase provisória de reabilitações com implantes.",
+      "observacoes": "Material em titânio. Esterilizar antes do uso. Manter armazenado em local seco e protegido da luz.",
+      "ativo": true,
+      "quantidade_inicial": null,
+      "quantidade_minima": null,
+      "quantidade_maxima": null,
+      "preco_unitario": null
+    }
+  ]

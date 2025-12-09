@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste QR Code</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            background: #f3f4f6;
+            margin: 0;
+        }
+        .container {
+            background: white;
+            padding: 40px;
+            border-radius: 16px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+        #qrcode {
+            margin: 20px 0;
+            display: inline-block;
+            padding: 20px;
+            background: white;
+            border: 2px solid #10b981;
+            border-radius: 12px;
+        }
+        .status {
+            margin: 10px 0;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-weight: bold;
+        }
+        .success {
+            background: #d1fae5;
+            color: #065f46;
+        }
+        .error {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+        button {
+            margin-top: 20px;
+            padding: 12px 24px;
+            background: #10b981;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #059669;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 Teste de QR Code</h1>
+        <div id="status"></div>
+        <div id="qrcode"></div>
+        <button onclick="generateNewQR()">Gerar Novo QR Code</button>
+        <div style="margin-top: 20px; color: #666;">
+            <small>Teste do QRCode.js</small>
+        </div>
+    </div>
+
+    <!-- Biblioteca QRCode.js (Local) -->
+    <script src="qrcode.min.js"></script>
+    
+    <script>
+        const statusDiv = document.getElementById('status');
+        
+        function showStatus(message, isError = false) {
+            statusDiv.className = `status ${isError ? 'error' : 'success'}`;
+            statusDiv.textContent = message;
+        }
+
+        function generateQR(text) {
+            const container = document.getElementById('qrcode');
+            container.innerHTML = ''; // Limpar
+            
+            try {
+                if (typeof QRCode === 'undefined') {
+                    showStatus('❌ Biblioteca QRCode.js não está carregada!', true);
+                    console.error('QRCode não definido');
+                    return;
+                }
+
+                new QRCode(container, {
+                    text: text,
+                    width: 256,
+                    height: 256,
+                    colorDark: "#000000",
+                    colorLight: "#ffffff",
+                    correctLevel: QRCode.CorrectLevel.H
+                });
+
+                showStatus('✅ QR Code gerado com sucesso!');
+                console.log('✅ QR Code gerado:', text);
+            } catch (error) {
+                showStatus('❌ Erro: ' + error.message, true);
+                console.error('Erro ao gerar QR Code:', error);
+            }
+        }
+
+        function generateNewQR() {
+            const randomCode = 'LAB-' + Math.random().toString(36).substring(2, 10).toUpperCase();
+            generateQR(randomCode);
+        }
+
+        // Verificar se a biblioteca carregou
+        window.addEventListener('load', () => {
+            console.log('Página carregada');
+            console.log('QRCode disponível?', typeof QRCode !== 'undefined');
+            
+            if (typeof QRCode !== 'undefined') {
+                showStatus('✅ Biblioteca QRCode.js carregada!');
+                // Gerar QR Code inicial
+                setTimeout(() => generateQR('LAB-365F6823'), 500);
+            } else {
+                showStatus('❌ Biblioteca QRCode.js não carregou!', true);
+            }
+        });
+    </script>
+</body>
+</html>
+

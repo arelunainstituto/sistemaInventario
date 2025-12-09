@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Monitor de Impressão - Sistema de Inventário</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        primary: {
+                            50: '#eff6ff',
+                            500: '#3b82f6',
+                            600: '#2563eb',
+                            700: '#1d4ed8'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-gray-100 dark:bg-gray-900 min-h-screen">
+    <!-- Navigation -->
+    <nav class="bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16">
+                <div class="flex items-center">
+                    <a href="index.html" class="flex items-center">
+                        <i class="fas fa-cube text-2xl text-blue-600 mr-3"></i>
+                        <span class="text-xl font-bold text-gray-900 dark:text-white">Sistema de Inventário</span>
+                    </a>
+                    <span class="ml-4 px-3 py-1 bg-green-100 text-green-800 text-sm rounded-full">
+                        <i class="fas fa-print mr-1"></i>
+                        Monitor de Impressão
+                    </span>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <button id="refreshBtn" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors">
+                        <i class="fas fa-sync-alt mr-2"></i>
+                        Atualizar
+                    </button>
+                    <a href="index.html" class="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white">
+                        <i class="fas fa-arrow-left mr-2"></i>
+                        Voltar
+                    </a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <main class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
+        <!-- Statistics Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+            <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        <i class="fas fa-clock text-2xl text-yellow-600"></i>
+                    </div>
+                    <div class="ml-4">
+                        <p class="text-sm font-medium text-gray-600 dark:text-gray-400">Pendentes</p>
+                        <p id="pendingCount" class="text-2xl font-bold text-gray-900 dark:text-white">-</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        <i class="fas fa-spinner text-2xl text-blue-600"></i>
+                    </div>
+                    <div class="ml-4">
+                        <p class="text-sm font-medium text-gray-600 dark:text-gray-400">Processando</p>
+                        <p id="processingCount" class="text-2xl font-bold text-gray-900 dark:text-white">-</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        <i class="fas fa-check-circle text-2xl text-green-600"></i>
+                    </div>
+                    <div class="ml-4">
+                        <p class="text-sm font-medium text-gray-600 dark:text-gray-400">Concluídos</p>
+                        <p id="completedCount" class="text-2xl font-bold text-gray-900 dark:text-white">-</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        <i class="fas fa-exclamation-triangle text-2xl text-red-600"></i>
+                    </div>
+                    <div class="ml-4">
+                        <p class="text-sm font-medium text-gray-600 dark:text-gray-400">Falharam</p>
+                        <p id="failedCount" class="text-2xl font-bold text-gray-900 dark:text-white">-</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Print Queue Table -->
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow">
+            <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+                <div class="flex justify-between items-center">
+                    <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
+                        <i class="fas fa-list mr-2"></i>
+                        Fila de Impressão
+                    </h2>
+                    <div class="flex items-center space-x-4">
+                        <select id="statusFilter" class="bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white text-sm rounded-lg px-3 py-2">
+                            <option value="">Todos os Status</option>
+                            <option value="pending">Pendente</option>
+                            <option value="processing">Processando</option>
+                            <option value="completed">Concluído</option>
+                            <option value="failed">Falhou</option>
+                        </select>
+                        <span id="connectionStatus" class="flex items-center text-sm">
+                            <span class="w-2 h-2 bg-gray-400 rounded-full mr-2"></span>
+                            Desconectado
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                    <thead class="bg-gray-50 dark:bg-gray-700">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                                Item
+                            </th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                                Status
+                            </th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                                Criado em
+                            </th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                                Concluído em
+                            </th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                                Tentativas
+                            </th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                                Ações
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody id="printQueueTable" class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                        <!-- Jobs will be loaded here -->
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Pagination -->
+            <div id="pagination" class="px-6 py-4 border-t border-gray-200 dark:border-gray-700 flex justify-between items-center">
+                <div class="text-sm text-gray-600 dark:text-gray-400">
+                    Mostrando <span id="showingFrom">0</span> a <span id="showingTo">0</span> de <span id="totalJobs">0</span> jobs
+                </div>
+                <div class="flex space-x-2">
+                    <button id="prevPage" class="px-3 py-1 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded hover:bg-gray-300 dark:hover:bg-gray-600 disabled:opacity-50" disabled>
+                        Anterior
+                    </button>
+                    <button id="nextPage" class="px-3 py-1 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded hover:bg-gray-300 dark:hover:bg-gray-600 disabled:opacity-50" disabled>
+                        Próximo
+                    </button>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        class PrintMonitor {
+            constructor() {
+                this.currentPage = 1;
+                this.limit = 20;
+                this.currentFilter = '';
+                this.eventSources = new Map();
+                
+                this.init();
+            }
+
+            init() {
+                this.loadStats();
+                this.loadPrintHistory();
+                this.setupEventListeners();
+                this.updateConnectionStatus('connecting');
+                
+                // Auto-refresh a cada 30 segundos
+                setInterval(() => {
+                    this.loadStats();
+                }, 30000);
+            }
+
+            setupEventListeners() {
+                document.getElementById('refreshBtn').addEventListener('click', () => {
+                    this.loadStats();
+                    this.loadPrintHistory();
+                });
+
+                document.getElementById('statusFilter').addEventListener('change', (e) => {
+                    this.currentFilter = e.target.value;
+                    this.currentPage = 1;
+                    this.loadPrintHistory();
+                });
+
+                document.getElementById('prevPage').addEventListener('click', () => {
+                    if (this.currentPage > 1) {
+                        this.currentPage--;
+                        this.loadPrintHistory();
+                    }
+                });
+
+                document.getElementById('nextPage').addEventListener('click', () => {
+                    this.currentPage++;
+                    this.loadPrintHistory();
+                });
+
+                // Event delegation for action buttons
+                document.getElementById('printQueueTable').addEventListener('click', (e) => {
+                    const button = e.target.closest('button[data-action]');
+                    if (!button) return;
+
+                    const action = button.dataset.action;
+                    const jobId = button.dataset.jobId;
+
+                    if (action === 'retry') {
+                        this.retryJob(jobId);
+                    } else if (action === 'cancel') {
+                        this.cancelJob(jobId);
+                    }
+                });
+            }
+
+            async loadStats() {
+                try {
+                    const response = await fetch('/api/print-stats');
+                    const result = await response.json();
+
+                    if (result.success) {
+                        const stats = result.data;
+                        document.getElementById('pendingCount').textContent = stats.pending;
+                        document.getElementById('processingCount').textContent = stats.processing;
+                        document.getElementById('completedCount').textContent = stats.completed;
+                        document.getElementById('failedCount').textContent = stats.failed;
+                    }
+                } catch (error) {
+                    console.error('Erro ao carregar estatísticas:', error);
+                }
+            }
+
+            async loadPrintHistory() {
+                try {
+                    let url = `/api/print-history?page=${this.currentPage}&limit=${this.limit}`;
+                    if (this.currentFilter) {
+                        url += `&status=${this.currentFilter}`;
+                    }
+
+                    const response = await fetch(url);
+                    const result = await response.json();
+
+                    if (result.success) {
+                        this.renderPrintHistory(result.data);
+                        this.updatePagination(result.pagination);
+                        this.updateConnectionStatus('connected');
+                    }
+                } catch (error) {
+                    console.error('Erro ao carregar histórico:', error);
+                    this.updateConnectionStatus('error');
+                }
+            }
+
+            renderPrintHistory(jobs) {
+                const tbody = document.getElementById('printQueueTable');
+                tbody.innerHTML = '';
+
+                if (jobs.length === 0) {
+                    tbody.innerHTML = `
+                        <tr>
+                            <td colspan="6" class="px-6 py-4 text-center text-gray-500 dark:text-gray-400">
+                                Nenhum job encontrado
+                            </td>
+                        </tr>
+                    `;
+                    return;
+                }
+
+                jobs.forEach(job => {
+                    const row = this.createJobRow(job);
+                    tbody.appendChild(row);
+                    
+                    // Configurar monitoramento em tempo real para jobs em processamento
+                    if (job.status === 'pending' || job.status === 'processing') {
+                        this.monitorJob(job.id);
+                    }
+                });
+            }
+
+            createJobRow(job) {
+                const tr = document.createElement('tr');
+                tr.id = `job-${job.id}`;
+                tr.className = 'hover:bg-gray-50 dark:hover:bg-gray-700';
+
+                const statusBadge = this.getStatusBadge(job.status);
+                const createdAt = new Date(job.created_at).toLocaleString('pt-BR');
+                const completedAt = job.completed_at ? new Date(job.completed_at).toLocaleString('pt-BR') : '-';
+
+                tr.innerHTML = `
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <div class="text-sm font-medium text-gray-900 dark:text-white">${job.item_name || 'Item sem nome'}</div>
+                        <div class="text-sm text-gray-500 dark:text-gray-400">${job.item_code || 'Sem código'}</div>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        ${statusBadge}
+                        ${job.error_message ? `<div class="text-xs text-red-600 mt-1">${job.error_message}</div>` : ''}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                        ${createdAt}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                        ${completedAt}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                        ${job.retry_count || 0}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                        ${this.getJobActions(job)}
+                    </td>
+                `;
+
+                return tr;
+            }
+
+            getStatusBadge(status) {
+                const badges = {
+                    pending: '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800"><i class="fas fa-clock mr-1"></i>Pendente</span>',
+                    processing: '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800"><i class="fas fa-spinner fa-spin mr-1"></i>Processando</span>',
+                    completed: '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800"><i class="fas fa-check mr-1"></i>Concluído</span>',
+                    failed: '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800"><i class="fas fa-times mr-1"></i>Falhou</span>'
+                };
+                return badges[status] || badges.pending;
+            }
+
+            getJobActions(job) {
+                if (job.status === 'failed') {
+                    return `<button data-action="retry" data-job-id="${job.id}" class="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300">
+                        <i class="fas fa-redo mr-1"></i>Tentar Novamente
+                    </button>`;
+                } else if (job.status === 'pending' || job.status === 'processing') {
+                    return `<button data-action="cancel" data-job-id="${job.id}" class="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300">
+                        <i class="fas fa-times mr-1"></i>Cancelar
+                    </button>`;
+                }
+                return '-';
+            }
+
+            monitorJob(jobId) {
+                // Evitar múltiplas conexões para o mesmo job
+                if (this.eventSources.has(jobId)) {
+                    return;
+                }
+
+                const eventSource = new EventSource(`/api/print-status/stream/${jobId}`);
+                this.eventSources.set(jobId, eventSource);
+
+                eventSource.onmessage = (event) => {
+                    try {
+                        const job = JSON.parse(event.data);
+                        this.updateJobRow(job);
+                        
+                        // Se job completou, fechar conexão
+                        if (job.status === 'completed' || job.status === 'failed') {
+                            eventSource.close();
+                            this.eventSources.delete(jobId);
+                            this.loadStats(); // Atualizar estatísticas
+                        }
+                    } catch (error) {
+                        console.error('Erro ao processar evento:', error);
+                    }
+                };
+
+                eventSource.onerror = () => {
+                    eventSource.close();
+                    this.eventSources.delete(jobId);
+                };
+            }
+
+            updateJobRow(job) {
+                const row = document.getElementById(`job-${job.id}`);
+                if (row) {
+                    const newRow = this.createJobRow(job);
+                    row.replaceWith(newRow);
+                }
+            }
+
+            updatePagination(pagination) {
+                document.getElementById('showingFrom').textContent = ((pagination.page - 1) * pagination.limit) + 1;
+                document.getElementById('showingTo').textContent = Math.min(pagination.page * pagination.limit, pagination.total);
+                document.getElementById('totalJobs').textContent = pagination.total;
+
+                document.getElementById('prevPage').disabled = pagination.page <= 1;
+                document.getElementById('nextPage').disabled = pagination.page >= pagination.pages;
+            }
+
+            updateConnectionStatus(status) {
+                const statusElement = document.getElementById('connectionStatus');
+                const statusConfig = {
+                    connecting: { color: 'bg-yellow-400', text: 'Conectando...' },
+                    connected: { color: 'bg-green-400', text: 'Conectado' },
+                    error: { color: 'bg-red-400', text: 'Erro de Conexão' }
+                };
+
+                const config = statusConfig[status] || statusConfig.error;
+                statusElement.innerHTML = `
+                    <span class="w-2 h-2 ${config.color} rounded-full mr-2"></span>
+                    ${config.text}
+                `;
+            }
+
+            async retryJob(jobId) {
+                try {
+                    const response = await fetch(`/api/print-status/${jobId}`, {
+                        method: 'PUT',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            status: 'pending',
+                            error_message: null
+                        })
+                    });
+
+                    if (response.ok) {
+                        this.loadPrintHistory();
+                        this.loadStats();
+                    } else {
+                        alert('Erro ao tentar novamente o job');
+                    }
+                } catch (error) {
+                    console.error('Erro ao tentar novamente:', error);
+                    alert('Erro ao tentar novamente o job');
+                }
+            }
+
+            async cancelJob(jobId) {
+                if (!confirm('Tem certeza que deseja cancelar este job de impressão?')) {
+                    return;
+                }
+
+                try {
+                    const response = await fetch(`/api/print-cancel/${jobId}`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        }
+                    });
+
+                    const result = await response.json();
+
+                    if (result.success) {
+                        this.loadPrintHistory();
+                        this.loadStats();
+                        alert('Job cancelado com sucesso!');
+                    } else {
+                        alert(result.error || 'Erro ao cancelar o job');
+                    }
+                } catch (error) {
+                    console.error('Erro ao cancelar job:', error);
+                    alert('Erro ao cancelar o job');
+                }
+            }
+        }
+
+        // Inicializar monitor
+        const printMonitor = new PrintMonitor();
+    </script>
+</body>
+</html>

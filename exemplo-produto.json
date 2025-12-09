@@ -1,0 +1,20 @@
+{
+  "qr_code": "LAB-9D5FBA3B",
+  "codigo_barras": "7891234567890",
+  "categoria": "Cerâmicas",
+  "nome_material": "Cera para Fundição Premium",
+  "marca": "IvoclarVivadent",
+  "fornecedor": "Dental Med Importadora Ltda",
+  "referencia_lote": "LT-2024-10-001",
+  "unidade_medida": "kg",
+  "localizacao": "Armário B - Prateleira 3",
+  "data_validade": "2025-12-31",
+  "descricao": "Cera de alta precisão para fundição de próteses metálicas. Expansão controlada de 1.2%. Temperatura de fusão: 95°C.",
+  "observacoes": "Armazenar em temperatura ambiente (20-25°C). Manter longe de fontes de calor direto.",
+  "ativo": true,
+  "quantidade_inicial": 10.5,
+  "quantidade_minima": 3.0,
+  "quantidade_maxima": 30.0,
+  "preco_unitario": 250.50
+}
+

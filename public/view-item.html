@@ -1,0 +1,819 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>📦 Visualizar Item - Sistema de Inventário</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        .gradient-bg {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .glass-effect {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        .card-hover {
+            transition: all 0.3s ease;
+        }
+        .card-hover:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+        }
+    </style>
+</head>
+<body class="bg-gray-50 dark:bg-gray-900 min-h-screen">
+    <!-- Header -->
+    <header class="gradient-bg text-white shadow-lg">
+        <div class="container mx-auto px-4 sm:px-6 py-4">
+            <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between space-y-3 sm:space-y-0">
+                <div class="flex items-center space-x-2 sm:space-x-4">
+                    <a href="inventory.html" class="flex items-center space-x-2 hover:opacity-80 transition-opacity">
+                        <i class="fas fa-arrow-left text-lg sm:text-xl"></i>
+                        <span class="text-base sm:text-lg font-semibold">Voltar ao Inventário</span>
+                    </a>
+                </div>
+                <div class="flex items-center justify-between w-full sm:w-auto space-x-2 sm:space-x-4">
+                    <h1 class="text-lg sm:text-2xl font-bold">
+                        <i class="fas fa-eye mr-2"></i>
+                        <span class="hidden sm:inline">Visualizar Item</span>
+                        <span class="sm:hidden">Item</span>
+                    </h1>
+                    <a href="settings.html" class="p-2 rounded-lg bg-white/20 hover:bg-white/30 transition-all duration-300 hover:scale-110 group" title="Configurações">
+                        <i class="fas fa-cog text-white group-hover:rotate-90 transition-transform duration-300"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="container mx-auto px-4 sm:px-6 py-6 sm:py-8">
+        <!-- Loading State -->
+        <div id="loadingState" class="text-center py-12">
+            <div class="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+            <p class="mt-4 text-gray-600 dark:text-gray-400">Carregando item...</p>
+        </div>
+
+        <!-- Error State -->
+        <div id="errorState" class="hidden text-center py-12">
+            <div class="bg-red-100 dark:bg-red-900 border border-red-400 text-red-700 dark:text-red-300 px-4 py-3 rounded-lg max-w-md mx-auto">
+                <i class="fas fa-exclamation-triangle mr-2"></i>
+                <span id="errorMessage">Item não encontrado</span>
+            </div>
+            <a href="inventory.html" class="inline-block mt-4 bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg transition-colors">
+                <i class="fas fa-arrow-left mr-2"></i>
+                Voltar ao Inventário
+            </a>
+        </div>
+
+        <!-- Item Details -->
+        <div id="itemDetails" class="hidden">
+            <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg overflow-hidden card-hover">
+                <!-- Item Header -->
+                <div class="gradient-bg text-white p-4 sm:p-6">
+                    <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between space-y-4 sm:space-y-0">
+                        <div class="flex-1">
+                            <h2 id="itemName" class="text-2xl sm:text-3xl font-bold mb-2"></h2>
+                            <span id="itemCategory" class="inline-block bg-white/20 px-3 py-1 rounded-full text-sm font-medium"></span>
+                        </div>
+                        <div class="text-left sm:text-right">
+                            <div id="itemStatus" class="text-xl sm:text-2xl font-bold mb-1"></div>
+                            <div class="text-sm opacity-90">Status</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Item Image -->
+                <div id="itemImageContainer" class="hidden p-6 border-b border-gray-200 dark:border-gray-700">
+                    <div class="text-center">
+                        <img id="itemImage" class="max-w-full h-64 object-contain mx-auto rounded-lg shadow-md" alt="Imagem do item">
+                    </div>
+                </div>
+
+                <!-- Item Information Grid -->
+                <div class="p-4 sm:p-6">
+                    <div class="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-6">
+                        <!-- Basic Info -->
+                        <div class="space-y-4">
+                            <h3 class="text-lg font-semibold text-gray-900 dark:text-white border-b border-gray-200 dark:border-gray-700 pb-2">
+                                <i class="fas fa-info-circle mr-2 text-blue-600"></i>
+                                Informações Básicas
+                            </h3>
+                            
+                            <div class="space-y-3">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">
+                                        <i class="fas fa-tag mr-1"></i>
+                                        Nome
+                                    </label>
+                                    <p id="detailName" class="text-gray-900 dark:text-white font-medium"></p>
+                                </div>
+                                
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">
+                                        <i class="fas fa-align-left mr-1"></i>
+                                        Descrição
+                                    </label>
+                                    <p id="detailDescription" class="text-gray-900 dark:text-white"></p>
+                                </div>
+                                
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">
+                                        <i class="fas fa-building mr-1"></i>
+                                        Empresa
+                                    </label>
+                                    <p id="detailCompany" class="text-gray-900 dark:text-white"></p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Location & Category -->
+                        <div class="space-y-4">
+                            <h3 class="text-lg font-semibold text-gray-900 dark:text-white border-b border-gray-200 dark:border-gray-700 pb-2">
+                                <i class="fas fa-map-marker-alt mr-2 text-green-600"></i>
+                                Localização & Categoria
+                            </h3>
+                            
+                            <div class="space-y-3">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">
+                                        <i class="fas fa-layer-group mr-1"></i>
+                                        Categoria
+                                    </label>
+                                    <p id="detailCategory" class="text-gray-900 dark:text-white"></p>
+                                </div>
+                                
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">
+                                        <i class="fas fa-location-dot mr-1"></i>
+                                        Localização
+                                    </label>
+                                    <p id="detailLocation" class="text-gray-900 dark:text-white"></p>
+                                </div>
+                                
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">
+                                        <i class="fas fa-user mr-1"></i>
+                                        Colaborador
+                                    </label>
+                                    <p id="detailCollaborator" class="text-gray-900 dark:text-white"></p>
+                                </div>
+                                
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">
+                                        <i class="fas fa-circle-check mr-1"></i>
+                                        Status
+                                    </label>
+                                    <p id="detailStatus" class="text-gray-900 dark:text-white"></p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Additional Details -->
+                        <div class="space-y-4">
+                            <h3 class="text-lg font-semibold text-gray-900 dark:text-white border-b border-gray-200 dark:border-gray-700 pb-2">
+                                <i class="fas fa-cogs mr-2 text-purple-600"></i>
+                                Detalhes Adicionais
+                            </h3>
+                            
+                            <div class="space-y-3">
+                                <div id="brandContainer" class="hidden">
+                                    <label class="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">
+                                        <i class="fas fa-trademark mr-1"></i>
+                                        Marca
+                                    </label>
+                                    <p id="detailBrand" class="text-gray-900 dark:text-white"></p>
+                                </div>
+                                
+                                <div id="modelContainer" class="hidden">
+                                    <label class="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">
+                                        <i class="fas fa-cube mr-1"></i>
+                                        Modelo
+                                    </label>
+                                    <p id="detailModel" class="text-gray-900 dark:text-white"></p>
+                                </div>
+                                
+                                <div id="serialContainer" class="hidden">
+                                    <label class="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">
+                                        <i class="fas fa-barcode mr-1"></i>
+                                        Número de Série
+                                    </label>
+                                    <p id="detailSerial" class="text-gray-900 dark:text-white"></p>
+                                </div>
+                                
+                                <div id="qrCodeContainer" class="hidden">
+                                    <label class="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">
+                                        <i class="fas fa-qrcode mr-1"></i>
+                                        QR Code
+                                    </label>
+                                    <div class="flex items-center space-x-4">
+                                        <div id="qrCodeImageContainer" class="flex-shrink-0">
+                                            <img id="qrCodeImage" class="w-24 h-24 border border-gray-300 dark:border-gray-600 rounded-lg" alt="QR Code">
+                                        </div>
+                                        <div>
+                                            <p id="qrCodeText" class="text-gray-900 dark:text-white font-mono text-sm"></p>
+                                            <button id="downloadQRCode" class="mt-2 bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded text-xs transition-colors">
+                                                <i class="fas fa-download mr-1"></i>
+                                                Baixar QR Code
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div id="valueContainer" class="hidden">
+                                    <label class="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">
+                                        <i class="fas fa-dollar-sign mr-1"></i>
+                                        Valor
+                                    </label>
+                                    <p id="detailValue" class="text-gray-900 dark:text-white"></p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Dates Section -->
+                    <div id="datesSection" class="mt-8 pt-6 border-t border-gray-200 dark:border-gray-700">
+                        <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+                            <i class="fas fa-calendar mr-2 text-orange-600"></i>
+                            Datas Importantes
+                        </h3>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div id="purchaseDateContainer" class="hidden">
+                                <label class="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">
+                                    <i class="fas fa-shopping-cart mr-1"></i>
+                                    Data de Compra
+                                </label>
+                                <p id="detailPurchaseDate" class="text-gray-900 dark:text-white"></p>
+                            </div>
+                            
+                            <div id="warrantyDateContainer" class="hidden">
+                                <label class="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">
+                                    <i class="fas fa-shield-alt mr-1"></i>
+                                    Data de Garantia
+                                </label>
+                                <p id="detailWarrantyDate" class="text-gray-900 dark:text-white"></p>
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">
+                                    <i class="fas fa-clock mr-1"></i>
+                                    Última Atualização
+                                </label>
+                                <p id="detailLastUpdate" class="text-gray-900 dark:text-white"></p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Documents Section -->
+                    <div id="documentsSection" class="hidden mt-8 pt-6 border-t border-gray-200 dark:border-gray-700">
+                        <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+                            <i class="fas fa-file-pdf mr-2 text-red-600"></i>
+                            Documentos
+                        </h3>
+                        <!-- Container dinâmico para documentos será inserido aqui pelo JavaScript -->
+                    </div>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="bg-gray-50 dark:bg-gray-700 px-4 sm:px-6 py-4">
+                    <!-- Mobile Layout -->
+                    <div class="block md:hidden space-y-4">
+                        <!-- QR Code Size Selection - Mobile -->
+                        <div class="flex flex-col space-y-2">
+                            <label for="qrCodeSize" class="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                <i class="fas fa-expand-arrows-alt mr-1"></i>
+                                Tamanho QR:
+                            </label>
+                            <select id="qrCodeSize" class="bg-white dark:bg-gray-600 border border-gray-300 dark:border-gray-500 text-gray-900 dark:text-white text-sm rounded-lg px-3 py-2 focus:ring-blue-500 focus:border-blue-500 w-full">
+                                <option value="5mm">Micro (5mm)</option>
+                                <option value="10mm">Mini (10mm)</option>
+                                <option value="15mm">Pequeno (15mm)</option>
+                                <option value="20mm">Médio (20mm)</option>
+                                <option value="25mm" selected>Padrão (25mm)</option>
+                                <option value="30mm">Grande (30mm)</option>
+                                <option value="35mm">Muito Grande (35mm)</option>
+                                <option value="40mm">Extra Grande (40mm)</option>
+                                <option value="45mm">Jumbo (45mm)</option>
+                                <option value="50mm">Máximo (50mm)</option>
+                                <option value="55mm">Ultra (55mm)</option>
+                            </select>
+                        </div>
+                        
+                        <!-- Action Buttons - Mobile -->
+                        <div class="grid grid-cols-1 gap-3">
+                            <button id="printButton" class="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg transition-colors text-center w-full">
+                                <i class="fas fa-print mr-2"></i>
+                                Imprimir QR Code
+                            </button>
+                            <a id="editButton" href="#" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg transition-colors text-center block w-full">
+                                <i class="fas fa-edit mr-2"></i>
+                                Editar Item
+                            </a>
+                            <a href="inventory.html" class="bg-gray-600 hover:bg-gray-700 text-white px-6 py-3 rounded-lg transition-colors text-center block w-full">
+                                <i class="fas fa-arrow-left mr-2"></i>
+                                Voltar
+                            </a>
+                        </div>
+                    </div>
+
+                    <!-- Desktop Layout -->
+                    <div class="hidden md:flex justify-between items-center">
+                        <a href="inventory.html" class="bg-gray-600 hover:bg-gray-700 text-white px-6 py-2 rounded-lg transition-colors">
+                            <i class="fas fa-arrow-left mr-2"></i>
+                            Voltar
+                        </a>
+                        <div class="flex items-center space-x-3">
+                            <!-- QR Code Size Selection - Desktop -->
+                            <div class="flex items-center space-x-2">
+                                <label for="qrCodeSizeDesktop" class="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                    <i class="fas fa-expand-arrows-alt mr-1"></i>
+                                    Tamanho QR:
+                                </label>
+                                <select id="qrCodeSizeDesktop" class="bg-white dark:bg-gray-600 border border-gray-300 dark:border-gray-500 text-gray-900 dark:text-white text-sm rounded-lg px-3 py-1 focus:ring-blue-500 focus:border-blue-500">
+                                    <option value="5mm">Micro (5mm)</option>
+                                    <option value="10mm">Mini (10mm)</option>
+                                    <option value="15mm">Pequeno (15mm)</option>
+                                    <option value="20mm">Médio (20mm)</option>
+                                    <option value="25mm" selected>Padrão (25mm)</option>
+                                    <option value="30mm">Grande (30mm)</option>
+                                    <option value="35mm">Muito Grande (35mm)</option>
+                                    <option value="40mm">Extra Grande (40mm)</option>
+                                    <option value="45mm">Jumbo (45mm)</option>
+                                    <option value="50mm">Máximo (50mm)</option>
+                                    <option value="55mm">Ultra (55mm)</option>
+                                </select>
+                            </div>
+                            
+                            <button id="printButtonDesktop" class="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg transition-colors">
+                                <i class="fas fa-print mr-2"></i>
+                                Imprimir QR Code
+                            </button>
+                            <a id="editButtonDesktop" href="#" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg transition-colors">
+                                <i class="fas fa-edit mr-2"></i>
+                                Editar Item
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        let currentItem = null;
+
+        // Função para obter parâmetros da URL
+        function getUrlParameter(name) {
+            name = name.replace(/[\[]/, '\\[').replace(/[\]]/, '\\]');
+            const regex = new RegExp('[\\?&]' + name + '=([^&#]*)');
+            const results = regex.exec(location.search);
+            return results === null ? '' : decodeURIComponent(results[1].replace(/\+/g, ' '));
+        }
+
+        // Função para carregar dados do item
+        async function loadItemData() {
+            const itemId = getUrlParameter('id');
+            if (!itemId) {
+                alert('ID do item não encontrado!');
+                window.location.href = 'inventory.html';
+                return;
+            }
+
+            try {
+                const response = await authenticatedFetch(`/api/items/${itemId}`);
+                if (!response.ok) {
+                    throw new Error('Item não encontrado');
+                }
+
+                const result = await response.json();
+                if (!result.success || !result.data) {
+                    throw new Error('Dados do item não encontrados');
+                }
+
+                const item = result.data;
+                currentItem = result.data;
+                displayItemData(item);
+            } catch (error) {
+                console.error('Erro ao carregar item:', error);
+                alert('Erro ao carregar dados do item');
+                window.location.href = 'inventory.html';
+            }
+        }
+
+        // Função para exibir dados do item
+        function displayItemData(item) {
+            // Esconder loading e mostrar detalhes
+            const loadingState = document.getElementById('loadingState');
+            const itemDetails = document.getElementById('itemDetails');
+            
+            if (loadingState) loadingState.classList.add('hidden');
+            if (itemDetails) itemDetails.classList.remove('hidden');
+
+            // Elementos do cabeçalho
+            const itemNameEl = document.getElementById('itemName');
+            const itemCategoryEl = document.getElementById('itemCategory');
+            const itemStatusEl = document.getElementById('itemStatus');
+            
+            if (itemNameEl) itemNameEl.textContent = item.name || 'Nome não informado';
+            if (itemCategoryEl) itemCategoryEl.textContent = item.category || 'Não informado';
+            if (itemStatusEl) itemStatusEl.textContent = item.status || 'Não informado';
+
+            // Elementos de detalhes básicos
+            const detailNameEl = document.getElementById('detailName');
+            const detailDescriptionEl = document.getElementById('detailDescription');
+            const detailCompanyEl = document.getElementById('detailCompany');
+            
+            if (detailNameEl) detailNameEl.textContent = item.name || 'Nome não informado';
+            if (detailDescriptionEl) detailDescriptionEl.textContent = item.description || 'Descrição não informada';
+            if (detailCompanyEl) detailCompanyEl.textContent = (item.module_data && item.module_data.company) || 'Não informado';
+
+            // Elementos de localização e categoria
+            const detailCategoryEl = document.getElementById('detailCategory');
+            const detailLocationEl = document.getElementById('detailLocation');
+            const detailCollaboratorEl = document.getElementById('detailCollaborator');
+            const detailStatusEl = document.getElementById('detailStatus');
+            
+            if (detailCategoryEl) detailCategoryEl.textContent = item.category || 'Não informado';
+            if (detailLocationEl) detailLocationEl.textContent = item.location || 'Não informado';
+            if (detailCollaboratorEl) detailCollaboratorEl.textContent = item.collaborator || 'Não informado';
+            if (detailStatusEl) detailStatusEl.textContent = item.status || 'Não informado';
+
+            // Elementos opcionais - mostrar apenas se tiverem valor
+            if (item.module_data && item.module_data.brand) {
+                const detailBrandEl = document.getElementById('detailBrand');
+                const brandContainer = document.getElementById('brandContainer');
+                if (detailBrandEl && brandContainer) {
+                    detailBrandEl.textContent = item.module_data.brand;
+                    brandContainer.classList.remove('hidden');
+                }
+            }
+
+            if (item.module_data && item.module_data.model) {
+                const detailModelEl = document.getElementById('detailModel');
+                const modelContainer = document.getElementById('modelContainer');
+                if (detailModelEl && modelContainer) {
+                    detailModelEl.textContent = item.module_data.model;
+                    modelContainer.classList.remove('hidden');
+                }
+            }
+
+            if (item.module_data && item.module_data.serial_number) {
+                const detailSerialEl = document.getElementById('detailSerial');
+                const serialContainer = document.getElementById('serialContainer');
+                if (detailSerialEl && serialContainer) {
+                    detailSerialEl.textContent = item.module_data.serial_number;
+                    serialContainer.classList.remove('hidden');
+                }
+            }
+
+            // QR Code
+            if (item.module_data && item.module_data.qr_code && item.module_data.qr_code_image) {
+                const qrCodeTextEl = document.getElementById('qrCodeText');
+                const qrCodeImageEl = document.getElementById('qrCodeImage');
+                const qrCodeContainer = document.getElementById('qrCodeContainer');
+                const downloadQRCodeBtn = document.getElementById('downloadQRCode');
+                
+                if (qrCodeTextEl && qrCodeImageEl && qrCodeContainer) {
+                    qrCodeTextEl.textContent = item.module_data.qr_code;
+                    qrCodeImageEl.src = item.module_data.qr_code_image;
+                    qrCodeImageEl.alt = `QR Code: ${item.module_data.qr_code}`;
+                    qrCodeContainer.classList.remove('hidden');
+                    
+                    // Configurar botão de download
+                    if (downloadQRCodeBtn) {
+                        downloadQRCodeBtn.onclick = function() {
+                            downloadQRCode(item.module_data.qr_code_image, `qr-code-${item.name || 'item'}.png`);
+                        };
+                    }
+                }
+            }
+
+            // Exibir valor - usar module_data.value se disponível, senão usar unit_price
+            const itemValue = (item.module_data && item.module_data.value) || item.unit_price;
+            if (itemValue && itemValue > 0) {
+                const detailValueEl = document.getElementById('detailValue');
+                const valueContainer = document.getElementById('valueContainer');
+                if (detailValueEl && valueContainer) {
+                    detailValueEl.textContent = `€ ${parseFloat(itemValue).toLocaleString('pt-PT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+                    valueContainer.classList.remove('hidden');
+                }
+            }
+
+            // Datas
+            if (item.module_data && item.module_data.purchase_date) {
+                const detailPurchaseDateEl = document.getElementById('detailPurchaseDate');
+                const purchaseDateContainer = document.getElementById('purchaseDateContainer');
+                if (detailPurchaseDateEl && purchaseDateContainer) {
+                    detailPurchaseDateEl.textContent = new Date(item.module_data.purchase_date).toLocaleDateString('pt-BR');
+                    purchaseDateContainer.classList.remove('hidden');
+                }
+            }
+
+            if (item.module_data && item.module_data.warranty_date) {
+                const detailWarrantyDateEl = document.getElementById('detailWarrantyDate');
+                const warrantyDateContainer = document.getElementById('warrantyDateContainer');
+                if (detailWarrantyDateEl && warrantyDateContainer) {
+                    detailWarrantyDateEl.textContent = new Date(item.module_data.warranty_date).toLocaleDateString('pt-BR');
+                    warrantyDateContainer.classList.remove('hidden');
+                }
+            }
+
+            // Última atualização
+            const detailLastUpdateEl = document.getElementById('detailLastUpdate');
+            if (detailLastUpdateEl && currentItem.updated_at) {
+                detailLastUpdateEl.textContent = new Date(currentItem.updated_at).toLocaleDateString('pt-BR');
+            }
+
+            // Documentos PDF - Suporte para novo campo pdfs e compatibilidade com module_data.pdf
+            let pdfUrls = [];
+            
+            // Verificar novo campo pdfs primeiro
+            if (item.pdfs && Array.isArray(item.pdfs) && item.pdfs.length > 0) {
+                pdfUrls = item.pdfs;
+            } 
+            // Compatibilidade com sistema antigo
+            else if (item.module_data && item.module_data.pdf) {
+                pdfUrls = [item.module_data.pdf];
+            }
+            
+            if (pdfUrls.length > 0) {
+                const documentsSection = document.getElementById('documentsSection');
+                
+                if (documentsSection) {
+                    documentsSection.classList.remove('hidden');
+                    
+                    // Limpar conteúdo anterior
+                    const existingContent = documentsSection.querySelector('.pdf-documents-container');
+                    if (existingContent) {
+                        existingContent.remove();
+                    }
+                    
+                    // Criar container para documentos
+                    const documentsContainer = document.createElement('div');
+                    documentsContainer.className = 'pdf-documents-container space-y-3';
+                    
+                    pdfUrls.forEach((pdfUrl, index) => {
+                        const documentDiv = document.createElement('div');
+                        documentDiv.className = 'bg-gray-50 dark:bg-gray-700 rounded-lg p-4';
+                        
+                        // Extrair nome do arquivo da URL
+                        let fileName = `Documento ${index + 1}`;
+                        try {
+                            const url = new URL(pdfUrl);
+                            const pathname = url.pathname;
+                            const filename = pathname.split('/').pop();
+                            const decodedFilename = decodeURIComponent(filename);
+                            fileName = decodedFilename || fileName;
+                        } catch (error) {
+                            // Manter nome padrão se não conseguir extrair
+                        }
+                        
+                        documentDiv.innerHTML = `
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center space-x-3">
+                                    <div class="flex-shrink-0">
+                                        <i class="fas fa-file-pdf text-red-500 text-2xl"></i>
+                                    </div>
+                                    <div>
+                                        <p class="text-sm font-medium text-gray-900 dark:text-white">
+                                            ${fileName}
+                                        </p>
+                                        <p class="text-xs text-gray-500 dark:text-gray-400">
+                                            Clique para visualizar
+                                        </p>
+                                    </div>
+                                </div>
+                                <div>
+                                    <button data-pdf-url="${pdfUrl}" class="pdf-view-btn bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg text-sm transition-colors">
+                                        <i class="fas fa-eye mr-1"></i>
+                                        Visualizar
+                                    </button>
+                                </div>
+                            </div>
+                        `;
+                        
+                        documentsContainer.appendChild(documentDiv);
+                    });
+                    
+                    // Adicionar container após o título
+                    const title = documentsSection.querySelector('h3');
+                    if (title && title.nextElementSibling) {
+                        title.nextElementSibling.remove(); // Remove o container antigo
+                    }
+                    title.insertAdjacentElement('afterend', documentsContainer);
+                }
+            }
+
+            // Atualizar imagem
+            const itemImage = document.getElementById('itemImage');
+            const itemImageContainer = document.getElementById('itemImageContainer');
+            if (item.module_data && item.module_data.image && itemImage && itemImageContainer) {
+                itemImage.src = item.module_data.image;
+                itemImage.alt = `Imagem de ${item.name}`;
+                itemImageContainer.classList.remove('hidden');
+            } else if (itemImage) {
+                itemImage.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgdmlld0JveD0iMCAwIDIwMCAyMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIyMDAiIGhlaWdodD0iMjAwIiBmaWxsPSIjRjNGNEY2Ii8+CjxwYXRoIGQ9Ik0xMDAgNzBDOTQuNDc3MiA3MCA5MCA3NC40NzcyIDkwIDgwVjEyMEM5MCA5NC40NzcyIDk0LjQ3NzIgOTAgMTAwIDkwSDEyMEMxMjUuNTIzIDkwIDEzMCA5NC40NzcyIDEzMCAxMDBWMTIwQzEzMCAxMjUuNTIzIDEyNS41MjMgMTMwIDEyMCAxMzBIMTAwQzk0LjQ3NzIgMTMwIDkwIDEyNS41MjMgOTAgMTIwVjgwWiIgZmlsbD0iIzlDQTNBRiIvPgo8L3N2Zz4K';
+                itemImage.alt = 'Imagem não disponível';
+            }
+
+            // Atualizar status badge se existir
+            const statusBadge = document.getElementById('statusBadge');
+            if (statusBadge) {
+                statusBadge.textContent = item.status || 'Não informado';
+                statusBadge.className = `inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(item.status)}`;
+            }
+
+            // Atualizar título da página
+            document.title = `${item.name} - Sistema de Inventário`;
+        }
+
+        // Função para obter cor do status
+        function getStatusColor(status) {
+            switch (status?.toLowerCase()) {
+                case 'ativo':
+                    return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300';
+                case 'inativo':
+                    return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300';
+                case 'manutenção':
+                    return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300';
+                default:
+                    return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-300';
+            }
+        }
+
+        // Função para download do QR Code
+        function downloadQRCode(dataUrl, filename) {
+            try {
+                const link = document.createElement('a');
+                link.href = dataUrl;
+                link.download = filename;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            } catch (error) {
+                console.error('Erro ao fazer download do QR Code:', error);
+                alert('Erro ao fazer download do QR Code');
+            }
+        }
+
+        // Função para imprimir QR Code
+        async function printQRCode() {
+            if (!currentItem) {
+                alert('Nenhum item carregado para impressão');
+                return;
+            }
+
+            // Obter o tamanho selecionado (mobile ou desktop)
+            const qrSizeMobile = document.getElementById('qrCodeSize');
+            const qrSizeDesktop = document.getElementById('qrCodeSizeDesktop');
+            const selectedSize = qrSizeMobile?.value || qrSizeDesktop?.value || '25mm';
+
+            // Obter o botão que foi clicado (mobile ou desktop)
+            const printButtonMobile = document.getElementById('printButton');
+            const printButtonDesktop = document.getElementById('printButtonDesktop');
+            const printButton = printButtonMobile?.style.display !== 'none' ? printButtonMobile : printButtonDesktop;
+
+            if (!printButton) return;
+
+            const originalText = printButton.innerHTML;
+            
+            try {
+                // Desabilitar botão e mostrar loading
+                printButton.disabled = true;
+                printButton.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Enviando para impressão...';
+                
+                const response = await fetch(`/api/print/${currentItem.id}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        qrCodeSize: selectedSize
+                    })
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    alert('QR Code enviado para impressão com sucesso!');
+                } else {
+                    throw new Error(result.error || 'Erro ao enviar para impressão');
+                }
+            } catch (error) {
+                console.error('Erro ao imprimir QR Code:', error);
+                alert(`Erro ao enviar para impressão: ${error.message}`);
+            } finally {
+                // Restaurar botão
+                printButton.disabled = false;
+                printButton.innerHTML = originalText;
+            }
+        }
+
+        // Função para editar item
+        function editItem() {
+            if (currentItem) {
+                window.location.href = `edit-item.html?id=${currentItem.id}`;
+            }
+        }
+
+        // Função para voltar
+        function goBack() {
+            window.location.href = 'inventory.html';
+        }
+
+        // Carregar dados quando a página carregar
+        document.addEventListener('DOMContentLoaded', function() {
+            // Aguardar o AuthManager inicializar
+            setTimeout(() => {
+                if (!requireAuthentication()) {
+                    return; // Será redirecionado para login
+                }
+                
+                // Mostrar informações do usuário
+                displayUserInfo();
+                
+                // Adicionar botão de logout se não existir
+                addLogoutButtonToHeader();
+                
+                // Carregar dados do item
+                loadItemData();
+                
+                // Adicionar event listeners para os botões de impressão
+                const printButton = document.getElementById('printButton');
+                const printButtonDesktop = document.getElementById('printButtonDesktop');
+                
+                if (printButton) {
+                    printButton.addEventListener('click', printQRCode);
+                }
+                
+                if (printButtonDesktop) {
+                    printButtonDesktop.addEventListener('click', printQRCode);
+                }
+
+                // Adicionar event listeners para os botões de editar
+                const editButton = document.getElementById('editButton');
+                const editButtonDesktop = document.getElementById('editButtonDesktop');
+                
+                if (editButton) {
+                    editButton.addEventListener('click', function(e) {
+                        e.preventDefault();
+                        editItem();
+                    });
+                }
+                
+                if (editButtonDesktop) {
+                    editButtonDesktop.addEventListener('click', function(e) {
+                        e.preventDefault();
+                        editItem();
+                    });
+                }
+                
+                // Sincronizar os selects de tamanho QR Code
+                const qrCodeSize = document.getElementById('qrCodeSize');
+                const qrCodeSizeDesktop = document.getElementById('qrCodeSizeDesktop');
+                
+                if (qrCodeSize && qrCodeSizeDesktop) {
+                    qrCodeSize.addEventListener('change', function() {
+                        qrCodeSizeDesktop.value = this.value;
+                    });
+                    
+                    qrCodeSizeDesktop.addEventListener('change', function() {
+                        qrCodeSize.value = this.value;
+                    });
+                }
+            }, 200);
+        });
+
+        // Event delegation para botões de visualizar PDF
+        document.addEventListener('click', function(e) {
+            if (e.target.closest('.pdf-view-btn')) {
+                const button = e.target.closest('.pdf-view-btn');
+                const pdfUrl = button.getAttribute('data-pdf-url');
+                if (pdfUrl) {
+                    window.open(pdfUrl, '_blank');
+                }
+            }
+        });
+
+        // Adicionar botão de logout ao cabeçalho
+        function addLogoutButtonToHeader() {
+            const header = document.querySelector('header');
+            if (!header || header.querySelector('[data-logout-btn]')) return;
+            
+            const logoutBtn = document.createElement('button');
+            logoutBtn.setAttribute('data-logout-btn', 'true');
+            logoutBtn.className = 'ml-4 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors text-sm';
+            logoutBtn.innerHTML = '<i class="fas fa-sign-out-alt mr-2"></i>Sair';
+            
+            const headerContent = header.querySelector('.container') || header;
+            headerContent.appendChild(logoutBtn);
+        }
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="config.js"></script>
+    <script src="auth.js"></script>
+</body>
+</html>

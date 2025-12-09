@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>✏️ Editar Item - Sistema de Inventário</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        .gradient-bg {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .glass-effect {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        .card-hover {
+            transition: all 0.3s ease;
+        }
+        .card-hover:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+        }
+    </style>
+</head>
+<body class="bg-gray-50 dark:bg-gray-900 min-h-screen">
+    <!-- Header -->
+    <header class="gradient-bg text-white shadow-lg">
+        <div class="container mx-auto px-6 py-4">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-4">
+                    <a href="inventory.html" class="flex items-center space-x-2 hover:opacity-80 transition-opacity">
+                        <i class="fas fa-arrow-left text-xl"></i>
+                        <span class="text-lg font-semibold">Voltar ao Inventário</span>
+                    </a>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <h1 class="text-2xl font-bold">
+                        <i class="fas fa-edit mr-2"></i>
+                        Editar Item
+                    </h1>
+                    <a href="settings.html" class="p-2 rounded-lg bg-white/20 hover:bg-white/30 transition-all duration-300 hover:scale-110 group" title="Configurações">
+                        <i class="fas fa-cog text-white group-hover:rotate-90 transition-transform duration-300"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="container mx-auto px-6 py-8">
+        <!-- Loading State -->
+        <div id="loadingState" class="text-center py-12">
+            <div class="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+            <p class="mt-4 text-gray-600 dark:text-gray-400">Carregando item...</p>
+        </div>
+
+        <!-- Error State -->
+        <div id="errorState" class="hidden text-center py-12">
+            <div class="bg-red-100 dark:bg-red-900 border border-red-400 text-red-700 dark:text-red-300 px-4 py-3 rounded-lg max-w-md mx-auto">
+                <i class="fas fa-exclamation-triangle mr-2"></i>
+                <span id="errorMessage">Item não encontrado</span>
+            </div>
+            <a href="inventory.html" class="inline-block mt-4 bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg transition-colors">
+                <i class="fas fa-arrow-left mr-2"></i>
+                Voltar ao Inventário
+            </a>
+        </div>
+
+        <!-- Edit Form -->
+        <div id="editForm" class="hidden">
+            <form id="itemForm" class="bg-white dark:bg-gray-800 rounded-xl shadow-lg overflow-hidden card-hover">
+                <!-- Form Header -->
+                <div class="gradient-bg text-white p-6">
+                    <h2 class="text-2xl font-bold">
+                        <i class="fas fa-edit mr-2"></i>
+                        Editando: <span id="itemTitle"></span>
+                    </h2>
+                    <p class="mt-2 opacity-90">Atualize as informações do item abaixo</p>
+                </div>
+
+                <!-- Current Image Display -->
+                <div id="currentImageContainer" class="hidden p-6 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700">
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        <i class="fas fa-image mr-1"></i>
+                        Imagem Atual
+                    </label>
+                    <div class="text-center">
+                        <img id="currentImage" class="max-w-full h-32 object-contain mx-auto rounded-lg shadow-md" alt="Imagem atual do item">
+                    </div>
+                </div>
+
+                <!-- Current PDF Display -->
+                <div id="currentPdfContainer" class="hidden p-6 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700">
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        <i class="fas fa-file-pdf mr-1"></i>
+                        Documento PDF Atual
+                    </label>
+                    <div class="flex items-center justify-center space-x-4 p-4 bg-white dark:bg-gray-600 rounded-lg">
+                        <div class="flex items-center space-x-2">
+                            <i class="fas fa-file-pdf text-red-500 text-2xl"></i>
+                            <div>
+                                <p id="currentPdfName" class="text-sm font-medium text-gray-700 dark:text-gray-300"></p>
+                                <p class="text-xs text-gray-500 dark:text-gray-400">Documento PDF vinculado</p>
+                            </div>
+                        </div>
+                        <a id="currentPdfLink" href="#" target="_blank" class="bg-red-600 hover:bg-red-700 text-white px-3 py-2 rounded-lg text-sm transition-colors flex items-center space-x-1">
+                            <i class="fas fa-external-link-alt"></i>
+                            <span>Visualizar</span>
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Form Fields -->
+                <div class="p-6 space-y-6">
+                    <!-- Basic Information -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <label for="itemName" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                <i class="fas fa-tag mr-1"></i>
+                                Nome *
+                            </label>
+                            <input type="text" id="itemName" name="name" required
+                                class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white">
+                        </div>
+
+                        <div>
+                            <label for="itemCategory" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                <i class="fas fa-layer-group mr-1"></i>
+                                Categoria *
+                            </label>
+                            <div class="relative">
+                                <select id="itemCategory" name="categoria_id" required
+                                    class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white">
+                                    <option value="">Selecione uma categoria</option>
+                                    <!-- Categorias serão carregadas dinamicamente -->
+                                </select>
+                                <button type="button" id="addCategoryBtn" 
+                                    class="absolute right-2 top-1/2 transform -translate-y-1/2 bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded-lg text-xs transition-colors">
+                                    <i class="fas fa-plus"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label for="itemCollaborator" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                <i class="fas fa-user mr-1"></i>
+                                Colaborador
+                            </label>
+                            <div class="relative">
+                                <select id="itemCollaborator" name="colaborador_id"
+                                    class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white">
+                                    <option value="">Selecione um colaborador</option>
+                                    <!-- Colaboradores serão carregados dinamicamente -->
+                                </select>
+                                <button type="button" id="addCollaboratorBtn" 
+                                    class="absolute right-2 top-1/2 transform -translate-y-1/2 bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded-lg text-xs transition-colors">
+                                    <i class="fas fa-plus"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label for="itemDescription" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            <i class="fas fa-align-left mr-1"></i>
+                            Descrição
+                        </label>
+                        <textarea id="itemDescription" name="description" rows="3"
+                            class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                            placeholder="Descreva o item..."></textarea>
+                    </div>
+
+                    <!-- Company and Location -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <label for="itemCompany" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                <i class="fas fa-building mr-1"></i>
+                                Empresa
+                            </label>
+                            <select id="itemCompany" name="company"
+                                class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white">
+                                <option value="">Selecione uma empresa</option>
+                                <option value="Vespasian Ventures">Vespasian Ventures</option>
+                                <option value="Instituto AreLuna">Instituto AreLuna</option>
+                                <option value="ProStoral">ProStoral</option>
+                                <option value="Pinklegion">Pinklegion</option>
+                                <option value="Papagaio Fotogénico">Papagaio Fotogénico</option>
+                                <option value="Nuvens Autóctones">Nuvens Autóctones</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label for="itemLocation" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                <i class="fas fa-location-dot mr-1"></i>
+                                Localização
+                            </label>
+                            <input type="text" id="itemLocation" name="location"
+                                class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                                placeholder="Ex: Almoxarifado A">
+                        </div>
+                    </div>
+
+                    <!-- Status -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <label for="itemStatus" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                <i class="fas fa-circle-check mr-1"></i>
+                                Status *
+                            </label>
+                            <select id="itemStatus" name="status" required
+                                class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white">
+                                <option value="Ativo">✅ Ativo</option>
+                                <option value="Inativo">❌ Inativo</option>
+                                <option value="Manutenção">🔧 Manutenção</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Additional Details -->
+                    <div class="border-t border-gray-200 dark:border-gray-700 pt-6">
+                        <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+                            <i class="fas fa-cogs mr-2"></i>
+                            Detalhes Adicionais
+                        </h3>
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                                <label for="itemBrand" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                    <i class="fas fa-trademark mr-1"></i>
+                                    Marca
+                                </label>
+                                <input type="text" id="itemBrand" name="brand"
+                                    class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                                    placeholder="Ex: Samsung, Dell, HP">
+                            </div>
+
+                            <div>
+                                <label for="itemModel" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                    <i class="fas fa-cube mr-1"></i>
+                                    Modelo
+                                </label>
+                                <input type="text" id="itemModel" name="model"
+                                    class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                                    placeholder="Ex: Inspiron 15, Galaxy S21">
+                            </div>
+
+                            <div>
+                                <label for="itemSerial" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                    <i class="fas fa-barcode mr-1"></i>
+                                    Número de Série
+                                </label>
+                                <input type="text" id="itemSerial" name="serial_number"
+                                    class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                                    placeholder="Digite o número de série">
+                            </div>
+
+                            <div>
+                                <label for="itemValue" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                    <i class="fas fa-dollar-sign mr-1"></i>
+                                    Valor (€)
+                                </label>
+                                <input type="number" id="itemValue" name="value" step="0.01" min="0"
+                                    class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                                    placeholder="0.00">
+                            </div>
+
+                            <div>
+                                <label for="itemPurchaseDate" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                    <i class="fas fa-shopping-cart mr-1"></i>
+                                    Data de Compra
+                                </label>
+                                <input type="date" id="itemPurchaseDate" name="purchase_date"
+                                    class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white">
+                            </div>
+
+                            <div>
+                                <label for="itemWarrantyDate" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                    <i class="fas fa-shield-alt mr-1"></i>
+                                    Data de Garantia
+                                </label>
+                                <input type="date" id="itemWarrantyDate" name="warranty_date"
+                                    class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Image Upload -->
+                    <div class="border-t border-gray-200 dark:border-gray-700 pt-6">
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-4">
+                            <i class="fas fa-camera mr-1"></i>
+                            Nova Imagem do Item
+                        </label>
+                        
+                        <!-- Image Selection Button -->
+                        <div class="mb-4">
+                            <button type="button" id="selectImageBtn" class="w-full bg-blue-600 hover:bg-blue-700 text-white px-4 py-3 rounded-lg transition-colors flex items-center justify-center space-x-2">
+                                <i class="fas fa-image"></i>
+                                <span id="imageButtonText">Selecionar Imagem</span>
+                            </button>
+                            <input type="file" id="itemImage" name="image" accept="image/*" class="hidden">
+                        </div>
+
+                        <!-- Image Preview -->
+                        <div id="imagePreview" class="hidden mb-4 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                    <i class="fas fa-image mr-1"></i>
+                                    Preview da Imagem
+                                </span>
+                                <button type="button" data-action="remove-image-preview" class="text-red-600 hover:text-red-700 text-sm">
+                                    <i class="fas fa-times mr-1"></i>
+                                    Remover
+                                </button>
+                            </div>
+                            <div class="text-center">
+                                <img id="previewImg" class="max-w-full h-32 object-contain mx-auto rounded-lg shadow-md" alt="Preview da imagem">
+                                <p id="imageFileName" class="mt-2 text-sm text-gray-600 dark:text-gray-400"></p>
+                            </div>
+                        </div>
+
+                        <!-- Image Upload Progress -->
+                        <div id="imageUploadProgress" class="hidden mb-4 p-4 bg-blue-50 dark:bg-blue-900 rounded-lg">
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-sm font-medium text-blue-700 dark:text-blue-300">
+                                    <i class="fas fa-upload mr-1"></i>
+                                    Upload da Imagem
+                                </span>
+                                <span id="imageProgressText" class="text-sm text-blue-600 dark:text-blue-400">0%</span>
+                            </div>
+                            <div class="w-full bg-blue-200 dark:bg-blue-800 rounded-full h-2">
+                                <div id="imageProgressBar" class="bg-blue-600 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
+                            </div>
+                            <p id="imageProgressMessage" class="mt-2 text-sm text-blue-600 dark:text-blue-400">Preparando...</p>
+                        </div>
+
+                        <p class="text-sm text-gray-500 dark:text-gray-400">
+                            <i class="fas fa-info-circle mr-1"></i>
+                            Deixe em branco para manter a imagem atual
+                        </p>
+                    </div>
+
+                    <!-- PDF Upload -->
+                    <div class="border-t border-gray-200 dark:border-gray-700 pt-6">
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-4">
+                            <i class="fas fa-file-pdf mr-1"></i>
+                            Documentos PDF
+                        </label>
+                        
+                        <!-- PDF Selection Button -->
+                        <div class="mb-4">
+                            <button type="button" id="selectPdfBtn" class="w-full bg-red-600 hover:bg-red-700 text-white px-4 py-3 rounded-lg transition-colors flex items-center justify-center space-x-2">
+                                <i class="fas fa-file-pdf"></i>
+                                <span id="pdfButtonText">Adicionar PDF</span>
+                            </button>
+                            <input type="file" id="itemPdf" name="pdf" accept=".pdf" multiple class="hidden">
+                        </div>
+
+                        <!-- PDF Previews Container -->
+                        <div id="pdfPreviewsContainer" class="space-y-3 mb-4"></div>
+
+                        <!-- PDF Upload Progress -->
+                        <div id="pdfUploadProgress" class="hidden mb-4 p-4 bg-red-50 dark:bg-red-900 rounded-lg">
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-sm font-medium text-red-700 dark:text-red-300">
+                                    <i class="fas fa-upload mr-1"></i>
+                                    Upload dos PDFs
+                                </span>
+                                <span id="progressText" class="text-sm text-red-600 dark:text-red-400">0%</span>
+                            </div>
+                            <div class="w-full bg-red-200 dark:bg-red-800 rounded-full h-2">
+                                <div id="progressBar" class="bg-red-600 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
+                            </div>
+                            <p id="progressMessage" class="mt-2 text-sm text-red-600 dark:text-red-400">Preparando...</p>
+                        </div>
+
+                        <p class="text-sm text-gray-500 dark:text-gray-400 mt-2">
+                            <i class="fas fa-info-circle mr-1"></i>
+                            Você pode adicionar múltiplos documentos PDF
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="bg-gray-50 dark:bg-gray-700 px-6 py-4 flex justify-between items-center">
+                    <div class="flex space-x-3">
+                        <a href="inventory.html" class="bg-gray-600 hover:bg-gray-700 text-white px-6 py-2 rounded-lg transition-colors">
+                            <i class="fas fa-times mr-2"></i>
+                            Cancelar
+                        </a>
+                        <button type="button" id="viewButton" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg transition-colors">
+                            <i class="fas fa-eye mr-2"></i>
+                            Visualizar
+                        </button>
+                    </div>
+                    <button type="submit" id="saveButton" class="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg transition-colors">
+                        <i class="fas fa-save mr-2"></i>
+                        Salvar Alterações
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Success Message -->
+        <div id="successMessage" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+            <div class="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md mx-4 text-center">
+                <div class="text-green-600 text-4xl mb-4">
+                    <i class="fas fa-check-circle"></i>
+                </div>
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-2">Item Atualizado!</h3>
+                <p class="text-gray-600 dark:text-gray-400 mb-4">As alterações foram salvas com sucesso.</p>
+                <div class="flex space-x-3 justify-center">
+                    <a href="inventory.html" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors">
+                        Voltar ao Inventário
+                    </a>
+                    <button id="continueEditingBtn" class="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg transition-colors">
+                        Continuar Editando
+                    </button>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Modal para Adicionar Categoria -->
+    <div id="categoryModal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center">
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-xl p-6 w-full max-w-md mx-4">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
+                    <i class="fas fa-layer-group mr-2"></i>
+                    Nova Categoria
+                </h3>
+                <button id="closeCategoryModal" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <form id="categoryForm">
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Nome da Categoria</label>
+                        <input type="text" id="categoryName" name="nome" required 
+                            class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                            placeholder="Ex: Eletrônicos, Móveis...">
+                    </div>
+                </div>
+                <div class="flex justify-end space-x-3 mt-6">
+                    <button type="button" id="cancelCategoryBtn" 
+                        class="px-4 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 transition-colors">
+                        Cancelar
+                    </button>
+                    <button type="submit" 
+                        class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors">
+                        <i class="fas fa-plus mr-2"></i>
+                        Criar Categoria
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal para Adicionar Colaborador -->
+    <div id="collaboratorModal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center">
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-xl p-6 w-full max-w-md mx-4">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
+                    <i class="fas fa-user mr-2"></i>
+                    Novo Colaborador
+                </h3>
+                <button id="closeCollaboratorModal" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <form id="collaboratorForm">
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Nome do Colaborador</label>
+                        <input type="text" id="collaboratorName" name="nome" required 
+                            class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                            placeholder="Ex: João Silva">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Email</label>
+                        <input type="email" id="collaboratorEmail" name="email" 
+                            class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                            placeholder="joao@empresa.com">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Cargo</label>
+                        <input type="text" id="collaboratorRole" name="cargo" 
+                            class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                            placeholder="Ex: Analista, Gerente...">
+                    </div>
+                </div>
+                <div class="flex justify-end space-x-3 mt-6">
+                    <button type="button" id="cancelCollaboratorBtn" 
+                        class="px-4 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 transition-colors">
+                        Cancelar
+                    </button>
+                    <button type="submit" 
+                        class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors">
+                        <i class="fas fa-plus mr-2"></i>
+                        Criar Colaborador
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="config.js"></script>
+    <script src="auth.js"></script>
+    <script>
+        // Proteger página - verificar autenticação
+        document.addEventListener('DOMContentLoaded', () => {
+            // Aguardar o AuthManager inicializar
+            setTimeout(() => {
+                if (!requireAuthentication()) {
+                    return; // Será redirecionado para login
+                }
+                
+                // Mostrar informações do usuário
+                displayUserInfo();
+                
+                // Adicionar botão de logout se não existir
+                addLogoutButtonToHeader();
+            }, 200);
+        });
+
+        // Adicionar botão de logout ao cabeçalho
+        function addLogoutButtonToHeader() {
+            const header = document.querySelector('header');
+            if (!header || header.querySelector('[data-logout-btn]')) return;
+            
+            const logoutBtn = document.createElement('button');
+            logoutBtn.setAttribute('data-logout-btn', 'true');
+            logoutBtn.className = 'ml-4 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors text-sm';
+            logoutBtn.innerHTML = '<i class="fas fa-sign-out-alt mr-2"></i>Sair';
+            
+            const headerContent = header.querySelector('.container') || header;
+            headerContent.appendChild(logoutBtn);
+        }
+    </script>
+    <script src="edit-item.js"></script>
+</body>
+</html>

@@ -1,0 +1,48 @@
+{
+  "name": "sistema-inventario-areluna",
+  "version": "1.0.0",
+  "description": "Sistema unificado de catalogação patrimonial para o Grupo AreLuna",
+  "main": "api/index.js",
+  "scripts": {
+    "start": "node api/index.js",
+    "dev": "nodemon api/index.js",
+    "build": "npm run vercel-build",
+    "vercel-build": "node -e \"console.log('Build process completed successfully')\"",
+    "postinstall": "echo 'Dependencies installed successfully'",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "engines": {
+    "node": "20.x"
+  },
+  "keywords": [
+    "inventory",
+    "supabase",
+    "nodejs",
+    "express"
+  ],
+  "author": "Grupo AreLuna",
+  "license": "MIT",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.75.0",
+    "axios": "^1.12.2",
+    "body-parser": "^1.20.2",
+    "canvas": "^3.2.0",
+    "compression": "^1.7.4",
+    "cors": "^2.8.5",
+    "dotenv": "^16.6.1",
+    "express": "^4.18.2",
+    "helmet": "^7.1.0",
+    "jimp": "^1.6.0",
+    "multer": "^2.0.2",
+    "node-fetch": "^2.7.0",
+    "pdfkit": "^0.17.2",
+    "qrcode": "^1.5.4",
+    "qrcode-reader": "^1.0.4",
+    "uuid": "^13.0.0",
+    "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.2",
+    "supertest": "^7.1.4"
+  }
+}

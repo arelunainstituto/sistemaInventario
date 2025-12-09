@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Configurações - Sistema de Inventário</title>
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    screens: {
+                        'xs': '475px',
+                    },
+                    colors: {
+                        primary: {
+                            50: '#f0f9ff',
+                            100: '#e0f2fe',
+                            200: '#bae6fd',
+                            300: '#7dd3fc',
+                            400: '#38bdf8',
+                            500: '#0ea5e9',
+                            600: '#0284c7',
+                            700: '#0369a1',
+                            800: '#075985',
+                            900: '#0c4a6e',
+                        }
+                    },
+                    animation: {
+                        'bounce-in': 'bounceIn 0.8s ease-out',
+                        'slide-up': 'slideUp 0.6s ease-out',
+                        'fade-in': 'fadeIn 1s ease-out',
+                        'pulse-slow': 'pulse 3s infinite',
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Supabase -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    
+    <!-- Config -->
+    <script src="config.js"></script>
+    
+    <!-- Auth Manager -->
+    <script src="auth.js"></script>
+    
+    <style>
+        @keyframes bounceIn {
+            0% { transform: scale(0.3); opacity: 0; }
+            50% { transform: scale(1.05); }
+            70% { transform: scale(0.9); }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        
+        @keyframes slideUp {
+            0% { transform: translateY(30px); opacity: 0; }
+            100% { transform: translateY(0); opacity: 1; }
+        }
+        
+        @keyframes fadeIn {
+            0% { opacity: 0; }
+            100% { opacity: 1; }
+        }
+        
+        .glass-effect {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .gradient-bg {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100dvh;
+        }
+        
+        .floating-shape {
+            position: absolute;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.1);
+            animation: float 6s ease-in-out infinite;
+        }
+        
+        .floating-shape:nth-child(1) {
+            width: clamp(60px, 15vw, 120px);
+            height: clamp(60px, 15vw, 120px);
+            top: 10%;
+            left: 10%;
+            animation-delay: 0s;
+        }
+        
+        .floating-shape:nth-child(2) {
+            width: clamp(80px, 20vw, 160px);
+            height: clamp(80px, 20vw, 160px);
+            top: 70%;
+            right: 10%;
+            animation-delay: 2s;
+        }
+        
+        .floating-shape:nth-child(3) {
+            width: clamp(40px, 10vw, 80px);
+            height: clamp(40px, 10vw, 80px);
+            top: 40%;
+            left: 5%;
+            animation-delay: 4s;
+        }
+        
+        @keyframes float {
+            0%, 100% { transform: translateY(0px) rotate(0deg); }
+            50% { transform: translateY(-20px) rotate(180deg); }
+        }
+        
+        @media (max-width: 640px) {
+            .floating-shape {
+                opacity: 0.3;
+            }
+            
+            .glass-effect {
+                backdrop-filter: blur(8px);
+            }
+            
+            input, button {
+                font-size: 16px !important;
+            }
+        }
+        
+        .config-card {
+            transition: all 0.3s ease;
+        }
+        
+        .config-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+        }
+    </style>
+</head>
+<body class="gradient-bg relative overflow-x-hidden">
+    <!-- Floating Shapes -->
+    <div class="floating-shape"></div>
+    <div class="floating-shape"></div>
+    <div class="floating-shape"></div>
+    
+    <!-- Header -->
+    <header class="relative z-20 bg-white/10 backdrop-blur-md border-b border-white/20">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-14 sm:h-16">
+                <div class="flex items-center">
+                    <a href="dashboard.html" class="flex items-center text-white hover:text-white/80 transition-colors">
+                        <i class="fas fa-arrow-left mr-2 text-sm sm:text-base"></i>
+                        <span class="text-sm sm:text-base font-medium">Voltar ao Dashboard</span>
+                    </a>
+                </div>
+                
+                <div class="flex items-center space-x-3 sm:space-x-4">
+                    <div class="text-white/80 text-xs sm:text-sm" id="userInfo">
+                        <i class="fas fa-user mr-1"></i>
+                        <span id="userEmail">Carregando...</span>
+                    </div>
+                    <button id="logoutButton" class="text-white/80 hover:text-white transition-colors text-xs sm:text-sm">
+                        <i class="fas fa-sign-out-alt mr-1"></i>
+                        Sair
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+    
+    <!-- Main Content -->
+    <main class="relative z-10 py-8 px-4 sm:px-6 lg:px-8">
+        <div class="max-w-6xl mx-auto">
+            <!-- Page Title -->
+            <div class="text-center mb-8 sm:mb-12 animate-bounce-in">
+                <div class="inline-flex items-center justify-center w-16 h-16 sm:w-20 sm:h-20 bg-white/20 rounded-full mb-3 sm:mb-4 glass-effect">
+                    <i class="fas fa-cog text-2xl sm:text-3xl text-white"></i>
+                </div>
+                <h1 class="text-2xl sm:text-3xl lg:text-4xl font-bold text-white mb-2">Configurações</h1>
+                <p class="text-sm sm:text-base text-white/80">Configurações do sistema</p>
+            </div>
+            
+            <!-- Configuration Cards Grid -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 animate-slide-up">
+                <!-- Change Password Card -->
+                <a href="settings-password.html" class="config-card glass-effect rounded-2xl p-6 shadow-xl hover:bg-white/15 transition-all block">
+                    <div class="flex items-center mb-4">
+                        <div class="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center mr-4">
+                            <i class="fas fa-key text-white text-xl"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-lg font-bold text-white">Alterar Senha</h3>
+                            <p class="text-sm text-white/70">Modifique sua senha de acesso</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center text-white/60 text-sm">
+                        <span>Acessar</span>
+                        <i class="fas fa-arrow-right ml-2"></i>
+                    </div>
+                </a>
+
+                <!-- User Management Card (Admin Only) -->
+                <a href="user-management.html" id="userManagementCard" class="config-card glass-effect rounded-2xl p-6 shadow-xl hover:bg-white/15 transition-all block">
+                    <div class="flex items-center mb-4">
+                        <div class="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center mr-4">
+                            <i class="fas fa-users-cog text-white text-xl"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-lg font-bold text-white">Gerenciar Usuários</h3>
+                            <p class="text-sm text-white/70">Criar e gerenciar usuários do sistema</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center text-white/60 text-sm">
+                        <span>Acessar</span>
+                        <i class="fas fa-arrow-right ml-2"></i>
+                    </div>
+                </a>
+
+                <!-- System Info Card -->
+                <div class="config-card glass-effect rounded-2xl p-6 shadow-xl">
+                    <div class="flex items-center mb-4">
+                        <div class="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center mr-4">
+                            <i class="fas fa-info-circle text-white text-xl"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-lg font-bold text-white">Informações do Sistema</h3>
+                            <p class="text-sm text-white/70">Versão e detalhes técnicos</p>
+                        </div>
+                    </div>
+                    <div class="space-y-2 text-white/80 text-sm">
+                        <div class="flex justify-between">
+                            <span>Versão:</span>
+                            <span class="font-semibold">1.0.0</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span>Ambiente:</span>
+                            <span class="font-semibold">Produção</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span>Grupo:</span>
+                            <span class="font-semibold">AreLuna</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Support Card -->
+                <div class="config-card glass-effect rounded-2xl p-6 shadow-xl">
+                    <div class="flex items-center mb-4">
+                        <div class="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center mr-4">
+                            <i class="fas fa-life-ring text-white text-xl"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-lg font-bold text-white">Suporte</h3>
+                            <p class="text-sm text-white/70">Precisa de ajuda?</p>
+                        </div>
+                    </div>
+                    <div class="space-y-2 text-white/80 text-sm">
+                        <div class="flex items-center">
+                            <i class="fas fa-envelope mr-2 text-white/60"></i>
+                            <span>suporte@institutoareluna.pt</span>
+                        </div>
+                        <div class="flex items-center">
+                            <i class="fas fa-phone mr-2 text-white/60"></i>
+                            <span>+351 XXX XXX XXX</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Footer -->
+            <div class="text-center mt-8 text-white/60 text-xs sm:text-sm animate-fade-in">
+                <p>&copy; 2024 Grupo AreLuna. Todos os direitos reservados.</p>
+            </div>
+        </div>
+    </main>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Check authentication - wait for auth to initialize
+            setTimeout(async () => {
+                if (!isAuthenticated()) {
+                    window.location.href = 'login.html';
+                    return;
+                }
+                
+                // Get user info
+                const user = await getCurrentUser();
+                if (user) {
+                    document.getElementById('userEmail').textContent = user.email || 'Usuário';
+                }
+            }, 300);
+            
+            // Setup logout button
+            document.getElementById('logoutButton').addEventListener('click', async function() {
+                await signOut();
+            });
+        });
+    </script>
+</body>
+</html>

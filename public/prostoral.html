@@ -1,0 +1,2206 @@
+<!DOCTYPE html>
+<html lang="pt" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes, viewport-fit=cover">
+    <meta name="theme-color" content="#10b981">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="format-detection" content="telephone=no">
+    <title>🦷 Laboratório ProStoral - Grupo AreLuna</title>
+    
+    <!-- Tailwind CSS v3+ -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- QR Code Generator (Local) -->
+    <script src="qrcode.min.js"></script>
+    
+    <!-- QR Code Scanner -->
+    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+    
+    <script>
+        // Verificar se a biblioteca QRCode carregou
+        window.addEventListener('load', () => {
+            if (typeof QRCode !== 'undefined') {
+                console.log('✅ Biblioteca QRCode.js carregada com sucesso!');
+            } else {
+                console.error('❌ Biblioteca QRCode.js não foi carregada!');
+            }
+            if (typeof Html5Qrcode !== 'undefined') {
+                console.log('✅ Biblioteca Html5Qrcode carregada com sucesso!');
+            } else {
+                console.error('❌ Biblioteca Html5Qrcode não foi carregada!');
+            }
+        });
+    </script>
+    
+    <!-- Estilos principais -->
+    <link rel="stylesheet" href="styles.css">
+    
+    <!-- CSS Responsivo -->
+    <link rel="stylesheet" href="responsive.css">
+    
+    <!-- Scripts de autenticação e módulos -->
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <script src="config.js"></script>
+    <script src="auth.js"></script>
+    <script src="modules.js"></script>
+    
+    <!-- Tailwind Configuration -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            if (typeof tailwind !== 'undefined') {
+                tailwind.config = {
+                    darkMode: 'class',
+                    theme: {
+                        extend: {
+                            colors: {
+                                primary: {
+                                    50: '#ecfdf5',
+                                    100: '#d1fae5',
+                                    200: '#a7f3d0',
+                                    300: '#6ee7b7',
+                                    400: '#34d399',
+                                    500: '#10b981',
+                                    600: '#059669',
+                                    700: '#047857',
+                                    800: '#065f46',
+                                    900: '#064e3b',
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    </script>
+    
+    <!-- Custom Styles -->
+    <style>
+        /* Garantir visibilidade das abas */
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block !important;
+        }
+        
+        /* Smooth scrolling */
+        html {
+            scroll-behavior: smooth;
+        }
+        
+        /* Fallback de background e cor de texto */
+        html {
+            background-color: #f8fafc !important;
+            color: #111827;
+        }
+        body {
+            background-color: #f8fafc !important;
+            color: #111827;
+        }
+        html, body { min-height: 100vh; }
+
+        /* Fallback para utilitário .hidden do Tailwind */
+        .hidden {
+            display: none !important;
+        }
+        
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+        
+        /* Lab tab content */
+        .lab-tab-content {
+            display: none;
+        }
+        .lab-tab-content.active {
+            display: block !important;
+            animation: fadeIn 0.3s ease-in-out;
+        }
+        
+        /* Animations */
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        @keyframes slide-in-right {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+        
+        .animate-slide-in-right {
+            animation: slide-in-right 0.3s ease-out;
+        }
+    </style>
+</head>
+
+<body class="bg-gradient-to-br from-emerald-50 via-teal-50 to-cyan-50 dark:from-gray-900 dark:via-emerald-900 dark:to-teal-900 min-h-screen font-sans antialiased" style="background-color:#f8fafc !important; color:#111827;">
+    
+    <!-- Fixed Header with Glassmorphism -->
+    <header class="fixed top-0 left-0 right-0 z-50 bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl border-b border-emerald-200/20 dark:border-gray-700/20 shadow-lg">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center py-4">
+                <!-- Logo Section -->
+                <div class="flex items-center space-x-4 animate-fade-in">
+                    <div class="relative">
+                        <div class="bg-gradient-to-br from-emerald-500 to-emerald-700 p-3 rounded-2xl shadow-lg">
+                            <i class="fas fa-tooth text-white text-2xl"></i>
+                        </div>
+                        <div class="absolute -top-1 -right-1 w-4 h-4 bg-green-500 rounded-full animate-pulse"></div>
+                    </div>
+                    <div class="hidden sm:block">
+                        <h1 class="text-2xl font-bold tracking-tight bg-gradient-to-r from-emerald-600 to-emerald-800 dark:from-emerald-400 dark:to-emerald-600 bg-clip-text text-transparent">
+                            🦷 Laboratório ProStoral
+                        </h1>
+                        <p class="text-sm text-gray-600 dark:text-gray-400 font-medium">Grupo AreLuna</p>
+                    </div>
+                    <div class="sm:hidden">
+                        <h1 class="text-lg font-bold tracking-tight bg-gradient-to-r from-emerald-600 to-emerald-800 dark:from-emerald-400 dark:to-emerald-600 bg-clip-text text-transparent">
+                            🦷 ProStoral
+                        </h1>
+                    </div>
+                </div>
+                
+                <!-- Mobile Menu Button -->
+                <div class="flex items-center">
+                    <button id="mobileMenuToggle" class="p-2 rounded-xl bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition-all duration-300">
+                        <i class="fas fa-bars text-gray-600 dark:text-gray-400 text-xl"></i>
+                    </button>
+                </div>
+                
+                <!-- Desktop Stats Section -->
+                <div class="hidden md:flex items-center space-x-4">
+                    <!-- Voltar ao Dashboard -->
+                    <a href="dashboard.html" class="p-2 rounded-xl bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition-all duration-300 hover:scale-110 group" title="Voltar ao Dashboard">
+                        <i class="fas fa-home text-gray-600 dark:text-gray-400"></i>
+                    </a>
+                    
+                    <!-- Dark Mode Toggle -->
+                    <button id="darkModeToggle" class="p-2 rounded-xl bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition-all duration-300 hover:scale-110">
+                        <i class="fas fa-moon dark:hidden text-gray-600"></i>
+                        <i class="fas fa-sun hidden dark:block text-yellow-400"></i>
+                    </button>
+                    
+                    <!-- Total OS -->
+                    <div class="bg-gradient-to-r from-emerald-500 to-emerald-600 text-white px-6 py-3 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105">
+                        <div class="flex items-center space-x-3">
+                            <i class="fas fa-clipboard-list text-lg"></i>
+                            <div class="text-left">
+                                <p class="text-xs font-medium opacity-90">Total de OS</p>
+                                <p id="totalOrders" class="text-xl font-bold">0</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Clientes Ativos -->
+                    <div class="bg-gradient-to-r from-teal-500 to-cyan-600 text-white px-6 py-3 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105">
+                        <div class="flex items-center space-x-3">
+                            <i class="fas fa-users text-lg"></i>
+                            <div class="text-left">
+                                <p class="text-xs font-medium opacity-90">Clientes</p>
+                                <p id="totalClients" class="text-xl font-bold">0</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Mobile Menu Overlay -->
+        <div id="mobileMenuOverlay" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 opacity-0 invisible transition-all duration-300"></div>
+        
+        <!-- Mobile Menu -->
+        <div id="mobileMenu" class="fixed top-0 right-0 h-full w-80 max-w-[85vw] bg-white dark:bg-gray-900 shadow-2xl transform translate-x-full transition-transform duration-300 z-50">
+            <div class="flex flex-col h-full">
+                <div class="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
+                    <h2 class="text-xl font-bold text-gray-900 dark:text-white">Menu</h2>
+                    <button id="closeMobileMenu" class="p-2 rounded-xl bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">
+                        <i class="fas fa-times text-gray-600 dark:text-gray-400"></i>
+                    </button>
+                </div>
+                
+                <div class="flex-1 p-6 space-y-6">
+                    <div class="bg-gradient-to-r from-emerald-500 to-emerald-600 text-white p-4 rounded-2xl">
+                        <div class="flex items-center space-x-3">
+                            <div class="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center">
+                                <i class="fas fa-user text-xl"></i>
+                            </div>
+                            <div>
+                                <p class="font-semibold" id="mobileUserEmail">Usuário</p>
+                                <p class="text-sm opacity-90">Logado</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="bg-gradient-to-r from-emerald-500 to-emerald-600 text-white p-4 rounded-xl">
+                            <div class="text-center">
+                                <i class="fas fa-clipboard-list text-2xl mb-2"></i>
+                                <p class="text-xs opacity-90">Total OS</p>
+                                <p id="mobileTotalOrders" class="text-lg font-bold">0</p>
+                            </div>
+                        </div>
+                        <div class="bg-gradient-to-r from-teal-500 to-cyan-600 text-white p-4 rounded-xl">
+                            <div class="text-center">
+                                <i class="fas fa-users text-2xl mb-2"></i>
+                                <p class="text-xs opacity-90">Clientes</p>
+                                <p id="mobileTotalClients" class="text-lg font-bold">0</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="space-y-3">
+                        <a href="dashboard.html" class="flex items-center space-x-3 p-4 rounded-xl bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">
+                            <i class="fas fa-home text-emerald-600 dark:text-emerald-400"></i>
+                            <span class="font-medium text-gray-900 dark:text-white">Dashboard Principal</span>
+                        </a>
+                        
+                        <button id="mobileDarkModeToggle" class="flex items-center space-x-3 p-4 rounded-xl bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors w-full text-left">
+                            <i class="fas fa-moon dark:hidden text-emerald-600"></i>
+                            <i class="fas fa-sun hidden dark:block text-yellow-500"></i>
+                            <span class="font-medium text-gray-900 dark:text-white">
+                                <span class="dark:hidden">Modo Escuro</span>
+                                <span class="hidden dark:block">Modo Claro</span>
+                            </span>
+                        </button>
+                        
+                        <button id="mobileLogoutBtn" class="flex items-center space-x-3 p-4 rounded-xl bg-red-100 dark:bg-red-900/30 hover:bg-red-200 dark:hover:bg-red-900/50 transition-colors w-full text-left">
+                            <i class="fas fa-sign-out-alt text-red-600 dark:text-red-400"></i>
+                            <span class="font-medium text-red-700 dark:text-red-300">Sair</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Container with proper spacing for fixed header -->
+    <div class="pt-20 sm:pt-24 pb-8">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            
+            <!-- Navigation Tabs - Estilo Menu Horizontal -->
+            <nav class="mb-6 sm:mb-8 animate-slide-up">
+                <div class="bg-white/90 dark:bg-gray-800/90 backdrop-blur-xl rounded-2xl sm:rounded-3xl shadow-xl border border-gray-200 dark:border-gray-700 p-0.5 sm:p-1">
+                    <div class="flex justify-between sm:justify-around items-center gap-0.5 sm:gap-1">
+                        <button class="prostoral-tab active group flex flex-col items-center justify-center p-2 sm:p-4 rounded-xl sm:rounded-2xl transition-all duration-300 bg-emerald-100 dark:bg-emerald-900 text-emerald-700 dark:text-emerald-300 flex-1 touch-target" data-tab="dashboard" title="Dashboard">
+                            <i class="fas fa-chart-line text-base sm:text-2xl mb-0.5 sm:mb-1 group-hover:scale-110 transition-transform duration-300"></i>
+                            <span class="text-[10px] sm:text-xs font-medium">Dashboard</span>
+                        </button>
+                        <button class="prostoral-tab group flex flex-col items-center justify-center p-2 sm:p-4 rounded-xl sm:rounded-2xl transition-all duration-300 hover:bg-gray-100 dark:hover:bg-gray-700 active:bg-gray-200 text-gray-600 dark:text-gray-400 flex-1 touch-target" data-tab="clients" title="Clientes">
+                            <i class="fas fa-users text-base sm:text-2xl mb-0.5 sm:mb-1 group-hover:scale-110 transition-transform duration-300"></i>
+                            <span class="text-[10px] sm:text-xs font-medium">Clientes</span>
+                        </button>
+                        <button class="prostoral-tab group flex flex-col items-center justify-center p-2 sm:p-4 rounded-xl sm:rounded-2xl transition-all duration-300 hover:bg-gray-100 dark:hover:bg-gray-700 active:bg-gray-200 text-gray-600 dark:text-gray-400 flex-1 touch-target" data-tab="orders" title="Ordens">
+                            <i class="fas fa-clipboard-list text-base sm:text-2xl mb-0.5 sm:mb-1 group-hover:scale-110 transition-transform duration-300"></i>
+                            <span class="text-[10px] sm:text-xs font-medium">Ordens</span>
+                        </button>
+                        <button class="prostoral-tab group flex flex-col items-center justify-center p-2 sm:p-4 rounded-xl sm:rounded-2xl transition-all duration-300 hover:bg-gray-100 dark:hover:bg-gray-700 active:bg-gray-200 text-gray-600 dark:text-gray-400 flex-1 touch-target" data-tab="kits" title="Kits">
+                            <i class="fas fa-box-open text-base sm:text-2xl mb-0.5 sm:mb-1 group-hover:scale-110 transition-transform duration-300"></i>
+                            <span class="text-[10px] sm:text-xs font-medium">Kits</span>
+                        </button>
+                        <button class="prostoral-tab group flex flex-col items-center justify-center p-2 sm:p-4 rounded-xl sm:rounded-2xl transition-all duration-300 hover:bg-gray-100 dark:hover:bg-gray-700 active:bg-gray-200 text-gray-600 dark:text-gray-400 flex-1 touch-target" data-tab="inventory" title="Estoque">
+                            <i class="fas fa-boxes text-base sm:text-2xl mb-0.5 sm:mb-1 group-hover:scale-110 transition-transform duration-300"></i>
+                            <span class="text-[10px] sm:text-xs font-medium">Estoque</span>
+                        </button>
+                    </div>
+                </div>
+            </nav>
+
+            <!-- Dashboard Tab -->
+            <div id="dashboard-content" class="tab-content active">
+                <div class="space-y-6">
+                    <!-- KPIs Grid -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                        <!-- KPI 1: OS Ativas -->
+                        <div class="bg-white/80 dark:bg-gray-800/80 backdrop-blur-xl rounded-3xl p-6 shadow-xl border border-white/20 dark:border-gray-700/20 hover:scale-105 transition-all duration-300">
+                            <div class="flex items-center justify-between mb-4">
+                                <div class="p-3 bg-gradient-to-br from-blue-500 to-blue-700 rounded-2xl">
+                                    <i class="fas fa-clipboard-list text-white text-2xl"></i>
+                                </div>
+                            </div>
+                            <p class="text-sm text-gray-600 dark:text-gray-400 font-medium mb-2">OS Ativas</p>
+                            <p class="text-3xl font-bold text-gray-900 dark:text-white" id="kpi-active-orders">0</p>
+                        </div>
+
+                        <!-- KPI 2: Estoque Baixo -->
+                        <div class="bg-white/80 dark:bg-gray-800/80 backdrop-blur-xl rounded-3xl p-6 shadow-xl border border-white/20 dark:border-gray-700/20 hover:scale-105 transition-all duration-300">
+                            <div class="flex items-center justify-between mb-4">
+                                <div class="p-3 bg-gradient-to-br from-red-500 to-red-700 rounded-2xl">
+                                    <i class="fas fa-exclamation-triangle text-white text-2xl"></i>
+                                </div>
+                            </div>
+                            <p class="text-sm text-gray-600 dark:text-gray-400 font-medium mb-2">Estoque Baixo</p>
+                            <p class="text-3xl font-bold text-gray-900 dark:text-white" id="kpi-low-stock">0</p>
+                        </div>
+
+                        <!-- KPI 3: Clientes Ativos -->
+                        <div class="bg-white/80 dark:bg-gray-800/80 backdrop-blur-xl rounded-3xl p-6 shadow-xl border border-white/20 dark:border-gray-700/20 hover:scale-105 transition-all duration-300">
+                            <div class="flex items-center justify-between mb-4">
+                                <div class="p-3 bg-gradient-to-br from-emerald-500 to-emerald-700 rounded-2xl">
+                                    <i class="fas fa-users text-white text-2xl"></i>
+                                </div>
+                            </div>
+                            <p class="text-sm text-gray-600 dark:text-gray-400 font-medium mb-2">Clientes Ativos</p>
+                            <p class="text-3xl font-bold text-gray-900 dark:text-white" id="kpi-active-clients">0</p>
+                        </div>
+
+                        <!-- KPI 4: Intercorrências -->
+                        <div class="bg-white/80 dark:bg-gray-800/80 backdrop-blur-xl rounded-3xl p-6 shadow-xl border border-white/20 dark:border-gray-700/20 hover:scale-105 transition-all duration-300">
+                            <div class="flex items-center justify-between mb-4">
+                                <div class="p-3 bg-gradient-to-br from-yellow-500 to-orange-700 rounded-2xl">
+                                    <i class="fas fa-bell text-white text-2xl"></i>
+                                </div>
+                            </div>
+                            <p class="text-sm text-gray-600 dark:text-gray-400 font-medium mb-2">Intercorrências Abertas</p>
+                            <p class="text-3xl font-bold text-gray-900 dark:text-white" id="kpi-open-incidents">0</p>
+                        </div>
+                    </div>
+
+                    <!-- Atividades Recentes -->
+                    <div class="bg-white/80 dark:bg-gray-800/80 backdrop-blur-xl rounded-3xl p-8 shadow-xl border border-white/20 dark:border-gray-700/20">
+                        <h2 class="text-2xl font-bold text-gray-900 dark:text-white mb-6 flex items-center gap-3">
+                            <i class="fas fa-history text-emerald-600"></i>
+                            Atividades Recentes
+                        </h2>
+                        <div id="recent-activities" class="text-center py-12 text-gray-500 dark:text-gray-400">
+                            <i class="fas fa-spinner fa-spin text-4xl mb-4"></i>
+                            <p>Carregando atividades...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Clients Tab -->
+            <div id="clients-content" class="tab-content">
+                <div class="bg-white/80 dark:bg-gray-800/80 backdrop-blur-xl rounded-3xl p-8 shadow-xl border border-white/20 dark:border-gray-700/20">
+                    <div class="flex justify-between items-center mb-6">
+                        <h2 class="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-3">
+                            <i class="fas fa-users text-emerald-600"></i>
+                            Gestão de Clientes
+                        </h2>
+                        <button id="btnNewClient" class="bg-gradient-to-r from-emerald-500 to-emerald-600 text-white px-6 py-3 rounded-2xl font-semibold shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 flex items-center gap-2">
+                            <i class="fas fa-plus"></i>
+                            Novo Cliente
+                        </button>
+                    </div>
+
+                    <!-- Filtros -->
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                        <div class="relative">
+                            <i class="fas fa-search absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+                            <input type="text" id="client-search" placeholder="Buscar cliente..." 
+                                class="w-full pl-12 pr-4 py-3 border-2 border-gray-200 dark:border-gray-700 rounded-2xl bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:border-emerald-500 dark:focus:border-emerald-400 focus:ring-2 focus:ring-emerald-200 dark:focus:ring-emerald-900 transition-all">
+                        </div>
+                        <select id="client-filter-type" class="border-2 border-gray-200 dark:border-gray-700 rounded-2xl px-4 py-3 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:border-emerald-500 dark:focus:border-emerald-400 focus:ring-2 focus:ring-emerald-200 dark:focus:ring-emerald-900 transition-all">
+                            <option value="">Todos os tipos</option>
+                            <option value="clinic">Clínica</option>
+                            <option value="dentist">Dentista</option>
+                            <option value="individual">Individual</option>
+                        </select>
+                        <select id="client-filter-status" class="border-2 border-gray-200 dark:border-gray-700 rounded-2xl px-4 py-3 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:border-emerald-500 dark:focus:border-emerald-400 focus:ring-2 focus:ring-emerald-200 dark:focus:ring-emerald-900 transition-all">
+                            <option value="">Todos os status</option>
+                            <option value="active">Ativos</option>
+                            <option value="inactive">Inativos</option>
+                        </select>
+                    </div>
+
+                    <!-- Tabela de Clientes -->
+                    <div class="overflow-x-auto rounded-2xl border border-gray-200 dark:border-gray-700">
+                        <table class="w-full">
+                            <thead class="bg-gray-50 dark:bg-gray-900">
+                                <tr>
+                                    <th class="px-6 py-4 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Cliente</th>
+                                    <th class="px-6 py-4 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Tipo</th>
+                                    <th class="px-6 py-4 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Contato</th>
+                                    <th class="px-6 py-4 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">NIF</th>
+                                    <th class="px-6 py-4 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
+                                    <th class="px-6 py-4 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody id="clients-table-body" class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                                <tr>
+                                    <td colspan="6" class="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
+                                        <i class="fas fa-spinner fa-spin text-4xl mb-4"></i>
+                                        <p>Carregando clientes...</p>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Orders Tab -->
+            <!-- Orders Tab -->
+            <div id="orders-content" class="tab-content">
+                <div class="bg-white/80 dark:bg-gray-800/80 backdrop-blur-xl rounded-3xl p-8 shadow-xl border border-white/20 dark:border-gray-700/20">
+                    <div class="flex justify-between items-center mb-6">
+                        <h2 class="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-3">
+                            <i class="fas fa-clipboard-list text-emerald-600"></i>
+                            Ordens de Serviço
+                        </h2>
+                        <div class="flex gap-3">
+                            <button id="btn-scan-qr" class="bg-gradient-to-r from-blue-500 to-blue-600 text-white px-6 py-3 rounded-2xl font-semibold shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 flex items-center gap-2">
+                                <i class="fas fa-qrcode"></i>
+                                Ler OS
+                            </button>
+                            <button id="btn-new-order" class="bg-gradient-to-r from-emerald-500 to-emerald-600 text-white px-6 py-3 rounded-2xl font-semibold shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 flex items-center gap-2">
+                                <i class="fas fa-plus"></i>
+                                Nova OS
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Filtros -->
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                        <div class="relative">
+                            <i class="fas fa-search absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+                            <input type="text" id="order-search" placeholder="Buscar ordem..." 
+                                class="w-full pl-12 pr-4 py-3 border-2 border-gray-200 dark:border-gray-700 rounded-2xl bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:border-emerald-500 dark:focus:border-emerald-400 focus:ring-2 focus:ring-emerald-200 dark:focus:ring-emerald-900 transition-all">
+                        </div>
+                        <select id="order-filter-status" class="border-2 border-gray-200 dark:border-gray-700 rounded-2xl px-4 py-3 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:border-emerald-500 dark:focus:border-emerald-400 focus:ring-2 focus:ring-emerald-200 dark:focus:ring-emerald-900 transition-all">
+                            <option value="">Todos os status</option>
+                            <option value="received">Recebido</option>
+                            <option value="design">Design</option>
+                            <option value="production">Produção</option>
+                            <option value="finishing">Acabamento</option>
+                            <option value="quality_control">Controle de Qualidade</option>
+                            <option value="delivered">Entregue</option>
+                            <option value="cancelled">Cancelado</option>
+                        </select>
+                        <select id="order-filter-technician" class="border-2 border-gray-200 dark:border-gray-700 rounded-2xl px-4 py-3 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:border-emerald-500 dark:focus:border-emerald-400 focus:ring-2 focus:ring-emerald-200 dark:focus:ring-emerald-900 transition-all">
+                            <option value="">Todos os técnicos</option>
+                        </select>
+                        <div class="flex gap-2">
+                            <button id="btn-prev-page" class="flex-1 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-4 py-3 rounded-2xl font-medium hover:bg-gray-200 dark:hover:bg-gray-600 transition-all">
+                                <i class="fas fa-chevron-left"></i>
+                            </button>
+                            <span id="page-info" class="flex items-center px-4 py-3 text-sm font-medium text-gray-700 dark:text-gray-300">Página 1 de 1</span>
+                            <button id="btn-next-page" class="flex-1 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-4 py-3 rounded-2xl font-medium hover:bg-gray-200 dark:hover:bg-gray-600 transition-all">
+                                <i class="fas fa-chevron-right"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Tabela de Ordens -->
+                    <div class="overflow-x-auto rounded-2xl border border-gray-200 dark:border-gray-700">
+                        <table class="w-full">
+                            <thead class="bg-gray-50 dark:bg-gray-900">
+                                <tr>
+                                    <th class="px-6 py-4 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Nº OS</th>
+                                    <th class="px-6 py-4 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Cliente</th>
+                                    <th class="px-6 py-4 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Paciente</th>
+                                    <th class="px-6 py-4 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
+                                    <th class="px-6 py-4 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Data</th>
+                                    <th class="px-6 py-4 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Custo Total</th>
+                                    <th class="px-6 py-4 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody id="orders-table-body" class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                                <tr>
+                                    <td colspan="7" class="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
+                                        <i class="fas fa-spinner fa-spin text-4xl mb-4"></i>
+                                        <p>Carregando ordens...</p>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Kits Tab -->
+            <div id="kits-content" class="tab-content">
+                <!-- Cabeçalho e Botão Criar -->
+                <div class="bg-white/80 dark:bg-gray-800/80 backdrop-blur-xl rounded-3xl p-6 shadow-xl border border-white/20 dark:border-gray-700/20 mb-6">
+                    <div class="flex justify-between items-center mb-4">
+                        <div>
+                            <h2 class="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-3">
+                                <i class="fas fa-box-open text-emerald-600"></i>
+                                Kits de Procedimentos
+                            </h2>
+                            <p class="text-gray-600 dark:text-gray-400 text-sm mt-1">Organize seus materiais em kits personalizados</p>
+                        </div>
+                        <button id="btnCreateKit" class="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-3 rounded-xl font-semibold transition-all shadow-lg hover:shadow-xl transform hover:-translate-y-1">
+                            <i class="fas fa-plus mr-2"></i>Criar Novo Kit
+                        </button>
+                    </div>
+                    
+                    <!-- Filtros -->
+                    <div class="flex gap-4 flex-wrap">
+                        <div class="flex-1 min-w-[200px]">
+                            <input type="text" id="searchKit" placeholder="Buscar kit..." 
+                                   class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-emerald-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                        </div>
+                        <div class="min-w-[200px]">
+                            <select id="filterKitType" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-emerald-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                                <option value="">Todos os tipos</option>
+                                <option value="zirconia">Zircônia</option>
+                                <option value="dissilicato">Dissilicato de Lítio</option>
+                                <option value="hibrida">Híbridas</option>
+                                <option value="provisoria">Provisórias</option>
+                                <option value="outro">Outro</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Lista de Kits -->
+                <div id="kitsContainer" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
+                
+                <!-- Estado Vazio -->
+                <div id="emptyKitsState" class="hidden bg-white/80 dark:bg-gray-800/80 backdrop-blur-xl rounded-3xl p-12 text-center shadow-xl">
+                    <i class="fas fa-box-open text-6xl text-gray-300 dark:text-gray-600 mb-4"></i>
+                    <h3 class="text-2xl font-bold text-gray-700 dark:text-gray-300 mb-2">Nenhum kit cadastrado</h3>
+                    <p class="text-gray-500 dark:text-gray-400 mb-6">Comece criando seu primeiro kit de procedimento</p>
+                    <button id="btnCreateKitEmpty" class="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-3 rounded-xl font-semibold transition-all">
+                        <i class="fas fa-plus mr-2"></i>Criar Primeiro Kit
+                    </button>
+                </div>
+            </div>
+
+            <!-- Inventory Tab -->
+            <div id="inventory-content" class="tab-content">
+                <!-- Sub-navegação do Laboratório -->
+                <div class="mb-4 sm:mb-6 animate-fade-in">
+                    <div class="bg-white/90 dark:bg-gray-800/90 backdrop-blur-xl rounded-xl sm:rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700 p-1" style="min-height: 80px;">
+                        <!-- Mobile: Grid 2x2 -->
+                        <div id="lab-submenu-mobile" class="grid grid-cols-2 gap-1 sm:hidden" style="display: grid !important; visibility: visible !important; opacity: 1 !important; height: auto !important;">
+                            <button class="lab-tab active flex flex-col items-center justify-center space-y-1 px-3 py-3 rounded-lg transition-all duration-300 bg-emerald-100 dark:bg-emerald-900 text-emerald-700 dark:text-emerald-300 font-medium touch-target" data-lab-tab="produtos">
+                                <i class="fas fa-flask text-lg"></i>
+                                <span class="text-xs">Produtos</span>
+                            </button>
+                            <button class="lab-tab flex flex-col items-center justify-center space-y-1 px-3 py-3 rounded-lg transition-all duration-300 hover:bg-gray-100 dark:hover:bg-gray-700 active:bg-gray-200 text-gray-600 dark:text-gray-400 font-medium touch-target" data-lab-tab="movimentacoes">
+                                <i class="fas fa-exchange-alt text-lg"></i>
+                                <span class="text-xs">Movimentações</span>
+                            </button>
+                            <button class="lab-tab flex flex-col items-center justify-center space-y-1 px-3 py-3 rounded-lg transition-all duration-300 hover:bg-gray-100 dark:hover:bg-gray-700 active:bg-gray-200 text-gray-600 dark:text-gray-400 font-medium touch-target relative" data-lab-tab="alertas">
+                                <i class="fas fa-bell text-lg"></i>
+                                <span class="text-xs">Alertas</span>
+                                <span id="alertCount" class="absolute top-1 right-1 bg-red-500 text-white text-xs px-1.5 py-0.5 rounded-full hidden">0</span>
+                            </button>
+                            <button class="lab-tab flex flex-col items-center justify-center space-y-1 px-3 py-3 rounded-lg transition-all duration-300 hover:bg-gray-100 dark:hover:bg-gray-700 active:bg-gray-200 text-gray-600 dark:text-gray-400 font-medium touch-target" data-lab-tab="relatorios">
+                                <i class="fas fa-chart-bar text-lg"></i>
+                                <span class="text-xs">Relatórios</span>
+                            </button>
+                        </div>
+                        
+                        <!-- Desktop: Horizontal -->
+                        <div id="lab-submenu-desktop" class="hidden sm:flex space-x-2" style="display: flex !important; visibility: visible !important; opacity: 1 !important; height: auto !important;">
+                            <button class="lab-tab active flex items-center space-x-2 px-4 lg:px-6 py-3 rounded-xl transition-all duration-300 bg-emerald-100 dark:bg-emerald-900 text-emerald-700 dark:text-emerald-300 font-medium touch-target" data-lab-tab="produtos">
+                                <i class="fas fa-flask"></i>
+                                <span>Produtos</span>
+                            </button>
+                            <button class="lab-tab flex items-center space-x-2 px-4 lg:px-6 py-3 rounded-xl transition-all duration-300 hover:bg-gray-100 dark:hover:bg-gray-700 active:bg-gray-200 text-gray-600 dark:text-gray-400 font-medium touch-target" data-lab-tab="movimentacoes">
+                                <i class="fas fa-exchange-alt"></i>
+                                <span>Movimentações</span>
+                            </button>
+                            <button class="lab-tab flex items-center space-x-2 px-4 lg:px-6 py-3 rounded-xl transition-all duration-300 hover:bg-gray-100 dark:hover:bg-gray-700 active:bg-gray-200 text-gray-600 dark:text-gray-400 font-medium touch-target relative" data-lab-tab="alertas">
+                                <i class="fas fa-bell"></i>
+                                <span>Alertas</span>
+                                <span id="alertCount-desktop" class="bg-red-500 text-white text-xs px-2 py-1 rounded-full ml-1 hidden">0</span>
+                            </button>
+                            <button class="lab-tab flex items-center space-x-2 px-4 lg:px-6 py-3 rounded-xl transition-all duration-300 hover:bg-gray-100 dark:hover:bg-gray-700 active:bg-gray-200 text-gray-600 dark:text-gray-400 font-medium touch-target" data-lab-tab="relatorios">
+                                <i class="fas fa-chart-bar"></i>
+                                <span>Relatórios</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Aba de Produtos -->
+                <div id="lab-produtos-content" class="lab-tab-content active">
+                    <div class="bg-white/80 dark:bg-gray-800/80 backdrop-blur-xl rounded-3xl p-6 shadow-xl border border-white/20 dark:border-gray-700/20">
+                        <!-- Cabeçalho -->
+                        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+                            <h2 class="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-3">
+                                <i class="fas fa-flask text-emerald-600"></i>
+                                Produtos do Laboratório
+                            </h2>
+                            <button id="btnNewProduct" class="bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white px-6 py-3 rounded-xl font-medium transition-all duration-300 hover:scale-105 shadow-lg flex items-center space-x-2">
+                                <i class="fas fa-plus"></i>
+                                <span>Novo Produto</span>
+                            </button>
+                        </div>
+
+                        <!-- Filtros -->
+                        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                            <div class="relative">
+                                <i class="fas fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+                                <input type="text" id="product-search" placeholder="Buscar produto..." class="w-full pl-10 pr-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all">
+                            </div>
+                            <select id="product-filter-categoria" class="px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent">
+                                <option value="">Todas as categorias</option>
+                                <option value="resinas">Resinas</option>
+                                <option value="ceras">Ceras</option>
+                                <option value="metais">Metais</option>
+                                <option value="gesso">Gesso</option>
+                                <option value="silicone">Silicone</option>
+                                <option value="ceramica">Cerâmica</option>
+                                <option value="acrilico">Acrílico</option>
+                                <option value="instrumentos">Instrumentos</option>
+                                <option value="equipamentos">Equipamentos</option>
+                                <option value="consumiveis">Consumíveis</option>
+                                <option value="outros">Outros</option>
+                            </select>
+                            <select id="product-filter-status" class="px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent">
+                                <option value="">Todos os status</option>
+                                <option value="disponivel">Disponível</option>
+                                <option value="baixo">Estoque Baixo</option>
+                                <option value="critico">Crítico</option>
+                                <option value="esgotado">Esgotado</option>
+                            </select>
+                            <button id="btnScanQR" class="bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-xl font-medium transition-all duration-300 flex items-center justify-center space-x-2">
+                                <i class="fas fa-qrcode"></i>
+                                <span>Escanear QR</span>
+                            </button>
+                        </div>
+
+                        <!-- Tabela de Produtos -->
+                        <div class="overflow-x-auto">
+                            <table class="w-full">
+                                <thead>
+                                    <tr class="border-b border-gray-200 dark:border-gray-700">
+                                        <th class="text-left py-3 px-4 text-gray-600 dark:text-gray-400 font-semibold">QR Code</th>
+                                        <th class="text-left py-3 px-4 text-gray-600 dark:text-gray-400 font-semibold">Material</th>
+                                        <th class="text-left py-3 px-4 text-gray-600 dark:text-gray-400 font-semibold">Marca</th>
+                                        <th class="text-left py-3 px-4 text-gray-600 dark:text-gray-400 font-semibold">Categoria</th>
+                                        <th class="text-left py-3 px-4 text-gray-600 dark:text-gray-400 font-semibold">Estoque</th>
+                                        <th class="text-left py-3 px-4 text-gray-600 dark:text-gray-400 font-semibold">Status</th>
+                                        <th class="text-left py-3 px-4 text-gray-600 dark:text-gray-400 font-semibold">Ações</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="productsTableBody" class="divide-y divide-gray-200 dark:divide-gray-700">
+                                    <tr>
+                                        <td colspan="7" class="text-center py-12 text-gray-500 dark:text-gray-400">
+                                            <i class="fas fa-flask text-4xl mb-2 opacity-50"></i>
+                                            <p>Carregando produtos...</p>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <!-- Paginação -->
+                        <div id="productsPagination" class="flex justify-between items-center mt-6">
+                            <div class="text-sm text-gray-600 dark:text-gray-400">
+                                <span id="productsCount">0</span> produtos encontrados
+                            </div>
+                            <div class="flex space-x-2">
+                                <button id="productsPrevPage" class="px-4 py-2 rounded-lg bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                                    <i class="fas fa-chevron-left"></i>
+                                </button>
+                                <span class="px-4 py-2 text-gray-700 dark:text-gray-300" id="productsPageInfo">Página 1 de 1</span>
+                                <button id="productsNextPage" class="px-4 py-2 rounded-lg bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                                    <i class="fas fa-chevron-right"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Aba de Movimentações -->
+                <div id="lab-movimentacoes-content" class="lab-tab-content">
+                    <div class="bg-white/80 dark:bg-gray-800/80 backdrop-blur-xl rounded-3xl p-6 shadow-xl border border-white/20 dark:border-gray-700/20">
+                        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+                            <h2 class="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-3">
+                                <i class="fas fa-exchange-alt text-emerald-600"></i>
+                                Movimentações de Estoque
+                            </h2>
+                            <div class="flex space-x-2">
+                                <button id="btnNewEntry" class="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white px-6 py-3 rounded-xl font-medium transition-all duration-300 hover:scale-105 shadow-lg flex items-center space-x-2">
+                                    <i class="fas fa-arrow-down"></i>
+                                    <span>Entrada</span>
+                                </button>
+                                <button id="btnNewExit" class="bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white px-6 py-3 rounded-xl font-medium transition-all duration-300 hover:scale-105 shadow-lg flex items-center space-x-2">
+                                    <i class="fas fa-arrow-up"></i>
+                                    <span>Saída</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Filtros -->
+                        <div class="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
+                            <div class="relative">
+                                <i class="fas fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+                                <input type="text" id="movement-search" placeholder="Buscar..." class="w-full pl-10 pr-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all">
+                            </div>
+                            <select id="movement-filter-tipo" class="px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent">
+                                <option value="">Todos os tipos</option>
+                                <option value="entrada">Entrada</option>
+                                <option value="saida">Saída</option>
+                            </select>
+                            <input type="date" id="movement-filter-data-inicio" class="px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent">
+                            <input type="date" id="movement-filter-data-fim" class="px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent">
+                            <button id="btnApplyMovementFilter" class="bg-emerald-500 hover:bg-emerald-600 text-white px-6 py-3 rounded-xl font-medium transition-all duration-300">
+                                Aplicar
+                            </button>
+                        </div>
+
+                        <!-- Tabela de Movimentações -->
+                        <div class="overflow-x-auto">
+                            <table class="w-full">
+                                <thead>
+                                    <tr class="border-b border-gray-200 dark:border-gray-700">
+                                        <th class="text-left py-3 px-4 text-gray-600 dark:text-gray-400 font-semibold">Data</th>
+                                        <th class="text-left py-3 px-4 text-gray-600 dark:text-gray-400 font-semibold">Tipo</th>
+                                        <th class="text-left py-3 px-4 text-gray-600 dark:text-gray-400 font-semibold">Produto</th>
+                                        <th class="text-left py-3 px-4 text-gray-600 dark:text-gray-400 font-semibold">Quantidade</th>
+                                        <th class="text-left py-3 px-4 text-gray-600 dark:text-gray-400 font-semibold">Responsável</th>
+                                        <th class="text-left py-3 px-4 text-gray-600 dark:text-gray-400 font-semibold">Motivo</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="movementsTableBody" class="divide-y divide-gray-200 dark:divide-gray-700">
+                                    <tr>
+                                        <td colspan="6" class="text-center py-12 text-gray-500 dark:text-gray-400">
+                                            <i class="fas fa-exchange-alt text-4xl mb-2 opacity-50"></i>
+                                            <p>Nenhuma movimentação encontrada</p>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <!-- Paginação -->
+                        <div id="movementsPagination" class="flex justify-between items-center mt-6">
+                            <div class="text-sm text-gray-600 dark:text-gray-400">
+                                <span id="movementsCount">0</span> movimentações encontradas
+                            </div>
+                            <div class="flex space-x-2">
+                                <button id="movementsPrevPage" class="px-4 py-2 rounded-lg bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                                    <i class="fas fa-chevron-left"></i>
+                                </button>
+                                <span class="px-4 py-2 text-gray-700 dark:text-gray-300" id="movementsPageInfo">Página 1 de 1</span>
+                                <button id="movementsNextPage" class="px-4 py-2 rounded-lg bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                                    <i class="fas fa-chevron-right"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Aba de Alertas -->
+                <div id="lab-alertas-content" class="lab-tab-content">
+                    <div class="bg-white/80 dark:bg-gray-800/80 backdrop-blur-xl rounded-3xl p-6 shadow-xl border border-white/20 dark:border-gray-700/20">
+                        <h2 class="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-3 mb-6">
+                            <i class="fas fa-bell text-emerald-600"></i>
+                            Alertas do Sistema
+                        </h2>
+
+                        <!-- Estatísticas de Alertas -->
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                            <div class="bg-red-50 dark:bg-red-900/20 rounded-xl p-4 border border-red-200 dark:border-red-800">
+                                <div class="flex items-center justify-between">
+                                    <div>
+                                        <p class="text-sm text-red-600 dark:text-red-400 mb-1">Críticos</p>
+                                        <p class="text-2xl font-bold text-red-700 dark:text-red-300" id="alertsCriticos">0</p>
+                                    </div>
+                                    <i class="fas fa-exclamation-triangle text-3xl text-red-500"></i>
+                                </div>
+                            </div>
+                            <div class="bg-yellow-50 dark:bg-yellow-900/20 rounded-xl p-4 border border-yellow-200 dark:border-yellow-800">
+                                <div class="flex items-center justify-between">
+                                    <div>
+                                        <p class="text-sm text-yellow-600 dark:text-yellow-400 mb-1">Avisos</p>
+                                        <p class="text-2xl font-bold text-yellow-700 dark:text-yellow-300" id="alertsAvisos">0</p>
+                                    </div>
+                                    <i class="fas fa-exclamation-circle text-3xl text-yellow-500"></i>
+                                </div>
+                            </div>
+                            <div class="bg-blue-50 dark:bg-blue-900/20 rounded-xl p-4 border border-blue-200 dark:border-blue-800">
+                                <div class="flex items-center justify-between">
+                                    <div>
+                                        <p class="text-sm text-blue-600 dark:text-blue-400 mb-1">Informativos</p>
+                                        <p class="text-2xl font-bold text-blue-700 dark:text-blue-300" id="alertsInfo">0</p>
+                                    </div>
+                                    <i class="fas fa-info-circle text-3xl text-blue-500"></i>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Filtros de Alertas -->
+                        <div class="bg-gray-50 dark:bg-gray-900/50 rounded-xl p-4 mb-6">
+                            <div class="flex flex-wrap items-center gap-3">
+                                <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Filtrar por tipo:</span>
+                                <button id="filterAllAlerts" class="px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 bg-emerald-600 text-white shadow-md">
+                                    <i class="fas fa-list mr-2"></i>Todos
+                                </button>
+                                <button id="filterCriticosAlerts" class="px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-red-100 dark:hover:bg-red-900/30 hover:text-red-700 dark:hover:text-red-400">
+                                    <i class="fas fa-exclamation-triangle mr-2"></i>Críticos
+                                </button>
+                                <button id="filterAvisosAlerts" class="px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-yellow-100 dark:hover:bg-yellow-900/30 hover:text-yellow-700 dark:hover:text-yellow-400">
+                                    <i class="fas fa-exclamation-circle mr-2"></i>Avisos
+                                </button>
+                                <button id="filterInformativosAlerts" class="px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-blue-100 dark:hover:bg-blue-900/30 hover:text-blue-700 dark:hover:text-blue-400">
+                                    <i class="fas fa-info-circle mr-2"></i>Informativos
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Lista de Alertas -->
+                        <div id="alertsList" class="space-y-4">
+                            <div class="text-center py-12 text-gray-500 dark:text-gray-400">
+                                <i class="fas fa-bell text-4xl mb-2 opacity-50"></i>
+                                <p>Carregando alertas...</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Aba de Relatórios -->
+                <div id="lab-relatorios-content" class="lab-tab-content">
+                    <div class="bg-white/80 dark:bg-gray-800/80 backdrop-blur-xl rounded-3xl p-6 shadow-xl border border-white/20 dark:border-gray-700/20">
+                        <h2 class="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-3 mb-6">
+                            <i class="fas fa-chart-bar text-emerald-600"></i>
+                            Relatórios e Análises
+                        </h2>
+
+                        <!-- Filtros de Período -->
+                        <div class="filter-container bg-white dark:bg-gray-700 rounded-xl shadow-sm p-4 sm:p-6 mb-4 sm:mb-6">
+                            <h3 class="text-base sm:text-lg font-semibold mb-3 sm:mb-4 flex items-center gap-2 text-gray-900 dark:text-white">
+                                <i class="fas fa-filter text-blue-600"></i>
+                                <span class="hidden sm:inline">Filtros de Período</span>
+                                <span class="sm:hidden">Filtros</span>
+                            </h3>
+                            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+                                <div>
+                                    <label class="block text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                        Data Início
+                                    </label>
+                                    <input type="date" id="filtroDataInicio" 
+                                           class="w-full px-3 sm:px-4 py-2.5 sm:py-2 text-base border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-600 dark:text-white touch-target">
+                                </div>
+                                <div>
+                                    <label class="block text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                        Data Fim
+                                    </label>
+                                    <input type="date" id="filtroDataFim" 
+                                           class="w-full px-3 sm:px-4 py-2.5 sm:py-2 text-base border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-600 dark:text-white touch-target">
+                                </div>
+                                <div class="filter-actions flex items-end gap-2">
+                                    <button id="btnAplicarFiltro" 
+                                            class="flex-1 bg-blue-600 text-white px-4 sm:px-6 py-2.5 sm:py-2 rounded-lg hover:bg-blue-700 active:bg-blue-800 transition-colors font-medium text-sm sm:text-base touch-target">
+                                        <i class="fas fa-search mr-1 sm:mr-2"></i>
+                                        <span class="hidden sm:inline">Aplicar Filtro</span>
+                                        <span class="sm:hidden">Aplicar</span>
+                                    </button>
+                                    <button id="btnLimparFiltro" 
+                                            class="bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-white px-3 sm:px-4 py-2.5 sm:py-2 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-500 active:bg-gray-400 transition-colors touch-target">
+                                        <i class="fas fa-times"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="mt-3 sm:mt-4 flex gap-2 flex-wrap justify-center sm:justify-start">
+                                <button class="text-xs sm:text-sm bg-gray-100 dark:bg-gray-600 px-2.5 sm:px-3 py-1.5 sm:py-1 rounded hover:bg-gray-200 dark:hover:bg-gray-500 active:bg-gray-300 transition-colors touch-target" data-preset="hoje">
+                                    Hoje
+                                </button>
+                                <button class="text-xs sm:text-sm bg-gray-100 dark:bg-gray-600 px-2.5 sm:px-3 py-1.5 sm:py-1 rounded hover:bg-gray-200 dark:hover:bg-gray-500 active:bg-gray-300 transition-colors touch-target" data-preset="semana">
+                                    Esta Semana
+                                </button>
+                                <button class="text-xs sm:text-sm bg-gray-100 dark:bg-gray-600 px-2.5 sm:px-3 py-1.5 sm:py-1 rounded hover:bg-gray-200 dark:hover:bg-gray-500 active:bg-gray-300 transition-colors touch-target" data-preset="mes">
+                                    Este Mês
+                                </button>
+                                <button class="text-xs sm:text-sm bg-gray-100 dark:bg-gray-600 px-2.5 sm:px-3 py-1.5 sm:py-1 rounded hover:bg-gray-200 dark:hover:bg-gray-500 active:bg-gray-300 transition-colors touch-target" data-preset="trimestre">
+                                    Trimestre
+                                </button>
+                                <button class="text-xs sm:text-sm bg-gray-100 dark:bg-gray-600 px-2.5 sm:px-3 py-1.5 sm:py-1 rounded hover:bg-gray-200 dark:hover:bg-gray-500 active:bg-gray-300 transition-colors touch-target" data-preset="ano">
+                                    Este Ano
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- KPIs -->
+                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-4 mb-6 sm:mb-8">
+                            <div class="kpi-card bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl p-4 sm:p-6 text-white shadow-lg hover:shadow-xl transition-shadow">
+                                <i class="fas fa-euro-sign text-2xl sm:text-3xl mb-2"></i>
+                                <p class="text-xs sm:text-sm opacity-90">Valor Total em Estoque</p>
+                                <p class="text-xl sm:text-2xl font-bold" id="totalStockValue">€0.00</p>
+                            </div>
+                            <div class="kpi-card bg-gradient-to-br from-green-500 to-green-600 rounded-xl p-4 sm:p-6 text-white shadow-lg hover:shadow-xl transition-shadow">
+                                <i class="fas fa-arrow-down text-2xl sm:text-3xl mb-2"></i>
+                                <p class="text-xs sm:text-sm opacity-90">Entradas (Mês)</p>
+                                <p class="text-xl sm:text-2xl font-bold" id="totalMonthEntries">0</p>
+                            </div>
+                            <div class="kpi-card bg-gradient-to-br from-red-500 to-red-600 rounded-xl p-4 sm:p-6 text-white shadow-lg hover:shadow-xl transition-shadow">
+                                <i class="fas fa-arrow-up text-2xl sm:text-3xl mb-2"></i>
+                                <p class="text-xs sm:text-sm opacity-90">Saídas (Mês)</p>
+                                <p class="text-xl sm:text-2xl font-bold" id="totalMonthExits">0</p>
+                            </div>
+                            <div class="kpi-card bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl p-4 sm:p-6 text-white shadow-lg hover:shadow-xl transition-shadow">
+                                <i class="fas fa-flask text-2xl sm:text-3xl mb-2"></i>
+                                <p class="text-xs sm:text-sm opacity-90">Total de Produtos</p>
+                                <p class="text-xl sm:text-2xl font-bold" id="totalProducts">0</p>
+                            </div>
+                        </div>
+
+                        <!-- Ações de Relatórios -->
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                            <button id="btnExportInventory" class="report-button bg-white dark:bg-gray-700 border-2 border-gray-300 dark:border-gray-600 rounded-xl p-4 sm:p-6 text-left hover:border-emerald-500 active:border-emerald-600 transition-all duration-300 hover:shadow-lg group touch-target">
+                                <i class="fas fa-file-excel text-2xl sm:text-3xl text-green-600 mb-2 sm:mb-3 group-hover:scale-110 transition-transform"></i>
+                                <h3 class="text-base sm:text-lg font-bold text-gray-900 dark:text-white mb-1 sm:mb-2">Relatório de Estoque</h3>
+                                <p class="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Exportar lista completa de produtos e quantidades</p>
+                            </button>
+
+                            <button id="btnExportMovements" class="report-button bg-white dark:bg-gray-700 border-2 border-gray-300 dark:border-gray-600 rounded-xl p-4 sm:p-6 text-left hover:border-emerald-500 active:border-emerald-600 transition-all duration-300 hover:shadow-lg group touch-target">
+                                <i class="fas fa-file-pdf text-2xl sm:text-3xl text-red-600 mb-2 sm:mb-3 group-hover:scale-110 transition-transform"></i>
+                                <h3 class="text-base sm:text-lg font-bold text-gray-900 dark:text-white mb-1 sm:mb-2">Relatório de Movimentações</h3>
+                                <p class="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Exportar histórico de entradas e saídas</p>
+                            </button>
+
+                            <button id="btnExportValue" class="report-button bg-white dark:bg-gray-700 border-2 border-gray-300 dark:border-gray-600 rounded-xl p-4 sm:p-6 text-left hover:border-emerald-500 active:border-emerald-600 transition-all duration-300 hover:shadow-lg group touch-target">
+                                <i class="fas fa-chart-pie text-2xl sm:text-3xl text-purple-600 mb-2 sm:mb-3 group-hover:scale-110 transition-transform"></i>
+                                <h3 class="text-base sm:text-lg font-bold text-gray-900 dark:text-white mb-1 sm:mb-2">Análise de Valor</h3>
+                                <p class="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Relatório de valor investido por categoria</p>
+                            </button>
+
+                            <button id="btnExportConsumption" class="report-button bg-white dark:bg-gray-700 border-2 border-gray-300 dark:border-gray-600 rounded-xl p-4 sm:p-6 text-left hover:border-emerald-500 active:border-emerald-600 transition-all duration-300 hover:shadow-lg group touch-target">
+                                <i class="fas fa-chart-line text-2xl sm:text-3xl text-blue-600 mb-2 sm:mb-3 group-hover:scale-110 transition-transform"></i>
+                                <h3 class="text-base sm:text-lg font-bold text-gray-900 dark:text-white mb-1 sm:mb-2">Análise de Consumo</h3>
+                                <p class="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Produtos mais consumidos no período</p>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Modal de Produto do Laboratório -->
+    <div id="productModal" class="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white dark:bg-gray-800 rounded-3xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <div class="sticky top-0 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-4 flex justify-between items-center">
+                <h3 id="productModalTitle" class="text-2xl font-bold text-gray-900 dark:text-white">Novo Produto</h3>
+                <button id="btnCloseProductModal" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors">
+                    <i class="fas fa-times text-2xl"></i>
+                </button>
+            </div>
+            <form id="productForm" class="p-6 space-y-6">
+                <input type="hidden" id="productId">
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Nome do Material *</label>
+                        <input type="text" id="productNomeMaterial" required class="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Categoria *</label>
+                        <select id="productCategoria" required class="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent">
+                            <option value="">Selecione...</option>
+                            <option value="resinas">Resinas</option>
+                            <option value="ceras">Ceras</option>
+                            <option value="metais">Metais</option>
+                            <option value="gesso">Gesso</option>
+                            <option value="silicone">Silicone</option>
+                            <option value="ceramica">Cerâmica</option>
+                            <option value="acrilico">Acrílico</option>
+                            <option value="instrumentos">Instrumentos</option>
+                            <option value="equipamentos">Equipamentos</option>
+                            <option value="consumiveis">Consumíveis</option>
+                            <option value="outros">Outros</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Marca</label>
+                        <input type="text" id="productMarca" class="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Fornecedor</label>
+                        <input type="text" id="productFornecedor" class="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Código de Barras</label>
+                        <input type="text" id="productCodigoBarras" class="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Referência/Lote</label>
+                        <input type="text" id="productReferenciaLote" class="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Unidade de Medida *</label>
+                        <select id="productUnidadeMedida" required class="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent">
+                            <option value="">Selecione...</option>
+                            <option value="g">Gramas (g)</option>
+                            <option value="kg">Quilogramas (kg)</option>
+                            <option value="ml">Mililitros (ml)</option>
+                            <option value="l">Litros (l)</option>
+                            <option value="un">Unidade (un)</option>
+                            <option value="barra">Barra</option>
+                            <option value="frasco">Frasco</option>
+                            <option value="caixa">Caixa</option>
+                            <option value="embalagem">Embalagem</option>
+                            <option value="metro">Metro</option>
+                            <option value="outro">Outro</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Localização</label>
+                        <input type="text" id="productLocalizacao" class="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Data de Validade</label>
+                        <input type="date" id="productDataValidade" class="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Estoque Mínimo</label>
+                        <input type="number" id="productEstoqueMinimo" step="0.01" min="0" class="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Estoque Máximo</label>
+                        <input type="number" id="productEstoqueMaximo" step="0.01" min="0" class="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Quantidade Inicial</label>
+                        <input type="number" id="productQuantidadeInicial" step="0.01" min="0" value="0" class="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Custo Unitário (€)</label>
+                        <input type="number" id="productCustoUnitario" step="0.01" min="0" class="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent">
+                    </div>
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Descrição</label>
+                    <textarea id="productDescricao" rows="3" class="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent"></textarea>
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Observações</label>
+                    <textarea id="productObservacoes" rows="2" class="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent"></textarea>
+                </div>
+                
+                <div class="flex justify-end space-x-3 pt-4 border-t border-gray-200 dark:border-gray-700">
+                    <button type="button" id="btnCancelProduct" class="px-6 py-3 rounded-xl border-2 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 font-medium hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
+                        Cancelar
+                    </button>
+                    <button type="submit" class="px-6 py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white font-medium transition-all duration-300 hover:scale-105 shadow-lg">
+                        Salvar Produto
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal de Movimentação -->
+    <div id="movementModal" class="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white dark:bg-gray-800 rounded-3xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div class="sticky top-0 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-4 flex justify-between items-center">
+                <h3 id="movementModalTitle" class="text-2xl font-bold text-gray-900 dark:text-white">Nova Movimentação</h3>
+                <button id="btnCloseMovementModal" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors">
+                    <i class="fas fa-times text-2xl"></i>
+                </button>
+            </div>
+            <form id="movementForm" class="p-6 space-y-6">
+                <input type="hidden" id="movementTipo">
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Produto *</label>
+                    <select id="movementProduto" required class="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent">
+                        <option value="">Selecione um produto...</option>
+                    </select>
+                </div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Quantidade *</label>
+                        <input type="number" id="movementQuantidade" required step="0.01" min="0.01" class="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent">
+                    </div>
+                    <div id="movementCustoUnitarioDiv" class="hidden">
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Custo Unitário (€)</label>
+                        <input type="number" id="movementCustoUnitario" step="0.01" min="0" class="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent">
+                    </div>
+                </div>
+                
+                <div id="movementResponsavelDiv">
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Responsável/Caso</label>
+                    <input type="text" id="movementResponsavel" class="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent">
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Motivo *</label>
+                    <select id="movementMotivo" required class="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent">
+                        <option value="">Selecione...</option>
+                    </select>
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Observações</label>
+                    <textarea id="movementObservacoes" rows="3" class="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent"></textarea>
+                </div>
+                
+                <div class="flex justify-end space-x-3 pt-4 border-t border-gray-200 dark:border-gray-700">
+                    <button type="button" id="btnCancelMovement" class="px-6 py-3 rounded-xl border-2 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 font-medium hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
+                        Cancelar
+                    </button>
+                    <button type="submit" class="px-6 py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white font-medium transition-all duration-300 hover:scale-105 shadow-lg">
+                        Registrar Movimentação
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal de Cliente -->
+    <div id="clientModal" class="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white dark:bg-gray-800 rounded-3xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <div class="sticky top-0 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-4 flex justify-between items-center">
+                <h3 id="clientModalTitle" class="text-2xl font-bold text-gray-900 dark:text-white">Novo Cliente</h3>
+                <button id="btnCloseClientModal" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors">
+                    <i class="fas fa-times text-2xl"></i>
+                </button>
+            </div>
+            
+            <form id="clientForm" class="p-6 space-y-6">
+                <input type="hidden" id="clientId">
+                
+                <!-- Informações Básicas -->
+                <div>
+                    <h4 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Informações Básicas</h4>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Nome / Razão Social *</label>
+                            <input type="text" id="clientName" required class="w-full px-4 py-2 border-2 border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:border-emerald-500 dark:focus:border-emerald-400 focus:ring-2 focus:ring-emerald-200 dark:focus:ring-emerald-900 transition-all">
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Tipo de Cliente</label>
+                            <select id="clientType" class="w-full px-4 py-2 border-2 border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:border-emerald-500 dark:focus:border-emerald-400 focus:ring-2 focus:ring-emerald-200 dark:focus:ring-emerald-900 transition-all">
+                                <option value="individual">Individual</option>
+                                <option value="clinic">Clínica</option>
+                                <option value="dentist">Dentista</option>
+                            </select>
+                            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Este campo é apenas informativo e não afeta o funcionamento</p>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Nome da Clínica</label>
+                            <input type="text" id="clientClinicName" class="w-full px-4 py-2 border-2 border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:border-emerald-500 dark:focus:border-emerald-400 focus:ring-2 focus:ring-emerald-200 dark:focus:ring-emerald-900 transition-all">
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Nome do Dentista</label>
+                            <input type="text" id="clientDentistName" class="w-full px-4 py-2 border-2 border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:border-emerald-500 dark:focus:border-emerald-400 focus:ring-2 focus:ring-emerald-200 dark:focus:ring-emerald-900 transition-all">
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">NIF</label>
+                            <input type="text" id="clientNif" class="w-full px-4 py-2 border-2 border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:border-emerald-500 dark:focus:border-emerald-400 focus:ring-2 focus:ring-emerald-200 dark:focus:ring-emerald-900 transition-all">
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Contato -->
+                <div>
+                    <h4 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Contato</h4>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Email</label>
+                            <input type="email" id="clientEmail" class="w-full px-4 py-2 border-2 border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:border-emerald-500 dark:focus:border-emerald-400 focus:ring-2 focus:ring-emerald-200 dark:focus:ring-emerald-900 transition-all">
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Telefone</label>
+                            <input type="tel" id="clientPhone" class="w-full px-4 py-2 border-2 border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:border-emerald-500 dark:focus:border-emerald-400 focus:ring-2 focus:ring-emerald-200 dark:focus:ring-emerald-900 transition-all">
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Telemóvel</label>
+                            <input type="tel" id="clientMobile" class="w-full px-4 py-2 border-2 border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:border-emerald-500 dark:focus:border-emerald-400 focus:ring-2 focus:ring-emerald-200 dark:focus:ring-emerald-900 transition-all">
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Endereço -->
+                <div>
+                    <h4 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Endereço</h4>
+                    <div class="grid grid-cols-1 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Morada</label>
+                            <input type="text" id="clientAddress" class="w-full px-4 py-2 border-2 border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:border-emerald-500 dark:focus:border-emerald-400 focus:ring-2 focus:ring-emerald-200 dark:focus:ring-emerald-900 transition-all">
+                        </div>
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Cidade</label>
+                                <input type="text" id="clientCity" class="w-full px-4 py-2 border-2 border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:border-emerald-500 dark:focus:border-emerald-400 focus:ring-2 focus:ring-emerald-200 dark:focus:ring-emerald-900 transition-all">
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Código Postal</label>
+                                <input type="text" id="clientPostalCode" class="w-full px-4 py-2 border-2 border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:border-emerald-500 dark:focus:border-emerald-400 focus:ring-2 focus:ring-emerald-200 dark:focus:ring-emerald-900 transition-all">
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">País</label>
+                                <input type="text" id="clientCountry" value="Portugal" class="w-full px-4 py-2 border-2 border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:border-emerald-500 dark:focus:border-emerald-400 focus:ring-2 focus:ring-emerald-200 dark:focus:ring-emerald-900 transition-all">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Informações Comerciais -->
+                <div>
+                    <h4 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Informações Comerciais</h4>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Prazo de Pagamento (dias)</label>
+                            <input type="number" id="clientPaymentTerms" value="30" class="w-full px-4 py-2 border-2 border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:border-emerald-500 dark:focus:border-emerald-400 focus:ring-2 focus:ring-emerald-200 dark:focus:ring-emerald-900 transition-all">
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Desconto (%)</label>
+                            <input type="number" step="0.01" id="clientDiscount" value="0" class="w-full px-4 py-2 border-2 border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:border-emerald-500 dark:focus:border-emerald-400 focus:ring-2 focus:ring-emerald-200 dark:focus:ring-emerald-900 transition-all">
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Limite de Crédito (€)</label>
+                            <input type="number" step="0.01" id="clientCreditLimit" class="w-full px-4 py-2 border-2 border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:border-emerald-500 dark:focus:border-emerald-400 focus:ring-2 focus:ring-emerald-200 dark:focus:ring-emerald-900 transition-all">
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Observações -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Observações</label>
+                    <textarea id="clientNotes" rows="3" class="w-full px-4 py-2 border-2 border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:border-emerald-500 dark:focus:border-emerald-400 focus:ring-2 focus:ring-emerald-200 dark:focus:ring-emerald-900 transition-all"></textarea>
+                </div>
+                
+                <!-- Status -->
+                <div>
+                    <label class="flex items-center space-x-3 cursor-pointer">
+                        <input type="checkbox" id="clientIsActive" checked class="w-5 h-5 text-emerald-600 border-gray-300 rounded focus:ring-emerald-500">
+                        <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Cliente Ativo</span>
+                    </label>
+                </div>
+                
+                <!-- Botões -->
+                <div class="flex justify-end space-x-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                    <button type="button" id="btnCancelClientModal" class="px-6 py-3 border-2 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-xl font-semibold hover:bg-gray-100 dark:hover:bg-gray-700 transition-all">
+                        Cancelar
+                    </button>
+                    <button type="submit" class="px-6 py-3 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all hover:scale-105">
+                        Salvar Cliente
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal de Visualização de Cliente -->
+    <div id="viewClientModal" class="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white dark:bg-gray-800 rounded-3xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <div class="sticky top-0 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-4 flex justify-between items-center">
+                <h3 class="text-2xl font-bold text-gray-900 dark:text-white">Detalhes do Cliente</h3>
+                <button id="btnCloseViewClientModal" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors">
+                    <i class="fas fa-times text-2xl"></i>
+                </button>
+            </div>
+            
+            <div id="viewClientContent" class="p-6">
+                <!-- Conteúdo será preenchido dinamicamente -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Criar/Editar Kit -->
+    <div id="kitModal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
+        <div class="bg-white dark:bg-gray-800 rounded-3xl p-8 max-w-4xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
+            <div class="flex justify-between items-center mb-6">
+                <h3 id="kitModalTitle" class="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                    <i class="fas fa-box-open text-emerald-600"></i>
+                    Criar Novo Kit
+                </h3>
+                <button id="btnCloseKitModal" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors">
+                    <i class="fas fa-times text-2xl"></i>
+                </button>
+            </div>
+            
+            <form id="kitForm">
+                <input type="hidden" id="kitId">
+                
+                <!-- Informações Básicas -->
+                <div class="mb-6">
+                    <h4 class="text-lg font-semibold text-gray-700 dark:text-gray-300 mb-4 flex items-center gap-2">
+                        <i class="fas fa-info-circle text-emerald-600"></i>
+                        Informações Básicas
+                    </h4>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Nome do Kit *</label>
+                            <input type="text" id="kitNome" required class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-emerald-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white" placeholder="Ex: Kit Zircônia Completo">
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Tipo de Procedimento *</label>
+                            <select id="kitTipo" required class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-emerald-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                                <option value="">Selecione...</option>
+                                <option value="zirconia">Zircônia</option>
+                                <option value="dissilicato">Dissilicato de Lítio</option>
+                                <option value="hibrida">Híbridas</option>
+                                <option value="provisoria">Provisórias para Capturas</option>
+                                <option value="outro">Outro</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Descrição</label>
+                        <textarea id="kitDescricao" rows="3" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-emerald-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white" placeholder="Descreva o kit e sua finalidade..."></textarea>
+                    </div>
+                </div>
+
+                <!-- Produtos do Kit -->
+                <div class="mb-6">
+                    <div class="flex justify-between items-center mb-4">
+                        <h4 class="text-lg font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-2">
+                            <i class="fas fa-boxes text-emerald-600"></i>
+                            Produtos do Kit <span id="produtoCount" class="text-sm text-gray-500 dark:text-gray-400">(0 produtos)</span>
+                        </h4>
+                        <button type="button" id="btnAddProduto" class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg transition-all">
+                            <i class="fas fa-plus mr-2"></i>Adicionar Produto
+                        </button>
+                    </div>
+                    
+                    <div id="produtosList" class="space-y-2">
+                        <div class="text-center text-gray-400 dark:text-gray-500 py-8">
+                            <i class="fas fa-box-open text-4xl mb-2"></i>
+                            <p>Nenhum produto adicionado</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Botões -->
+                <div class="flex gap-3 justify-end pt-4 border-t border-gray-200 dark:border-gray-700">
+                    <button type="button" id="btnCancelKit" class="px-6 py-2 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 transition-all">
+                        Cancelar
+                    </button>
+                    <button type="submit" class="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-2 rounded-lg transition-all font-semibold">
+                        <i class="fas fa-save mr-2"></i>Salvar Kit
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal Buscar Produtos -->
+    <div id="produtoModal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-[10000] flex items-center justify-center p-4">
+        <div class="bg-white dark:bg-gray-800 rounded-3xl p-8 max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                    <i class="fas fa-search text-emerald-600"></i>
+                    Buscar Produtos do Estoque
+                </h3>
+                <button id="btnCloseProdutoModal" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors">
+                    <i class="fas fa-times text-2xl"></i>
+                </button>
+            </div>
+
+            <!-- Busca de Produtos -->
+            <div class="mb-4">
+                <input type="text" id="searchProduto" placeholder="Digite o nome do produto..." 
+                       class="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-emerald-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+            </div>
+
+            <!-- Lista de Produtos -->
+            <div id="produtoSearchResults" class="mb-6 max-h-96 overflow-y-auto"></div>
+
+            <!-- Produto Selecionado -->
+            <div id="selectedProdutoInfo" class="hidden mb-4 p-4 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-lg">
+                <h4 class="font-semibold text-gray-700 dark:text-gray-300 mb-3">Produto Selecionado:</h4>
+                <div id="selectedProdutoDetails"></div>
+                <div class="mt-3">
+                    <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Quantidade necessária *</label>
+                    <input type="number" id="produtoQuantidade" min="0.01" step="0.01" value="1"
+                           class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-emerald-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                </div>
+            </div>
+
+            <!-- Botões -->
+            <div class="flex gap-3 justify-end pt-4 border-t border-gray-200 dark:border-gray-700">
+                <button type="button" id="btnCancelProduto" class="px-6 py-2 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 transition-all">
+                    Cancelar
+                </button>
+                <button type="button" id="btnConfirmProduto" class="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-2 rounded-lg transition-all font-semibold">
+                    <i class="fas fa-plus mr-2"></i>Adicionar ao Kit
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Criar/Editar Ordem de Serviço -->
+    <div id="modal-order-form" class="hidden fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-white dark:bg-gray-800 rounded-3xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div class="p-6 border-b border-gray-200 dark:border-gray-700">
+                <h3 id="modal-order-title" class="text-2xl font-bold text-gray-900 dark:text-white">Nova Ordem de Serviço</h3>
+            </div>
+            
+            <form id="order-form" class="p-6 space-y-4">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Cliente *</label>
+                        <select id="order-client-id" required class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-emerald-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                            <option value="">Selecione...</option>
+                        </select>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Nome do Paciente *</label>
+                        <input type="text" id="order-patient-name" required class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-emerald-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                    </div>
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Tipo de Trabalho</label>
+                    <input type="text" id="order-work-type" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-emerald-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Descrição do Trabalho *</label>
+                    <textarea id="order-work-description" required rows="3" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-emerald-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"></textarea>
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Data Prevista de Entrega</label>
+                    <input type="datetime-local" id="order-expected-delivery" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-emerald-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                </div>
+            </form>
+            
+            <div class="p-6 border-t border-gray-200 dark:border-gray-700 flex justify-end gap-3">
+                <button type="button" data-close-modal="modal-order-form" class="px-6 py-2 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 transition-all">
+                    Cancelar
+                </button>
+                <button type="button" id="btn-save-order" class="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-2 rounded-lg transition-all font-semibold">
+                    Salvar
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Detalhes da Ordem de Serviço -->
+    <div id="modal-order-details" class="hidden fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-white dark:bg-gray-800 rounded-3xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <div class="p-6 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
+                <div class="flex items-center gap-4">
+                    <h3 class="text-2xl font-bold text-gray-900 dark:text-white">
+                        Detalhes da OS #<span id="detail-order-number">-</span>
+                    </h3>
+                    <!-- Ações Rápidas dentro do Modal -->
+                    <div id="modal-quick-actions" class="flex gap-2">
+                        <!-- Os botões serão inseridos dinamicamente aqui -->
+                    </div>
+                </div>
+                <button data-close-modal="modal-order-details" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
+                    <i class="fas fa-times text-xl"></i>
+                </button>
+            </div>
+            
+            <div class="p-6 space-y-6">
+                <!-- Informações Gerais -->
+                <div class="bg-gray-50 dark:bg-gray-900 rounded-xl p-4">
+                    <h4 class="font-bold text-lg mb-3 text-gray-900 dark:text-white">Informações Gerais</h4>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                        <div>
+                            <span class="text-gray-500 dark:text-gray-400">Cliente:</span>
+                            <span id="detail-client-name" class="font-medium text-gray-900 dark:text-white ml-2">-</span>
+                        </div>
+                        <div>
+                            <span class="text-gray-500 dark:text-gray-400">Paciente:</span>
+                            <span id="detail-patient-name" class="font-medium text-gray-900 dark:text-white ml-2">-</span>
+                        </div>
+                        <div>
+                            <span class="text-gray-500 dark:text-gray-400">Tipo:</span>
+                            <span id="detail-work-type" class="font-medium text-gray-900 dark:text-white ml-2">-</span>
+                        </div>
+                        <div>
+                            <span class="text-gray-500 dark:text-gray-400">Status:</span>
+                            <span id="detail-status" class="ml-2">-</span>
+                        </div>
+                        <div class="md:col-span-2">
+                            <span class="text-gray-500 dark:text-gray-400">Descrição:</span>
+                            <p id="detail-work-description" class="font-medium text-gray-900 dark:text-white mt-1">-</p>
+                        </div>
+                        <div>
+                            <span class="text-gray-500 dark:text-gray-400">Custo Total:</span>
+                            <span id="detail-total-cost" class="font-bold text-emerald-600 ml-2">-</span>
+                        </div>
+                        <div>
+                            <span class="text-gray-500 dark:text-gray-400">Preço Final:</span>
+                            <span id="detail-final-price" class="font-bold text-gray-900 dark:text-white ml-2">-</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- QR Code -->
+                <div class="bg-gray-50 dark:bg-gray-900 rounded-xl p-4">
+                    <h4 class="font-bold text-lg mb-3 text-gray-900 dark:text-white">QR Code</h4>
+                    <div id="order-qr-code" class="flex justify-center"></div>
+                </div>
+
+                <!-- Materiais -->
+                <div class="bg-gray-50 dark:bg-gray-900 rounded-xl p-4">
+                    <div class="flex justify-between items-center mb-3">
+                        <h4 class="font-bold text-lg text-gray-900 dark:text-white">Materiais Utilizados</h4>
+                        <div class="flex gap-2">
+                            <button id="btn-show-add-kit" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded-lg text-sm font-medium transition-all">
+                                <i class="fas fa-box mr-1"></i>Adicionar Kit
+                            </button>
+                            <button id="btn-show-add-material" class="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1 rounded-lg text-sm font-medium transition-all">
+                                <i class="fas fa-plus mr-1"></i>Adicionar Produto
+                            </button>
+                        </div>
+                    </div>
+                    <div id="order-materials-list"></div>
+                </div>
+
+                <!-- Time Tracking -->
+                <div class="bg-gray-50 dark:bg-gray-900 rounded-xl p-4">
+                    <div class="flex justify-between items-center mb-3">
+                        <h4 class="font-bold text-lg text-gray-900 dark:text-white">Registros de Tempo</h4>
+                        <button id="btn-show-start-work" class="bg-purple-600 hover:bg-purple-700 text-white px-3 py-1 rounded-lg text-sm font-medium transition-all">
+                            <i class="fas fa-play mr-1"></i>Iniciar Trabalho
+                        </button>
+                    </div>
+                    
+                    <!-- Timer Ativo -->
+                    <div id="active-timer" class="hidden mb-4 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-lg p-4">
+                        <div class="flex items-center justify-between">
+                            <div class="flex-1">
+                                <p class="text-sm font-medium text-purple-900 dark:text-purple-100">Trabalho em Andamento</p>
+                                <p class="text-xs text-purple-700 dark:text-purple-300" id="active-timer-stage">-</p>
+                            </div>
+                            <div class="text-center px-4">
+                                <p class="text-2xl font-bold text-purple-900 dark:text-purple-100 font-mono" id="active-timer-display">00:00:00</p>
+                            </div>
+                            <div class="flex gap-2">
+                                <button id="btn-pause-work" class="bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-2 rounded-lg text-sm font-medium transition-all hidden">
+                                    <i class="fas fa-pause"></i>
+                                </button>
+                                <button id="btn-resume-work" class="bg-green-500 hover:bg-green-600 text-white px-3 py-2 rounded-lg text-sm font-medium transition-all hidden">
+                                    <i class="fas fa-play"></i>
+                                </button>
+                                <button id="btn-finish-work" class="bg-red-500 hover:bg-red-600 text-white px-3 py-2 rounded-lg text-sm font-medium transition-all">
+                                    <i class="fas fa-stop mr-1"></i>Finalizar
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div id="order-time-tracking-list"></div>
+                </div>
+
+                <!-- Reparos Vinculados -->
+                <div id="repairs-section" class="bg-gray-50 dark:bg-gray-900 rounded-xl p-4 hidden">
+                    <div class="flex justify-between items-center mb-3">
+                        <h4 class="font-bold text-lg text-gray-900 dark:text-white">
+                            <i class="fas fa-tools text-blue-600 mr-2"></i>Reparos Vinculados
+                        </h4>
+                        <button id="btn-create-repair" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg text-sm font-medium transition-all">
+                            <i class="fas fa-plus mr-1"></i>Criar OS de Reparo
+                        </button>
+                    </div>
+                    <div id="order-repairs-list"></div>
+                </div>
+
+                <!-- Intercorrências -->
+                <div class="bg-gray-50 dark:bg-gray-900 rounded-xl p-4">
+                    <div class="flex justify-between items-center mb-3">
+                        <h4 class="font-bold text-lg text-gray-900 dark:text-white">Intercorrências</h4>
+                        <button id="btn-show-add-issue" class="bg-orange-600 hover:bg-orange-700 text-white px-3 py-1.5 rounded-lg text-sm font-medium transition-all">
+                            <i class="fas fa-plus mr-1"></i>Nova Intercorrência
+                        </button>
+                    </div>
+                    <div id="order-issues-list"></div>
+                </div>
+
+                <!-- Histórico -->
+                <div class="bg-gray-50 dark:bg-gray-900 rounded-xl p-4">
+                    <h4 class="font-bold text-lg mb-3 text-gray-900 dark:text-white">Histórico de Alterações</h4>
+                    <div id="order-history-list"></div>
+                </div>
+            </div>
+            
+            <div class="p-6 border-t border-gray-200 dark:border-gray-700 flex justify-end">
+                <button data-close-modal="modal-order-details" class="bg-gray-600 hover:bg-gray-700 text-white px-6 py-2 rounded-lg transition-all font-semibold">
+                    Fechar
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Adicionar Kit -->
+    <div id="modal-add-kit" class="hidden fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-white dark:bg-gray-800 rounded-3xl shadow-2xl max-w-md w-full">
+            <div class="p-6 border-b border-gray-200 dark:border-gray-700">
+                <h3 class="text-2xl font-bold text-gray-900 dark:text-white">Adicionar Kit</h3>
+            </div>
+            
+            <div class="p-6 space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Kit *</label>
+                    <select id="material-kit-id" required class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-emerald-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                        <option value="">Selecione um kit...</option>
+                    </select>
+                </div>
+                
+                <div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
+                    <p class="text-sm text-blue-800 dark:text-blue-300">
+                        <i class="fas fa-info-circle mr-2"></i>
+                        Todos os produtos do kit serão adicionados automaticamente à OS. O estoque será atualizado automaticamente.
+                    </p>
+                </div>
+            </div>
+            
+            <div class="p-6 border-t border-gray-200 dark:border-gray-700 flex justify-end gap-3">
+                <button type="button" data-close-modal="modal-add-kit" class="px-6 py-2 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 transition-all">
+                    Cancelar
+                </button>
+                <button type="button" id="btn-confirm-add-kit" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg transition-all font-semibold">
+                    <i class="fas fa-box mr-2"></i>Adicionar Kit
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Adicionar Material Avulso -->
+    <div id="modal-add-material" class="hidden fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-white dark:bg-gray-800 rounded-3xl shadow-2xl max-w-md w-full">
+            <div class="p-6 border-b border-gray-200 dark:border-gray-700">
+                <h3 class="text-2xl font-bold text-gray-900 dark:text-white">Adicionar Material</h3>
+            </div>
+            
+            <div class="p-6 space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Produto *</label>
+                    <select id="material-item-id" required class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-emerald-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                        <option value="">Selecione um produto...</option>
+                    </select>
+                </div>
+                
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Quantidade *</label>
+                        <input type="number" id="material-quantity" required min="0.01" step="0.01" value="1" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-emerald-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Custo Unit. (€)</label>
+                        <input type="number" id="material-unit-cost" step="0.01" min="0" readonly class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white cursor-not-allowed">
+                    </div>
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Unidade</label>
+                    <input type="text" id="material-unit" placeholder="un, kg, ml, etc" readonly class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white cursor-not-allowed">
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Observações</label>
+                    <textarea id="material-notes" rows="2" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-emerald-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"></textarea>
+                </div>
+            </div>
+            
+            <div class="p-6 border-t border-gray-200 dark:border-gray-700 flex justify-end gap-3">
+                <button type="button" data-close-modal="modal-add-material" class="px-6 py-2 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 transition-all">
+                    Cancelar
+                </button>
+                <button type="button" id="btn-confirm-add-material" class="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-2 rounded-lg transition-all font-semibold">
+                    <i class="fas fa-plus mr-2"></i>Adicionar Material
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Iniciar Trabalho -->
+    <div id="modal-start-work" class="hidden fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-white dark:bg-gray-800 rounded-3xl shadow-2xl max-w-md w-full">
+            <div class="p-6 border-b border-gray-200 dark:border-gray-700">
+                <h3 class="text-2xl font-bold text-gray-900 dark:text-white">Iniciar Trabalho</h3>
+            </div>
+            
+            <div class="p-6 space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Etapa *</label>
+                    <select id="work-stage" required class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                        <option value="">Selecione...</option>
+                        <option value="design">Design</option>
+                        <option value="production">Produção</option>
+                        <option value="finishing">Acabamento</option>
+                        <option value="quality_control">Controle de Qualidade</option>
+                        <!-- Etapas customizadas serão inseridas aqui -->
+                        <option value="__add_new__" style="color: #9333ea; font-weight: 600;">+ Adicionar etapa</option>
+                    </select>
+                </div>
+                
+                <div class="bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-lg p-3">
+                    <p class="text-sm text-purple-800 dark:text-purple-300">
+                        <i class="fas fa-info-circle mr-2"></i>
+                        O cronômetro iniciará assim que você clicar em "Iniciar". Você poderá pausar e retomar o trabalho quantas vezes precisar.
+                    </p>
+                </div>
+            </div>
+            
+            <div class="p-6 border-t border-gray-200 dark:border-gray-700 flex justify-end gap-3">
+                <button type="button" data-close-modal="modal-start-work" class="px-6 py-2 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 transition-all">
+                    Cancelar
+                </button>
+                <button type="button" id="btn-start-work" class="bg-purple-600 hover:bg-purple-700 text-white px-6 py-2 rounded-lg transition-all font-semibold">
+                    <i class="fas fa-play mr-2"></i>Iniciar Trabalho
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Adicionar Nova Etapa -->
+    <div id="modal-add-stage" class="hidden fixed inset-0 bg-black/50 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
+        <div class="bg-white dark:bg-gray-800 rounded-3xl shadow-2xl max-w-md w-full">
+            <div class="p-6 border-b border-gray-200 dark:border-gray-700">
+                <h3 class="text-2xl font-bold text-gray-900 dark:text-white">
+                    <i class="fas fa-plus-circle text-purple-600 mr-2"></i>
+                    Adicionar Nova Etapa
+                </h3>
+            </div>
+            
+            <div class="p-6 space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Nome da Etapa *</label>
+                    <input type="text" id="new-stage-name" required placeholder="Ex: Polimento, Montagem..." class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                </div>
+                
+                <div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
+                    <p class="text-sm text-blue-800 dark:text-blue-300">
+                        <i class="fas fa-lightbulb mr-2"></i>
+                        Esta etapa ficará salva e poderá ser reutilizada em futuros trabalhos.
+                    </p>
+                </div>
+            </div>
+            
+            <div class="p-6 border-t border-gray-200 dark:border-gray-700 flex justify-end gap-3">
+                <button type="button" id="btn-cancel-stage" class="px-6 py-2 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 transition-all">
+                    Cancelar
+                </button>
+                <button type="button" id="btn-save-stage" class="bg-purple-600 hover:bg-purple-700 text-white px-6 py-2 rounded-lg transition-all font-semibold">
+                    <i class="fas fa-check mr-2"></i>Salvar Etapa
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Criar OS de Reparo -->
+    <div id="modal-create-repair" class="hidden fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-white dark:bg-gray-800 rounded-3xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div class="p-6 border-b border-gray-200 dark:border-gray-700">
+                <h3 class="text-2xl font-bold text-gray-900 dark:text-white">
+                    <i class="fas fa-tools text-blue-600 mr-2"></i>
+                    Criar OS de Reparo
+                </h3>
+                <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                    Esta OS de reparo será vinculada à OS principal
+                </p>
+            </div>
+            
+            <div class="p-6 space-y-4">
+                <!-- OS Principal (somente leitura) -->
+                <div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                    <p class="text-sm font-medium text-blue-900 dark:text-blue-300">
+                        <i class="fas fa-link mr-2"></i>
+                        OS Principal: <span id="repair-parent-order-number" class="font-bold"></span>
+                    </p>
+                    <p class="text-xs text-blue-700 dark:text-blue-400 mt-1">
+                        Cliente: <span id="repair-client-name"></span> | Paciente: <span id="repair-patient-name"></span>
+                    </p>
+                </div>
+
+                <!-- Tipo de Reparo -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Tipo de Reparo *
+                    </label>
+                    <select id="repair-type" required class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                        <option value="">Selecione...</option>
+                        <option value="warranty">🛡️ Garantia (Sem custo)</option>
+                        <option value="billable">💰 Pago (Com custo)</option>
+                        <option value="goodwill">💝 Cortesia (Sem custo)</option>
+                    </select>
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        <i class="fas fa-info-circle"></i>
+                        Garantia e Cortesia não geram custo adicional
+                    </p>
+                </div>
+
+                <!-- Motivo do Reparo -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Motivo do Reparo *
+                    </label>
+                    <textarea id="repair-reason" required rows="3" placeholder="Descreva o motivo do reparo..." class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"></textarea>
+                </div>
+
+                <!-- Descrição do Trabalho -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Descrição do Trabalho
+                        <span class="text-gray-400">(opcional)</span>
+                    </label>
+                    <textarea id="repair-work-description" rows="2" placeholder="Descrição específica do trabalho de reparo..." class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"></textarea>
+                </div>
+
+                <!-- Data de Entrega e Prioridade (grid 2 colunas) -->
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            Data de Entrega
+                        </label>
+                        <input type="date" id="repair-due-date" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            Prioridade
+                        </label>
+                        <select id="repair-priority" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                            <option value="normal">Normal</option>
+                            <option value="high" selected>Alta</option>
+                            <option value="urgent">Urgente</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Informação sobre numeração -->
+                <div class="bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-3">
+                    <p class="text-xs text-gray-600 dark:text-gray-400">
+                        <i class="fas fa-hashtag mr-1"></i>
+                        A OS de reparo será criada com numeração automática: <span id="repair-preview-number" class="font-mono font-bold"></span>
+                    </p>
+                </div>
+            </div>
+            
+            <div class="p-6 border-t border-gray-200 dark:border-gray-700 flex justify-end gap-3">
+                <button type="button" data-close-modal="modal-create-repair" class="px-6 py-2 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 transition-all">
+                    Cancelar
+                </button>
+                <button type="button" id="btn-confirm-create-repair" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg transition-all font-semibold">
+                    <i class="fas fa-check mr-2"></i>Criar OS de Reparo
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Adicionar Intercorrência -->
+    <div id="modal-add-issue" class="hidden fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-white dark:bg-gray-800 rounded-3xl shadow-2xl max-w-2xl w-full">
+            <div class="p-6 border-b border-gray-200 dark:border-gray-700">
+                <h3 class="text-2xl font-bold text-gray-900 dark:text-white">
+                    <i class="fas fa-exclamation-triangle text-orange-600 mr-2"></i>
+                    Nova Intercorrência
+                </h3>
+            </div>
+            
+            <div class="p-6 space-y-4">
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Tipo *</label>
+                        <select id="issue-type" required class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-orange-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                            <option value="">Selecione...</option>
+                            <option value="technical">Técnico</option>
+                            <option value="material">Material</option>
+                            <option value="delay">Atraso</option>
+                            <option value="quality">Qualidade</option>
+                            <option value="client_request">Solicitação do Cliente</option>
+                            <option value="other">Outro</option>
+                        </select>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Gravidade *</label>
+                        <select id="issue-severity" required class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-orange-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                            <option value="low">Baixa</option>
+                            <option value="medium" selected>Média</option>
+                            <option value="high">Alta</option>
+                            <option value="critical">Crítica</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Título *</label>
+                    <input type="text" id="issue-title" required maxlength="255" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-orange-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white" placeholder="Resumo da intercorrência">
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Descrição *</label>
+                    <textarea id="issue-description" required rows="4" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-orange-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white resize-none" placeholder="Descreva detalhadamente o problema ou situação"></textarea>
+                </div>
+                
+                <div class="bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-lg p-3">
+                    <p class="text-sm text-orange-800 dark:text-orange-300">
+                        <i class="fas fa-info-circle mr-2"></i>
+                        Esta intercorrência ficará registrada no histórico da OS. Somente você e administradores poderão visualizar.
+                    </p>
+                </div>
+            </div>
+            
+            <div class="p-6 border-t border-gray-200 dark:border-gray-700 flex justify-end gap-3">
+                <button type="button" data-close-modal="modal-add-issue" class="px-6 py-2 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 transition-all">
+                    Cancelar
+                </button>
+                <button type="button" id="btn-confirm-add-issue" class="bg-orange-600 hover:bg-orange-700 text-white px-6 py-2 rounded-lg transition-all font-semibold">
+                    <i class="fas fa-save mr-2"></i>Salvar Intercorrência
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Scanner QR Code -->
+    <div id="modal-qr-scanner" class="hidden fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-white dark:bg-gray-800 rounded-3xl shadow-2xl max-w-2xl w-full">
+            <div class="p-6 border-b border-gray-200 dark:border-gray-700">
+                <h3 class="text-2xl font-bold text-gray-900 dark:text-white">
+                    <i class="fas fa-qrcode text-blue-600 mr-2"></i>
+                    Ler QR Code da OS
+                </h3>
+            </div>
+            
+            <div class="p-6">
+                <!-- Área do scanner -->
+                <div id="qr-reader" class="w-full rounded-lg overflow-hidden bg-black" style="min-height: 300px;"></div>
+                
+                <!-- Instruções -->
+                <div class="mt-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                    <p class="text-sm text-blue-800 dark:text-blue-300">
+                        <i class="fas fa-info-circle mr-2"></i>
+                        Posicione o QR code da ordem de serviço na frente da câmera. O sistema abrirá automaticamente os detalhes da OS quando detectado.
+                    </p>
+                </div>
+                
+                <!-- Status -->
+                <div id="qr-scanner-status" class="mt-3 text-center text-sm text-gray-600 dark:text-gray-400">
+                    Aguardando câmera...
+                </div>
+            </div>
+            
+            <div class="p-6 border-t border-gray-200 dark:border-gray-700 flex justify-end gap-3">
+                <button type="button" id="btn-close-qr-scanner" class="px-6 py-2 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 transition-all">
+                    <i class="fas fa-times mr-2"></i>Fechar
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="prostoral.js"></script>
+    <script src="prostoral-ordens.js"></script>
+    <script src="prostoral-kits.js"></script>
+    
+    <script>
+        // Mobile Menu Logic
+        const mobileMenuToggle = document.getElementById('mobileMenuToggle');
+        const mobileMenu = document.getElementById('mobileMenu');
+        const mobileMenuOverlay = document.getElementById('mobileMenuOverlay');
+        const closeMobileMenu = document.getElementById('closeMobileMenu');
+        
+        function openMobileMenu() {
+            mobileMenu.classList.remove('translate-x-full');
+            mobileMenuOverlay.classList.remove('opacity-0', 'invisible');
+        }
+        
+        function closeMobileMenuFn() {
+            mobileMenu.classList.add('translate-x-full');
+            mobileMenuOverlay.classList.add('opacity-0', 'invisible');
+        }
+        
+        mobileMenuToggle?.addEventListener('click', openMobileMenu);
+        closeMobileMenu?.addEventListener('click', closeMobileMenuFn);
+        mobileMenuOverlay?.addEventListener('click', closeMobileMenuFn);
+        
+        // Mobile Logout
+        document.getElementById('mobileLogoutBtn')?.addEventListener('click', () => {
+            if (window.authManager) {
+                window.authManager.signOut();
+            }
+        });
+        
+        // Dark Mode Toggle
+        const darkModeToggle = document.getElementById('darkModeToggle');
+        const mobileDarkModeToggle = document.getElementById('mobileDarkModeToggle');
+        
+        function toggleDarkMode() {
+            document.documentElement.classList.toggle('dark');
+            localStorage.setItem('darkMode', document.documentElement.classList.contains('dark'));
+        }
+        
+        // Load dark mode preference
+        if (localStorage.getItem('darkMode') === 'true') {
+            document.documentElement.classList.add('dark');
+        }
+        
+        darkModeToggle?.addEventListener('click', toggleDarkMode);
+        mobileDarkModeToggle?.addEventListener('click', toggleDarkMode);
+        
+        // Tab Navigation
+        const tabs = document.querySelectorAll('.prostoral-tab');
+        const tabContents = document.querySelectorAll('.tab-content');
+        
+        tabs.forEach(tab => {
+            tab.addEventListener('click', () => {
+                const targetTab = tab.dataset.tab;
+                
+                // Remove active class from all tabs
+                tabs.forEach(t => {
+                    t.classList.remove('active');
+                    t.classList.remove('bg-emerald-100', 'dark:bg-emerald-900', 'text-emerald-700', 'dark:text-emerald-300');
+                    t.classList.add('text-gray-600', 'dark:text-gray-400');
+                });
+                
+                // Add active class to clicked tab
+                tab.classList.add('active');
+                tab.classList.add('bg-emerald-100', 'dark:bg-emerald-900', 'text-emerald-700', 'dark:text-emerald-300');
+                tab.classList.remove('text-gray-600', 'dark:text-gray-400');
+                
+                // Hide all tab contents
+                tabContents.forEach(content => {
+                    content.classList.remove('active');
+                });
+                
+                // Show target tab content
+                const targetContent = document.getElementById(`${targetTab}-content`);
+                if (targetContent) {
+                    targetContent.classList.add('active');
+                    
+                    // Carregar dados da aba se necessário
+                    if (targetTab === 'clients' && window.prostoralApp) {
+                        window.prostoralApp.loadClients();
+                    } else if (targetTab === 'kits' && window.kitsModule) {
+                        window.kitsModule.init();
+                    } else if (targetTab === 'orders' && window.ordersApp) {
+                        if (!window.ordersApp.initialized) {
+                            window.ordersApp.init();
+                            window.ordersApp.initialized = true;
+                        }
+                    } else if (targetTab === 'inventory' && window.prostoralLab) {
+                        // Inicializar o módulo de laboratório
+                        if (!window.prostoralLab.initialized) {
+                            window.prostoralLab.init();
+                            window.prostoralLab.initialized = true;
+                        }
+                        // Carregar produtos por padrão
+                        window.prostoralLab.loadProducts();
+                    }
+                }
+            });
+        });
+
+        // Lab tabs navigation
+        document.querySelectorAll('.lab-tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                const targetTab = tab.getAttribute('data-lab-tab');
+                
+                // Remove active de todas as abas
+                document.querySelectorAll('.lab-tab').forEach(t => {
+                    t.classList.remove('active', 'bg-emerald-100', 'dark:bg-emerald-900', 'text-emerald-700', 'dark:text-emerald-300');
+                    t.classList.add('hover:bg-gray-100', 'dark:hover:bg-gray-700', 'text-gray-600', 'dark:text-gray-400');
+                });
+                
+                // Adicionar active à aba clicada
+                tab.classList.add('active', 'bg-emerald-100', 'dark:bg-emerald-900', 'text-emerald-700', 'dark:text-emerald-300');
+                tab.classList.remove('hover:bg-gray-100', 'dark:hover:bg-gray-700', 'text-gray-600', 'dark:text-gray-400');
+                
+                // Ocultar todo o conteúdo
+                document.querySelectorAll('.lab-tab-content').forEach(content => {
+                    content.classList.remove('active');
+                });
+                
+                // Mostrar o conteúdo correspondente
+                const targetContent = document.getElementById(`lab-${targetTab}-content`);
+                if (targetContent) {
+                    targetContent.classList.add('active');
+                    
+                    // Carregar dados da aba se necessário
+                    if (window.prostoralLab) {
+                        if (targetTab === 'produtos') {
+                            window.prostoralLab.loadProducts();
+                        } else if (targetTab === 'movimentacoes') {
+                            window.prostoralLab.loadMovements();
+                        } else if (targetTab === 'alertas') {
+                            window.prostoralLab.loadAlerts();
+                        } else if (targetTab === 'relatorios') {
+                            window.prostoralLab.loadReports();
+                        }
+                    }
+                }
+            });
+        });
+        
+        // FIX: Forçar exibição do submenu de laboratório
+        function forceLabSubmenuDisplay() {
+            const inventoryTab = document.querySelector('[data-tab="inventory"]');
+            if (inventoryTab && inventoryTab.classList.contains('active')) {
+                const mobileGrid = document.querySelector('#inventory-content .grid.grid-cols-2');
+                const desktopFlex = document.querySelector('#inventory-content .hidden.sm\\:flex');
+                
+                if (mobileGrid) {
+                    mobileGrid.style.display = 'grid';
+                    mobileGrid.style.visibility = 'visible';
+                    mobileGrid.style.opacity = '1';
+                    mobileGrid.style.height = 'auto';
+                }
+                
+                if (desktopFlex) {
+                    desktopFlex.style.display = 'flex';
+                    desktopFlex.style.visibility = 'visible';
+                    desktopFlex.style.opacity = '1';
+                    desktopFlex.style.height = 'auto';
+                }
+            }
+        }
+        
+        // Executar após mudança de aba e ao carregar
+        const originalTabClick = document.querySelectorAll('.prostoral-tab');
+        originalTabClick.forEach(tab => {
+            tab.addEventListener('click', () => {
+                setTimeout(forceLabSubmenuDisplay, 100);
+            });
+        });
+        
+        // Executar ao carregar a página se a aba estiver ativa
+        setTimeout(forceLabSubmenuDisplay, 500);
+    </script>
+
+    <!-- jsQR - Biblioteca para leitura de QR Code -->
+    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+    
+    <!-- QuaggaJS - Biblioteca para leitura de Código de Barras -->
+    <script src="https://cdn.jsdelivr.net/npm/@ericblade/quagga2@1.8.4/dist/quagga.min.js"></script>
+
+    <!-- Módulo de Laboratório -->
+    <script src="laboratorio.js"></script>
+</body>
+</html>
