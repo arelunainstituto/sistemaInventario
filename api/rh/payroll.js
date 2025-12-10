@@ -64,17 +64,15 @@ router.get('/', requirePermission('HR', 'read_own'), async (req, res) => {
 // POST / - Criar/Calcular folha
 router.post('/', requirePermission('HR', 'payroll_process'), async (req, res) => {
     try {
-        const { employee_id, period_month, period_year, base_salary, overtime_hours, overtime_value, bonus, other_discounts } = req.body;
+        const { employee_id, period_month, period_year, base_salary, overtime_hours, overtime_value, bonus, other_discounts, inss_discount, irrf_discount, currency } = req.body;
 
-        // Cálculos básicos (simplificados)
-        // TODO: Implementar tabelas reais de INSS e IRRF
         const gross_salary = parseFloat(base_salary) + parseFloat(overtime_value || 0) + parseFloat(bonus || 0);
 
-        // Estimativa de descontos (exemplo: 11% INSS, 15% IRRF simplificado)
-        const inss_discount = gross_salary * 0.11;
-        const irrf_discount = (gross_salary - inss_discount) * 0.075; // Exemplo muito simplificado
-        const total_discounts = inss_discount + irrf_discount + parseFloat(other_discounts || 0);
+        // Use provided tax values or calculate estimates
+        const inss = inss_discount !== undefined ? parseFloat(inss_discount) : (gross_salary * 0.11);
+        const irrf = irrf_discount !== undefined ? parseFloat(irrf_discount) : ((gross_salary - inss) * 0.075);
 
+        const total_discounts = inss + irrf + parseFloat(other_discounts || 0);
         const net_salary = gross_salary - total_discounts;
 
         const { data, error } = await supabase
@@ -87,10 +85,11 @@ router.post('/', requirePermission('HR', 'payroll_process'), async (req, res) =>
                 overtime_hours: overtime_hours || 0,
                 overtime_value: overtime_value || 0,
                 bonus: bonus || 0,
-                inss_discount,
-                irrf_discount,
+                inss_discount: inss,
+                irrf_discount: irrf,
                 other_discounts: other_discounts || 0,
                 net_salary,
+                currency: currency || 'EUR',
                 status: 'DRAFT',
                 created_by: req.user.id
             }])
@@ -103,6 +102,78 @@ router.post('/', requirePermission('HR', 'payroll_process'), async (req, res) =>
     } catch (error) {
         console.error('Erro ao criar folha:', error);
         res.status(500).json({ error: 'Erro interno ao criar folha' });
+    }
+});
+
+// PUT /:id - Atualizar folha (apenas Rascunho)
+router.put('/:id', requirePermission('HR', 'payroll_process'), async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { base_salary, overtime_hours, overtime_value, bonus, other_discounts, inss_discount, irrf_discount, currency } = req.body;
+
+        // Verificar se está em rascunho
+        const { data: current } = await supabase.from('rh_payrolls').select('status').eq('id', id).single();
+        if (current.status !== 'DRAFT') {
+            return res.status(400).json({ error: 'Apenas folhas em rascunho podem ser editadas' });
+        }
+
+        const gross_salary = parseFloat(base_salary) + parseFloat(overtime_value || 0) + parseFloat(bonus || 0);
+        const inss = parseFloat(inss_discount || 0);
+        const irrf = parseFloat(irrf_discount || 0);
+        const total_discounts = inss + irrf + parseFloat(other_discounts || 0);
+        const net_salary = gross_salary - total_discounts;
+
+        const { data, error } = await supabase
+            .from('rh_payrolls')
+            .update({
+                base_salary,
+                overtime_hours: overtime_hours || 0,
+                overtime_value: overtime_value || 0,
+                bonus: bonus || 0,
+                inss_discount: inss,
+                irrf_discount: irrf,
+                other_discounts: other_discounts || 0,
+                net_salary,
+                currency: currency || 'EUR',
+                updated_at: new Date()
+            })
+            .eq('id', id)
+            .select()
+            .single();
+
+        if (error) throw error;
+
+        res.json(data);
+    } catch (error) {
+        console.error('Erro ao atualizar folha:', error);
+        res.status(500).json({ error: 'Erro interno' });
+    }
+});
+
+// DELETE /:id - Excluir folha (apenas Rascunho)
+router.delete('/:id', requirePermission('HR', 'payroll_process'), async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        // Verificar se está em rascunho
+        const { data: current } = await supabase.from('rh_payrolls').select('status').eq('id', id).single();
+        if (!current) return res.status(404).json({ error: 'Folha não encontrada' });
+
+        if (current.status !== 'DRAFT') {
+            return res.status(400).json({ error: 'Apenas folhas em rascunho podem ser excluídas' });
+        }
+
+        const { error } = await supabase
+            .from('rh_payrolls')
+            .delete()
+            .eq('id', id);
+
+        if (error) throw error;
+
+        res.json({ message: 'Folha excluída com sucesso' });
+    } catch (error) {
+        console.error('Erro ao excluir folha:', error);
+        res.status(500).json({ error: 'Erro interno' });
     }
 });
 

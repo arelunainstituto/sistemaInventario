@@ -162,13 +162,13 @@ function renderOrgChart(employees) {
                 const color = '#7e22ce'; // Purple-600
                 const initials = d.data.name.substring(0, 2).toUpperCase();
                 const imageHtml = d.data.imageUrl
-                    ? `<img src="${d.data.imageUrl}" class="w-10 h-10 rounded-full border-2 border-white shadow-sm object-cover" />`
-                    : `<div class="w-10 h-10 rounded-full bg-purple-100 border-2 border-white shadow-sm flex items-center justify-center text-purple-600 font-bold text-xs">${initials}</div>`;
+                    ? `<img src="${d.data.imageUrl}" style="width: 50px; height: 50px;" class="rounded-full border-2 border-white shadow-sm object-cover" />`
+                    : `<div style="width: 50px; height: 50px;" class="rounded-full bg-purple-100 border-2 border-white shadow-sm flex items-center justify-center text-purple-600 font-bold text-sm">${initials}</div>`;
 
                 return `
                     <div style="font-family: 'Inter', sans-serif; background-color:white; position:absolute;margin-top:-1px; margin-left:-1px;width:${d.width}px;height:${d.height}px;border-radius:10px;border: 1px solid #E4E2E9; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);">
                         <div style="background-color:${color};position:absolute;margin-top:-25px;margin-left:${15}px;border-radius:100px;width:50px;height:50px;" ></div>
-                        <div style="position:absolute;margin-top:-20px;margin-left:${20}px;">
+                        <div style="position:absolute;margin-top:-25px;margin-left:${15}px;">
                             ${imageHtml}
                         </div>
                         <div style="font-size:15px;color:#08011E;margin-left:20px;margin-top:32px"> ${d.data.name} </div>

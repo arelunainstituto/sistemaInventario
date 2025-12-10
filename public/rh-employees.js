@@ -95,7 +95,7 @@ const employeesTemplate = `
                 </nav>
             </div>
             
-            <form id="employeeForm" onsubmit="handleEmployeeSubmit(event)" class="flex-1 overflow-y-auto p-6">
+            <form id="employeeForm" onsubmit="handleEmployeeSubmit(event)" class="flex-1 overflow-y-auto p-6" novalidate>
                 <input type="hidden" id="employeeId">
                 
                 <!-- 1. DADOS PESSOAIS -->
@@ -963,9 +963,40 @@ window.editEmployee = async function (id) {
 
 window.handleEmployeeSubmit = async function (e) {
     e.preventDefault();
+
+    // Manual Validation
+    const form = e.target;
+
+    // Required Fields Validation
+    const requiredFields = [
+        { name: 'name', label: 'Nome Completo', tab: 'personal' },
+        { name: 'nif', label: 'NIF', tab: 'personal' },
+        { name: 'department', label: 'Departamento', tab: 'professional' },
+        { name: 'role', label: 'Cargo / Função', tab: 'professional' }
+    ];
+
+    for (const field of requiredFields) {
+        const input = form.elements[field.name];
+        if (!input || !input.value.trim()) {
+            // Switch to tab
+            if (window.switchModalTab) {
+                window.switchModalTab(field.tab);
+            }
+
+            // Show alert
+            alert(`O campo ${field.label} é obrigatório.`);
+
+            // Focus field
+            if (input) {
+                setTimeout(() => input.focus(), 100);
+            }
+
+            return; // Stop submission
+        }
+    }
+
     window.showLoading();
 
-    const form = e.target;
     const id = document.getElementById('employeeId').value;
     const formData = new FormData(form);
     const rawData = Object.fromEntries(formData.entries());
