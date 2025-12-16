@@ -19,7 +19,7 @@ class ClientPortalApp {
 
     async init() {
         console.log('Inicializando Portal do Cliente...');
-        
+
         // Aguardar authManager estar pronto
         if (!window.authManager || !window.authManager.isUserAuthenticated()) {
             console.error('Usuário não autenticado');
@@ -42,13 +42,13 @@ class ClientPortalApp {
 
         // Setup event listeners
         this.setupEventListeners();
-        
+
         // Carregar dashboard
         await this.loadDashboard();
-        
+
         // Carregar ordens inicialmente
         await this.loadOrders();
-        
+
         console.log('Portal do Cliente inicializado!');
     }
 
@@ -64,6 +64,15 @@ class ClientPortalApp {
             }
 
             const data = await response.json();
+            console.log('[DEBUG] checkClientRole response:', data);
+
+            // Verificar se é usuário interno e redirecionar
+            if (data.isInternal && data.redirectUrl) {
+                alert('Usuário interno detectado. Redirecionando para o Sistema de Laboratório...');
+                window.location.href = data.redirectUrl;
+                return;
+            }
+
             if (!data.isClient) {
                 alert('Acesso negado: Você não tem permissão de cliente');
                 window.location.href = '/prostoral.html';
@@ -89,7 +98,7 @@ class ClientPortalApp {
         if (darkModeToggle) {
             darkModeToggle.addEventListener('click', () => this.toggleDarkMode());
         }
-        
+
         const mobileDarkModeToggle = document.getElementById('mobileDarkModeToggle');
         if (mobileDarkModeToggle) {
             mobileDarkModeToggle.addEventListener('click', () => this.toggleDarkMode());
@@ -100,21 +109,21 @@ class ClientPortalApp {
         const closeMobileMenu = document.getElementById('closeMobileMenu');
         const mobileMenuOverlay = document.getElementById('mobileMenuOverlay');
         const mobileMenu = document.getElementById('mobileMenu');
-        
+
         if (openMobileMenu) {
             openMobileMenu.addEventListener('click', () => {
                 mobileMenu.classList.remove('translate-x-full');
                 mobileMenuOverlay.classList.remove('opacity-0', 'invisible');
             });
         }
-        
+
         if (closeMobileMenu) {
             closeMobileMenu.addEventListener('click', () => {
                 mobileMenu.classList.add('translate-x-full');
                 mobileMenuOverlay.classList.add('opacity-0', 'invisible');
             });
         }
-        
+
         if (mobileMenuOverlay) {
             mobileMenuOverlay.addEventListener('click', () => {
                 mobileMenu.classList.add('translate-x-full');
@@ -127,7 +136,7 @@ class ClientPortalApp {
         if (logoutBtn) {
             logoutBtn.addEventListener('click', () => this.logout());
         }
-        
+
         const mobileLogoutBtn = document.getElementById('mobileLogoutBtn');
         if (mobileLogoutBtn) {
             mobileLogoutBtn.addEventListener('click', () => this.logout());
@@ -235,7 +244,7 @@ class ClientPortalApp {
     async loadDashboard() {
         try {
             const token = await window.authManager.getAccessToken();
-            
+
             // Carregar KPIs
             const kpisResponse = await fetch(`${this.apiBaseUrl}/client/dashboard/kpis`, {
                 headers: { 'Authorization': `Bearer ${token}` }
@@ -246,7 +255,7 @@ class ClientPortalApp {
             }
 
             const kpis = await kpisResponse.json();
-            
+
             document.getElementById('kpi-total-orders').textContent = kpis.total_orders || 0;
             document.getElementById('kpi-active-orders').textContent = kpis.active_orders || 0;
             document.getElementById('kpi-completed-orders').textContent = kpis.completed_orders || 0;
@@ -283,7 +292,7 @@ class ClientPortalApp {
 
     renderRecentActivities(orders) {
         const container = document.getElementById('recent-activities');
-        
+
         if (!orders || orders.length === 0) {
             container.innerHTML = '<p class="text-gray-500 dark:text-gray-400">Nenhuma atividade recente</p>';
             return;
@@ -313,7 +322,7 @@ class ClientPortalApp {
     async loadOrders() {
         try {
             const token = await window.authManager.getAccessToken();
-            
+
             const params = new URLSearchParams({
                 page: this.currentPage,
                 limit: this.itemsPerPage,
@@ -333,7 +342,7 @@ class ClientPortalApp {
             const data = await response.json();
             this.orders = data.orders || [];
             this.totalPages = data.pagination?.totalPages || 1;
-            
+
             this.renderOrdersTable();
 
         } catch (error) {
@@ -344,7 +353,7 @@ class ClientPortalApp {
 
     renderOrdersTable() {
         const tbody = document.getElementById('orders-table-body');
-        
+
         if (!this.orders || this.orders.length === 0) {
             tbody.innerHTML = `
                 <tr>
@@ -523,10 +532,10 @@ class ClientPortalApp {
                     </button>
                 </div>
                 <div id="client-issues-list">
-                    ${order.client_issues && order.client_issues.length > 0 ? 
-                        order.client_issues.map(issue => this.renderIssue(issue)).join('') :
-                        '<p class="text-gray-500 dark:text-gray-400">Nenhuma intercorrência registrada</p>'
-                    }
+                    ${order.client_issues && order.client_issues.length > 0 ?
+                order.client_issues.map(issue => this.renderIssue(issue)).join('') :
+                '<p class="text-gray-500 dark:text-gray-400">Nenhuma intercorrência registrada</p>'
+            }
                 </div>
             </div>
 
@@ -537,9 +546,9 @@ class ClientPortalApp {
                 </h4>
                 <div class="space-y-3">
                     ${order.history && order.history.length > 0 ?
-                        order.history.map(h => this.renderHistoryItem(h)).join('') :
-                        '<p class="text-gray-500 dark:text-gray-400">Nenhum histórico disponível</p>'
-                    }
+                order.history.map(h => this.renderHistoryItem(h)).join('') :
+                '<p class="text-gray-500 dark:text-gray-400">Nenhum histórico disponível</p>'
+            }
                 </div>
             </div>
         `;

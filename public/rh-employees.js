@@ -450,6 +450,22 @@ const employeesTemplate = `
                         </div>
                         
                         <div class="col-span-2">
+                            <h4 class="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">Segurança</h4>
+                            <div class="bg-gray-50 p-4 rounded-lg border border-gray-200 mb-6">
+                                <h5 class="text-sm font-medium text-gray-700 mb-3">Definir Senha de Acesso</h5>
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div>
+                                        <label class="form-label text-xs">Nova Senha</label>
+                                        <input type="password" name="password" class="form-input text-sm" placeholder="Deixe em branco para manter a atual" minlength="6">
+                                    </div>
+                                    <div>
+                                        <label class="form-label text-xs">Confirmar Senha</label>
+                                        <input type="password" name="confirm_password" class="form-input text-sm" placeholder="Confirme a nova senha">
+                                    </div>
+                                </div>
+                                <p class="text-xs text-gray-500 mt-2">A senha deve ter no mínimo 6 caracteres.</p>
+                            </div>
+
                             <h4 class="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">Acesso ao Sistema</h4>
                             <div class="bg-gray-50 p-4 rounded-lg border border-gray-200">
                                 <p class="text-sm text-gray-600 mb-3">Selecione os módulos que este funcionário poderá acessar:</p>
@@ -458,6 +474,16 @@ const employeesTemplate = `
                                         <i class="fas fa-spinner fa-spin mr-2"></i> Carregando módulos...
                                     </div>
                                 </div>
+                            </div>
+
+                            <h4 class="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4 mt-6">Vinculação com Cliente (Externo)</h4>
+                            <div class="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                                <label class="form-label text-sm">Vincular a Cliente Existente</label>
+                                <p class="text-xs text-gray-500 mb-2">Se selecionado, este usuário terá permissão para criar ordens em nome deste cliente.</p>
+                                <select name="linked_client_id" id="linkedClientSelect" class="form-input text-sm">
+                                    <option value="">Nenhum (Apenas Interno)</option>
+                                    <!-- Populated by JS -->
+                                </select>
                             </div>
                         </div>
                         
@@ -786,7 +812,8 @@ window.openEmployeeModal = async function (employee = null) {
     // Carregar dependências
     await Promise.all([
         loadAvailableModules(),
-        window.loadSupervisors ? window.loadSupervisors() : Promise.resolve()
+        window.loadSupervisors ? window.loadSupervisors() : Promise.resolve(),
+        window.loadClientsList ? window.loadClientsList() : Promise.resolve()
     ]);
 
     if (employee) {
@@ -890,6 +917,12 @@ window.openEmployeeModal = async function (employee = null) {
         } else {
             toggleBankingRegion('PT'); // Default to PT if no payroll data
             if (window.toggleSalaryCurrency) window.toggleSalaryCurrency('EUR'); // Default to EUR
+        }
+
+        // Set Linked Client
+        if (employee.linked_client && employee.linked_client.id) {
+            const clientSelect = document.getElementById('linkedClientSelect');
+            if (clientSelect) clientSelect.value = employee.linked_client.id;
         }
 
     } else {
@@ -1096,8 +1129,31 @@ window.handleEmployeeSubmit = async function (e) {
         },
 
         // Módulos
-        modules: Array.from(document.querySelectorAll('input[name="modules"]:checked')).map(cb => cb.value)
+        modules: Array.from(document.querySelectorAll('input[name="modules"]:checked')).map(cb => cb.value),
+
+        // Cliente Vinculado
+        linked_client_id: document.getElementById('linkedClientSelect').value || null,
+
+
     };
+
+    // Validar Senha
+    const password = rawData.password;
+    const confirmPassword = rawData.confirm_password;
+
+    if (password) {
+        if (password.length < 6) {
+            alert('A senha deve ter pelo menos 6 caracteres.');
+            window.hideLoading();
+            return;
+        }
+        if (password !== confirmPassword) {
+            alert('As senhas não coincidem.');
+            window.hideLoading();
+            return;
+        }
+        employeeData.password = password;
+    }
 
     // Coletar Contactos de Emergência
     const emergency_contacts = [];
@@ -1267,6 +1323,29 @@ window.loadSupervisors = async function () {
         }
     } catch (error) {
         console.error('Erro ao carregar supervisores:', error);
+    }
+};
+
+window.loadClientsList = async function () {
+    const select = document.getElementById('linkedClientSelect');
+    if (!select) return;
+
+    try {
+        const response = await window.authenticatedFetch('/api/rh/employees/clients');
+        if (response.ok) {
+            const data = await response.json();
+            // Preserve current selection if any
+            const currentValue = select.value;
+
+            select.innerHTML = '<option value="">Nenhum (Apenas Interno)</option>' +
+                data
+                    .map(client => `<option value="${client.id}">${client.name}</option>`)
+                    .join('');
+
+            if (currentValue) select.value = currentValue;
+        }
+    } catch (error) {
+        console.error('Erro ao carregar clientes:', error);
     }
 };
 

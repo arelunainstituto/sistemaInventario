@@ -8,6 +8,29 @@ const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY; // Usar Service Role para operações administrativas
 const supabase = createClient(supabaseUrl, supabaseKey);
 
+// GET /clients - Listar todos os clientes disponíveis para vinculação
+router.get('/clients', requirePermission('HR', 'read'), async (req, res) => {
+    console.log('[RH] GET /clients endpoint hit');
+    try {
+        console.log('[RH] Fetching clients from prostoral_clients table...');
+        const { data, error } = await supabase
+            .from('prostoral_clients')
+            .select('id, name, user_id')
+            .order('name');
+
+        if (error) {
+            console.error('[RH] Supabase error fetching clients:', error);
+            throw error;
+        }
+
+        console.log(`[RH] Found ${data ? data.length : 0} clients`);
+        res.json(data);
+    } catch (error) {
+        console.error('Erro detalhado ao listar clientes:', error);
+        res.status(500).json({ error: 'Erro interno ao listar clientes', details: error.message });
+    }
+});
+
 // GET / - Listar funcionários
 router.get('/', requirePermission('HR', 'read_own'), async (req, res) => {
     try {
@@ -52,6 +75,8 @@ router.get('/', requirePermission('HR', 'read_own'), async (req, res) => {
         res.status(500).json({ error: 'Erro interno ao listar funcionários' });
     }
 });
+
+
 
 // GET /:id - Detalhes do funcionário
 router.get('/:id', async (req, res) => {
@@ -138,6 +163,17 @@ router.get('/:id', async (req, res) => {
             data.supervisor = supervisor || null;
         }
 
+        // Buscar cliente vinculado
+        if (data.user_id) {
+            const { data: linkedClient } = await supabase
+                .from('prostoral_clients')
+                .select('id, name')
+                .eq('user_id', data.user_id)
+                .single();
+
+            data.linked_client = linkedClient || null;
+        }
+
         res.json(data);
     } catch (error) {
         console.error('Erro ao buscar funcionário:', error);
@@ -168,7 +204,9 @@ router.post('/', requirePermission('HR', 'create'), async (req, res) => {
             // Related data
             emergency_contacts, // Array of emergency contacts
             payroll_data, // Object with payroll information
-            modules // Array of module IDs
+            modules, // Array of module IDs
+            password, // Optional initial password
+            linked_client_id // ID do cliente para vincular
         } = req.body;
 
         // Validações básicas
@@ -190,7 +228,7 @@ router.post('/', requirePermission('HR', 'create'), async (req, res) => {
             // Criar novo usuário
             const { data: newUser, error: createError } = await supabase.auth.admin.createUser({
                 email: email,
-                password: 'Mudar123!', // Senha temporária padrão
+                password: password || 'Mudar123!', // Use provided password or default
                 email_confirm: true,
                 user_metadata: {
                     full_name: name,
@@ -338,6 +376,25 @@ router.post('/', requirePermission('HR', 'create'), async (req, res) => {
             if (modulesError) console.error('Erro ao atribuir módulos:', modulesError);
         }
 
+        // 7. Vincular a cliente (se fornecido)
+        if (linked_client_id && userId) {
+            console.log(`[RH] Vinculando usuário ${userId} ao cliente ${linked_client_id}`);
+
+            // Primeiro, garantir que este usuário não esteja vinculado a outros clientes
+            await supabase
+                .from('prostoral_clients')
+                .update({ user_id: null })
+                .eq('user_id', userId);
+
+            // Vincular ao cliente selecionado
+            const { error: linkError } = await supabase
+                .from('prostoral_clients')
+                .update({ user_id: userId })
+                .eq('id', linked_client_id);
+
+            if (linkError) console.error('Erro ao vincular cliente:', linkError);
+        }
+
         res.status(201).json(employee);
     } catch (error) {
         console.error('Erro ao criar funcionário:', error);
@@ -360,11 +417,14 @@ router.put('/:id', requirePermission('HR', 'update'), async (req, res) => {
         const newSalary = updates.salary_base;
         const emergency_contacts = updates.emergency_contacts;
         const payroll_data = updates.payroll_data;
+        const password = updates.password;
 
         delete updates.modules;
         delete updates.salary_base; // Não atualizar diretamente
         delete updates.emergency_contacts;
         delete updates.payroll_data;
+        delete updates.password;
+        delete updates.linked_client_id; // Processar separadamente
 
         // Remover campos que não devem ser atualizados diretamente
         delete updates.id;
@@ -381,12 +441,27 @@ router.put('/:id', requirePermission('HR', 'update'), async (req, res) => {
         if (fetchError) throw fetchError;
 
         // Atualizar dados do funcionário (exceto salary_base)
-        const { data, error } = await supabase
-            .from('rh_employees')
-            .update(updates)
-            .eq('id', id)
-            .select()
-            .single();
+        // Atualizar dados do funcionário (exceto salary_base)
+        let data, error;
+
+        if (Object.keys(updates).length > 0) {
+            const result = await supabase
+                .from('rh_employees')
+                .update(updates)
+                .eq('id', id)
+                .select()
+                .single();
+            data = result.data;
+            error = result.error;
+        } else {
+            const result = await supabase
+                .from('rh_employees')
+                .select('*')
+                .eq('id', id)
+                .single();
+            data = result.data;
+            error = result.error;
+        }
 
         if (error) throw error;
 
@@ -517,6 +592,43 @@ router.put('/:id', requirePermission('HR', 'update'), async (req, res) => {
                     console.error('Erro ao atualizar módulos:', modulesError);
                     // Não falhar a atualização do funcionário por isso
                 }
+            }
+        }
+
+        // Atualizar Senha (se fornecida e usuário existir)
+        if (password && currentEmployee.user_id) {
+            console.log(`[RH] Atualizando senha do usuário ${currentEmployee.user_id}`);
+            const { error: passwordError } = await supabase.auth.admin.updateUserById(
+                currentEmployee.user_id,
+                { password: password }
+            );
+
+            if (passwordError) {
+                console.error('Erro ao atualizar senha:', passwordError);
+            }
+        }
+
+        // Atualizar Vinculação com Cliente
+        const linked_client_id = req.body.linked_client_id;
+
+        // Se linked_client_id foi enviado (mesmo que seja null para desvincular)
+        if (currentEmployee.user_id && req.body.hasOwnProperty('linked_client_id')) {
+            console.log(`[RH] Atualizando vínculo de cliente para usuário ${currentEmployee.user_id}`);
+
+            // 1. Remover vínculo existente deste usuário com qualquer cliente
+            await supabase
+                .from('prostoral_clients')
+                .update({ user_id: null })
+                .eq('user_id', currentEmployee.user_id);
+
+            // 2. Se houver novo ID, criar vínculo
+            if (linked_client_id) {
+                const { error: linkError } = await supabase
+                    .from('prostoral_clients')
+                    .update({ user_id: currentEmployee.user_id })
+                    .eq('id', linked_client_id);
+
+                if (linkError) console.error('Erro ao vincular cliente:', linkError);
             }
         }
 

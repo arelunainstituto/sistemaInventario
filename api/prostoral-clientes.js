@@ -34,13 +34,50 @@ async function getClientId(userId) {
 async function checkClientRole(req, res) {
     try {
         const user = req.user;
-        
-        // Verificar se o usuário tem a role "cliente"
-        const isClient = user.roles?.includes('cliente') || user.roles?.includes('client');
-        
+
+        // Verificar se o usuário tem a role "cliente" ou permissão de cliente (ex: Admin)
+        const hasClientPermission = user.permissions?.some(p => p.startsWith('prostoral_client'));
+        const isClient = user.roles?.includes('cliente') || user.roles?.includes('client') || hasClientPermission;
+
         // Ou verificar se está vinculado a um client na tabela prostoral_clients
         const clientId = await getClientId(user.id);
-        
+
+        console.log('[DEBUG] checkClientRole:', {
+            userId: user.id,
+            roles: user.roles,
+            permissions: user.permissions,
+            isClient,
+            hasClientPermission,
+            clientId
+        });
+
+        // Se não for cliente (e nem tiver permissão), verificar se é um usuário interno SEM acesso ao módulo client
+        // Se tiver permissão prostoral_client, NÃO redireciona, deixa passar
+        // Isso evita que funcionários internos recebam erro de permissão ao tentar acessar o portal do cliente
+        // e permite redirecioná-los para o dashboard correto
+        if (!isClient && !clientId) {
+            const hasAdmin = user.roles?.includes('Admin');
+            const hasLabPermission = user.permissions?.some(p => p.startsWith('laboratory:'));
+
+            console.log('[DEBUG] Internal Check:', {
+                hasAdmin,
+                hasLabPermission,
+                userRoles: user.roles,
+                userPermissions: user.permissions?.filter(p => p.includes('laboratory'))
+            });
+
+            const isInternal = hasAdmin || hasLabPermission;
+
+            if (isInternal) {
+                console.log('[DEBUG] Redirecting internal user');
+                return res.json({
+                    isClient: false,
+                    isInternal: true,
+                    redirectUrl: '/prostoral.html'
+                });
+            }
+        }
+
         return res.json({
             isClient: isClient || !!clientId,
             clientId: clientId
@@ -62,6 +99,16 @@ async function getClientDashboardKPIs(req, res) {
         const clientId = await getClientId(user.id);
 
         if (!clientId) {
+            // Se for admin/permissão, retorna vazio
+            const hasClientPermission = user.permissions?.some(p => p.startsWith('prostoral_client')) || user.roles?.includes('Admin');
+            if (hasClientPermission) {
+                return res.json({
+                    total_orders: 0,
+                    active_orders: 0,
+                    completed_orders: 0,
+                    open_issues: 0
+                });
+            }
             return res.status(403).json({ error: 'Usuário não é cliente' });
         }
 
@@ -116,6 +163,11 @@ async function getClientRecentOrders(req, res) {
         const clientId = await getClientId(user.id);
 
         if (!clientId) {
+            // Se for admin/permissão, retorna vazio
+            const hasClientPermission = user.permissions?.some(p => p.startsWith('prostoral_client')) || user.roles?.includes('Admin');
+            if (hasClientPermission) {
+                return res.json([]);
+            }
             return res.status(403).json({ error: 'Usuário não é cliente' });
         }
 
@@ -148,6 +200,19 @@ async function listClientOrders(req, res) {
         const clientId = await getClientId(user.id);
 
         if (!clientId) {
+            // Se for admin/permissão, retorna vazio
+            const hasClientPermission = user.permissions?.some(p => p.startsWith('prostoral_client')) || user.roles?.includes('Admin');
+            if (hasClientPermission) {
+                return res.json({
+                    orders: [],
+                    pagination: {
+                        page: 1,
+                        limit: 20,
+                        total: 0,
+                        totalPages: 0
+                    }
+                });
+            }
             return res.status(403).json({ error: 'Usuário não é cliente' });
         }
 
@@ -210,6 +275,11 @@ async function createClientOrder(req, res) {
         const clientId = await getClientId(user.id);
 
         if (!clientId) {
+            // Se for admin/permissão, explicar o problema
+            const hasClientPermission = user.permissions?.some(p => p.startsWith('prostoral_client')) || user.roles?.includes('Admin');
+            if (hasClientPermission) {
+                return res.status(400).json({ error: 'Modo Admin: Você precisa vincular um Cliente ao seu usuário para criar ordens.' });
+            }
             return res.status(403).json({ error: 'Usuário não é cliente' });
         }
 
@@ -295,6 +365,11 @@ async function getClientOrderDetails(req, res) {
         const clientId = await getClientId(user.id);
 
         if (!clientId) {
+            // Se for admin, não consegue ver ordem específica de cliente se não estiver vinculado
+            const hasClientPermission = user.permissions?.some(p => p.startsWith('prostoral_client')) || user.roles?.includes('Admin');
+            if (hasClientPermission) {
+                return res.status(404).json({ error: 'Ordem não encontrada (Modo Admin sem cliente vinculado)' });
+            }
             return res.status(403).json({ error: 'Usuário não é cliente' });
         }
 
@@ -348,6 +423,10 @@ async function createClientIssue(req, res) {
         const clientId = await getClientId(user.id);
 
         if (!clientId) {
+            const hasClientPermission = user.permissions?.some(p => p.startsWith('prostoral_client')) || user.roles?.includes('Admin');
+            if (hasClientPermission) {
+                return res.status(400).json({ error: 'Modo Admin: Você precisa vincular um Cliente ao seu usuário para criar intercorrências.' });
+            }
             return res.status(403).json({ error: 'Usuário não é cliente' });
         }
 
@@ -443,9 +522,9 @@ async function getAllClients(req, res) {
 
     } catch (error) {
         console.error('Erro ao listar clientes:', error);
-        return res.status(500).json({ 
+        return res.status(500).json({
             success: false,
-            error: error.message 
+            error: error.message
         });
     }
 }

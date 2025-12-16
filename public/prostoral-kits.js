@@ -3,16 +3,16 @@
 // Integrado ao prostoral.html
 // ============================================
 
-(function() {
+(function () {
     'use strict';
-    
+
     // Variáveis do módulo
     let allKits = [];
     let allProdutos = [];
     let kitProdutos = [];
     let selectedProduto = null;
     let editingKitId = null;
-    
+
     // Inicializar módulo quando a aba Kits for ativada
     function initKitsModule() {
         if (!window.authManager || !window.authManager.supabase) {
@@ -20,50 +20,50 @@
             showNotification('Erro: Sistema de autenticação não disponível', 'error');
             return;
         }
-        
+
         console.log('✅ Inicializando módulo de Kits...');
-        
+
         // Event listeners
         setupEventListeners();
-        
+
         // Carregar dados
         loadKits();
         loadProdutos();
     }
-    
+
     // ============================================
     // EVENT LISTENERS
     // ============================================
-    
+
     function setupEventListeners() {
         // Botões criar kit
         document.getElementById('btnCreateKit')?.addEventListener('click', openCreateKitModal);
         document.getElementById('btnCreateKitEmpty')?.addEventListener('click', openCreateKitModal);
-        
+
         // Modal kit
         document.getElementById('btnCloseKitModal')?.addEventListener('click', closeKitModal);
         document.getElementById('btnCancelKit')?.addEventListener('click', closeKitModal);
         document.getElementById('kitForm')?.addEventListener('submit', saveKit);
-        
+
         // Modal produto
         document.getElementById('btnAddProduto')?.addEventListener('click', openProdutoModal);
         document.getElementById('btnCloseProdutoModal')?.addEventListener('click', closeProdutoModal);
         document.getElementById('btnCancelProduto')?.addEventListener('click', closeProdutoModal);
         document.getElementById('btnConfirmProduto')?.addEventListener('click', addProdutoToKit);
         document.getElementById('searchProduto')?.addEventListener('input', searchProdutos);
-        
+
         // Filtros
         document.getElementById('searchKit')?.addEventListener('input', filterKits);
         document.getElementById('filterKitType')?.addEventListener('change', filterKits);
     }
-    
+
     // ============================================
     // CARREGAR DADOS
     // ============================================
-    
+
     async function loadKits() {
         try {
-            const { data, error} = await window.authManager.supabase
+            const { data, error } = await window.authManager.supabase
                 .from('kits')
                 .select(`
                     *,
@@ -93,7 +93,7 @@
             showNotification('Erro ao carregar kits', 'error');
         }
     }
-    
+
     async function loadProdutos() {
         try {
             const { data, error } = await window.authManager.supabase
@@ -111,31 +111,31 @@
             showNotification('Erro ao carregar produtos do estoque', 'error');
         }
     }
-    
+
     // ============================================
     // RENDERIZAÇÃO
     // ============================================
-    
+
     function renderKits(kitsToRender = null) {
         const container = document.getElementById('kitsContainer');
         const emptyState = document.getElementById('emptyKitsState');
         const kits = kitsToRender || allKits;
-        
+
         if (!container) return;
-        
+
         if (kits.length === 0) {
             container.innerHTML = '';
             emptyState?.classList.remove('hidden');
             return;
         }
-        
+
         emptyState?.classList.add('hidden');
-        
+
         const html = kits.map(kit => {
             const totalProdutos = kit.kit_produtos?.length || 0;
             const tipoLabel = getTipoLabel(kit.tipo);
             const tipoColor = getTipoColor(kit.tipo);
-            
+
             return `
                 <div class="kit-card bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-lg border border-gray-200 dark:border-gray-700 hover:shadow-xl transition-all">
                     <div class="flex justify-between items-start mb-4">
@@ -166,16 +166,16 @@
                 </div>
             `;
         }).join('');
-        
+
         container.innerHTML = html;
-        
+
         // Event delegation para botões de ação dos kits
         container.querySelectorAll('.kit-action-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 e.stopPropagation();
                 const kitId = btn.getAttribute('data-kit-id');
                 const action = btn.getAttribute('data-action');
-                
+
                 if (action === 'edit') {
                     editKit(kitId);
                 } else if (action === 'delete') {
@@ -184,11 +184,11 @@
             });
         });
     }
-    
+
     // ============================================
     // MODALS
     // ============================================
-    
+
     function openCreateKitModal() {
         editingKitId = null;
         kitProdutos = [];
@@ -198,13 +198,13 @@
         updateProdutosList();
         showModal('kitModal');
     }
-    
+
     function closeKitModal() {
         hideModal('kitModal');
         editingKitId = null;
         kitProdutos = [];
     }
-    
+
     function openProdutoModal() {
         selectedProduto = null;
         document.getElementById('searchProduto').value = '';
@@ -212,53 +212,53 @@
         searchProdutos();
         showModal('produtoModal');
     }
-    
+
     function closeProdutoModal() {
         hideModal('produtoModal');
         selectedProduto = null;
     }
-    
+
     function showModal(modalId) {
         document.getElementById(modalId)?.classList.remove('hidden');
     }
-    
+
     function hideModal(modalId) {
         document.getElementById(modalId)?.classList.add('hidden');
     }
-    
+
     // ============================================
     // AÇÕES DE KIT
     // ============================================
-    
+
     async function saveKit(event) {
         event.preventDefault();
-        
+
         const nome = document.getElementById('kitNome').value.trim();
         const tipo = document.getElementById('kitTipo').value;
         const descricao = document.getElementById('kitDescricao').value.trim();
-        
+
         if (!nome || !tipo) {
             showNotification('Preencha todos os campos obrigatórios', 'error');
             return;
         }
-        
+
         if (kitProdutos.length === 0) {
             showNotification('Adicione pelo menos um produto ao kit', 'error');
             return;
         }
-        
+
         try {
             let kitId = editingKitId;
-            
+
             if (editingKitId) {
                 // Atualizar kit existente
                 const { error: updateError } = await window.authManager.supabase
                     .from('kits')
                     .update({ nome, tipo, descricao })
                     .eq('id', editingKitId);
-                
+
                 if (updateError) throw updateError;
-                
+
                 // Remover produtos antigos
                 await window.authManager.supabase
                     .from('kit_produtos')
@@ -271,22 +271,22 @@
                     .insert({ nome, tipo, descricao })
                     .select()
                     .single();
-                
+
                 if (insertError) throw insertError;
                 kitId = newKit.id;
             }
-            
+
             // Adicionar produtos ao kit
             const kitProdutosData = kitProdutos.map(p => ({
                 kit_id: kitId,
                 produto_id: p.produto_id,
                 quantidade: p.quantidade
             }));
-            
+
             await window.authManager.supabase
                 .from('kit_produtos')
                 .insert(kitProdutosData);
-            
+
             showNotification(`Kit ${editingKitId ? 'atualizado' : 'criado'} com sucesso!`, 'success');
             closeKitModal();
             await loadKits();
@@ -295,7 +295,7 @@
             showNotification('Erro ao salvar kit: ' + error.message, 'error');
         }
     }
-    
+
     async function editKit(kitId) {
         try {
             const kit = allKits.find(k => k.id === kitId);
@@ -303,24 +303,34 @@
                 showNotification('Kit não encontrado', 'error');
                 return;
             }
-            
+
             editingKitId = kitId;
             document.getElementById('kitModalTitle').textContent = 'Editar Kit';
             document.getElementById('kitId').value = kitId;
             document.getElementById('kitNome').value = kit.nome;
             document.getElementById('kitTipo').value = kit.tipo;
             document.getElementById('kitDescricao').value = kit.descricao || '';
-            
+
             // Carregar produtos do kit
-            kitProdutos = kit.kit_produtos.map(kp => ({
-                produto_id: kp.prostoral_inventory.id,
-                nome: kp.prostoral_inventory.name,
-                codigo: kp.prostoral_inventory.code,
-                quantidade: kp.quantidade,
-                unidade_medida: kp.prostoral_inventory.unit,
-                quantidade_estoque: kp.prostoral_inventory.quantity
-            }));
-            
+            kitProdutos = kit.kit_produtos
+                .filter(kp => kp.produtoslaboratorio) // Safety check for deleted products
+                .map(kp => {
+                    const prod = kp.produtoslaboratorio;
+                    // Handle nested estoque which might be object or array depending on relation
+                    const estoque = Array.isArray(prod.estoquelaboratorio)
+                        ? prod.estoquelaboratorio[0]
+                        : prod.estoquelaboratorio;
+
+                    return {
+                        produto_id: prod.id,
+                        nome: prod.nome_material,
+                        codigo: prod.qr_code,
+                        quantidade: kp.quantidade,
+                        unidade_medida: prod.unidade_medida,
+                        quantidade_estoque: estoque?.quantidade_atual || 0
+                    };
+                });
+
             updateProdutosList();
             showModal('kitModal');
         } catch (error) {
@@ -328,26 +338,26 @@
             showNotification('Erro ao carregar kit', 'error');
         }
     }
-    
+
     async function deleteKit(kitId) {
         const kit = allKits.find(k => k.id === kitId);
         if (!kit) return;
-        
+
         if (!confirm(`Tem certeza que deseja excluir o kit "${kit.nome}"?`)) {
             return;
         }
-        
+
         try {
             await window.authManager.supabase
                 .from('kit_produtos')
                 .delete()
                 .eq('kit_id', kitId);
-            
+
             await window.authManager.supabase
                 .from('kits')
                 .delete()
                 .eq('id', kitId);
-            
+
             showNotification('Kit excluído com sucesso!', 'success');
             await loadKits();
         } catch (error) {
@@ -355,26 +365,26 @@
             showNotification('Erro ao excluir kit: ' + error.message, 'error');
         }
     }
-    
+
     // ============================================
     // PRODUTOS DO KIT
     // ============================================
-    
+
     function searchProdutos() {
         const searchTerm = document.getElementById('searchProduto').value.toLowerCase();
-        const filteredProdutos = allProdutos.filter(p => 
+        const filteredProdutos = allProdutos.filter(p =>
             p.name.toLowerCase().includes(searchTerm) ||
             (p.code && p.code.toLowerCase().includes(searchTerm))
         );
-        
+
         const resultsContainer = document.getElementById('produtoSearchResults');
         if (!resultsContainer) return;
-        
+
         if (filteredProdutos.length === 0) {
             resultsContainer.innerHTML = '<div class="text-center text-gray-400 py-8"><i class="fas fa-search text-4xl mb-2"></i><p>Nenhum produto encontrado</p></div>';
             return;
         }
-        
+
         const html = filteredProdutos.map(produto => `
             <div data-produto-id="${produto.id}" 
                  class="produto-item p-3 border border-gray-200 dark:border-gray-700 rounded-lg cursor-pointer hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-colors ${selectedProduto?.id === produto.id ? 'bg-emerald-100 dark:bg-emerald-900/30' : ''}">
@@ -390,9 +400,9 @@
                 </div>
             </div>
         `).join('');
-        
+
         resultsContainer.innerHTML = html;
-        
+
         // Event delegation para cliques nos produtos
         resultsContainer.querySelectorAll('.produto-item').forEach(item => {
             item.addEventListener('click', () => {
@@ -401,14 +411,14 @@
             });
         });
     }
-    
+
     function selectProduto(produtoId) {
         selectedProduto = allProdutos.find(p => p.id === produtoId);
-        
+
         if (selectedProduto) {
             const info = document.getElementById('selectedProdutoInfo');
             const details = document.getElementById('selectedProdutoDetails');
-            
+
             if (info && details) {
                 details.innerHTML = `
                     <div class="font-semibold text-gray-800 dark:text-white">${escapeHtml(selectedProduto.name)}</div>
@@ -419,26 +429,26 @@
                 `;
                 info.classList.remove('hidden');
             }
-            
+
             searchProdutos();
         }
     }
-    
+
     function addProdutoToKit() {
         if (!selectedProduto) {
             showNotification('Selecione um produto', 'error');
             return;
         }
-        
+
         const quantidade = parseFloat(document.getElementById('produtoQuantidade').value);
-        
+
         if (!quantidade || quantidade <= 0) {
             showNotification('Informe uma quantidade válida', 'error');
             return;
         }
-        
+
         const existingIndex = kitProdutos.findIndex(p => p.produto_id === selectedProduto.id);
-        
+
         if (existingIndex >= 0) {
             kitProdutos[existingIndex].quantidade = quantidade;
         } else {
@@ -451,33 +461,33 @@
                 quantidade_estoque: selectedProduto.quantity
             });
         }
-        
+
         updateProdutosList();
         closeProdutoModal();
         showNotification('Produto adicionado ao kit', 'success');
     }
-    
+
     function removeProdutoFromKit(produtoId) {
         kitProdutos = kitProdutos.filter(p => p.produto_id !== produtoId);
         updateProdutosList();
         showNotification('Produto removido do kit', 'info');
     }
-    
+
     function updateProdutosList() {
         const container = document.getElementById('produtosList');
         const countElement = document.getElementById('produtoCount');
-        
+
         if (!container) return;
-        
+
         if (countElement) {
             countElement.textContent = `(${kitProdutos.length} ${kitProdutos.length === 1 ? 'produto' : 'produtos'})`;
         }
-        
+
         if (kitProdutos.length === 0) {
             container.innerHTML = '<div class="text-center text-gray-400 dark:text-gray-500 py-8"><i class="fas fa-box-open text-4xl mb-2"></i><p>Nenhum produto adicionado</p></div>';
             return;
         }
-        
+
         const html = kitProdutos.map(produto => `
             <div class="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
                 <div>
@@ -492,9 +502,9 @@
                 </button>
             </div>
         `).join('');
-        
+
         container.innerHTML = html;
-        
+
         // Event listeners para botões de remover produto
         container.querySelectorAll('.remove-produto-btn').forEach(btn => {
             btn.addEventListener('click', () => {
@@ -503,35 +513,35 @@
             });
         });
     }
-    
+
     // ============================================
     // FILTROS
     // ============================================
-    
+
     function filterKits() {
         const searchTerm = document.getElementById('searchKit')?.value.toLowerCase() || '';
         const filterType = document.getElementById('filterKitType')?.value || '';
-        
+
         let filtered = allKits;
-        
+
         if (searchTerm) {
-            filtered = filtered.filter(kit => 
+            filtered = filtered.filter(kit =>
                 kit.nome.toLowerCase().includes(searchTerm) ||
                 (kit.descricao && kit.descricao.toLowerCase().includes(searchTerm))
             );
         }
-        
+
         if (filterType) {
             filtered = filtered.filter(kit => kit.tipo === filterType);
         }
-        
+
         renderKits(filtered);
     }
-    
+
     // ============================================
     // UTILITÁRIOS
     // ============================================
-    
+
     function getTipoLabel(tipo) {
         const tipos = {
             'zirconia': 'Zircônia',
@@ -542,7 +552,7 @@
         };
         return tipos[tipo] || tipo;
     }
-    
+
     function getTipoColor(tipo) {
         const colors = {
             'zirconia': 'linear-gradient(135deg, #8b5cf6, #7c3aed)',
@@ -553,34 +563,34 @@
         };
         return colors[tipo] || colors.outro;
     }
-    
+
     function escapeHtml(text) {
         if (!text) return '';
         const div = document.createElement('div');
         div.textContent = text;
         return div.innerHTML;
     }
-    
+
     function showNotification(message, type = 'info') {
         const notification = document.createElement('div');
         notification.className = `fixed top-4 right-4 z-[10001] px-6 py-3 rounded-lg shadow-lg transform transition-all duration-300 translate-x-full`;
-        
+
         const colors = {
             'success': 'bg-emerald-600 text-white',
             'error': 'bg-red-600 text-white',
             'warning': 'bg-yellow-600 text-white',
             'info': 'bg-blue-600 text-white'
         };
-        
+
         notification.className += ` ${colors[type] || colors.info}`;
         notification.textContent = message;
-        
+
         document.body.appendChild(notification);
-        
+
         setTimeout(() => {
             notification.classList.remove('translate-x-full');
         }, 100);
-        
+
         setTimeout(() => {
             notification.classList.add('translate-x-full');
             setTimeout(() => {
@@ -588,13 +598,13 @@
             }, 300);
         }, 3000);
     }
-    
+
     // ============================================
     // EXPOSIÇÃO PÚBLICA
     // ============================================
-    
+
     let isInitialized = false;
-    
+
     // Wrapper para garantir inicialização única
     function initOnce() {
         if (isInitialized) {
@@ -604,7 +614,7 @@
         isInitialized = true;
         initKitsModule();
     }
-    
+
     window.kitsModule = {
         init: initOnce,
         editKit,
@@ -612,7 +622,7 @@
         selectProduto,
         removeProdutoFromKit
     };
-    
+
     console.log('✅ Módulo de Kits carregado (aguardando ativação da aba)');
-    
+
 })();
