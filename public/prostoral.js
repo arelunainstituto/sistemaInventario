@@ -14,7 +14,7 @@ class ProstoralApp {
 
     async init() {
         console.log('Iniciando ProStoral App...');
-        
+
         // Aguardar authManager estar pronto
         if (!window.authManager) {
             console.error('AuthManager não encontrado');
@@ -37,8 +37,8 @@ class ProstoralApp {
         // Carregar dados do usuário
         await this.loadUserInfo();
 
-        // Carregar dashboard (view inicial)
-        await this.loadDashboard();
+        // Carregar TODOS os dados (centralizado)
+        await this.loadAllData();
 
         // Setup event listeners
         this.setupEventListeners();
@@ -50,7 +50,7 @@ class ProstoralApp {
             // Desktop
             document.getElementById('totalOrders').textContent = '0';
             document.getElementById('totalClients').textContent = '0';
-            
+
             // Mobile
             document.getElementById('mobileUserEmail').textContent = user.email;
             document.getElementById('mobileTotalOrders').textContent = '0';
@@ -95,7 +95,7 @@ class ProstoralApp {
         console.log('Carregando dashboard...');
         try {
             const token = await window.authManager.getAccessToken();
-            
+
             // Carregar KPIs
             const response = await fetch(`${this.apiBaseUrl}/dashboard/kpis`, {
                 headers: { 'Authorization': `Bearer ${token}` }
@@ -106,14 +106,14 @@ class ProstoralApp {
             }
 
             const data = await response.json();
-            
+
             if (data.success && data.kpis) {
                 // Atualizar KPIs
                 document.getElementById('kpi-active-orders').textContent = data.kpis.totalOrders || 0;
                 document.getElementById('kpi-low-stock').textContent = data.kpis.lowStockItems || 0;
                 document.getElementById('kpi-active-clients').textContent = data.kpis.ordersByStatus?.active || 0;
                 document.getElementById('kpi-open-incidents').textContent = data.kpis.openIncidents || 0;
-                
+
                 // Atualizar header stats
                 document.getElementById('totalOrders').textContent = data.kpis.totalOrders || 0;
                 document.getElementById('mobileTotalOrders').textContent = data.kpis.totalOrders || 0;
@@ -134,7 +134,7 @@ class ProstoralApp {
 
         try {
             const token = await window.authManager.getAccessToken();
-            
+
             // Buscar últimas OS
             const response = await fetch(`${this.apiBaseUrl}/orders?limit=5`, {
                 headers: { 'Authorization': `Bearer ${token}` }
@@ -145,7 +145,7 @@ class ProstoralApp {
             }
 
             const data = await response.json();
-            
+
             if (data.success && data.orders && data.orders.length > 0) {
                 container.innerHTML = `
                     <div class="space-y-4">
@@ -217,7 +217,7 @@ class ProstoralApp {
 
             const data = await response.json();
             let clients = data.clients || [];
-            
+
             // Filtro de tipo (client-side já que a API não suporta)
             const type = document.getElementById('client-filter-type')?.value || '';
             if (type === 'clinic') {
@@ -227,7 +227,7 @@ class ProstoralApp {
             } else if (type === 'individual') {
                 clients = clients.filter(c => !c.clinic_name && !c.dentist_name);
             }
-            
+
             this.clients = clients;
 
             // Atualizar contadores
@@ -263,7 +263,7 @@ class ProstoralApp {
             // Determinar o nome principal e subtítulo
             const mainName = client.name || 'N/A';
             const subtitle = client.clinic_name || client.dentist_name || '';
-            
+
             // Determinar ícone baseado em qual campo está preenchido
             let icon = 'fa-user';
             if (client.clinic_name && client.dentist_name) {
@@ -271,7 +271,7 @@ class ProstoralApp {
             } else if (client.dentist_name) {
                 icon = 'fa-user-md';
             }
-            
+
             return `
             <tr class="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
                 <td class="px-6 py-4 whitespace-nowrap">
@@ -391,6 +391,71 @@ class ProstoralApp {
 
     showSuccess(message) {
         alert(message);
+    }
+
+    async loadData() {
+        console.warn('⚠️ loadData() está obsoleto. Use loadAllData() ou métodos específicos.');
+        await this.loadAllData();
+    }
+
+    /**
+     * Carrega todos os dados do módulo de uma vez
+     * Otimizado para evitar múltiplas chamadas de rede
+     */
+    async loadAllData() {
+        console.log('🚀 Iniciando carregamento centralizado do Prostoral...');
+
+        try {
+            // Mostrar loading global se necessário (opcional)
+
+            // 1. Carregar Dashboard (KPIs são leves, sempre bom atualizar)
+            const dashboardPromise = this.loadDashboard();
+
+            // 2. Carregar Clientes (com cache)
+            const clientsPromise = this.loadClients();
+
+            // 3. Carregar Ordens (window.ordersApp)
+            let ordersPromise = Promise.resolve();
+            if (window.ordersApp) {
+                ordersPromise = window.ordersApp.loadOrders();
+            }
+
+            // 4. Carregar Kits (window.kitsModule)
+            let kitsPromise = Promise.resolve();
+            if (window.kitsModule && window.kitsModule.loadKits) {
+                // Se o método existir publicamente
+                kitsPromise = window.kitsModule.loadKits();
+            } else if (window.kitsModule && window.kitsModule.initKitsModule) {
+                // Fallback para init se loadKits não estiver exposto ainda
+                // Nota: Idealmente vamos refatorar kitsModule para expor loadKits
+                console.log('📦 Inicializando Kits via initKitsModule...');
+                // window.kitsModule.initKitsModule(); // Pode ser redundante se já chamado no HTML, verifique
+            }
+
+            // 5. Carregar Inventário (window.prostoralLab)
+            let inventoryPromise = Promise.resolve();
+            if (window.prostoralLab) {
+                // Laboratorio geralmente carrega no init, mas podemos forçar check
+                if (!window.prostoralLab.products || window.prostoralLab.products.length === 0) {
+                    inventoryPromise = window.prostoralLab.loadProducts();
+                }
+            }
+
+            // Aguardar todos (Promise.allSettled para que um erro não bloqueie os outros)
+            await Promise.allSettled([
+                dashboardPromise,
+                clientsPromise,
+                ordersPromise,
+                kitsPromise,
+                inventoryPromise
+            ]);
+
+            console.log('✅ Todos os dados do Prostoral foram carregados/verificados.');
+
+        } catch (error) {
+            console.error('❌ Erro no carregamento centralizado:', error);
+            this.showError('Erro ao carregar dados do sistema');
+        }
     }
 
     // =====================================================
@@ -519,7 +584,7 @@ class ProstoralApp {
             `;
 
             document.getElementById('viewClientModal').classList.remove('hidden');
-            
+
             // Adicionar event listener para o botão de editar
             document.getElementById('btnEditFromView')?.addEventListener('click', (e) => {
                 const clientId = e.currentTarget.dataset.clientId;
@@ -547,7 +612,7 @@ class ProstoralApp {
             // Preencher o formulário
             document.getElementById('clientId').value = client.id;
             document.getElementById('clientName').value = client.name || '';
-            
+
             // Definir o tipo de cliente baseado nos dados
             let clientType = 'individual';
             if (client.clinic_name && !client.dentist_name) {
@@ -556,7 +621,7 @@ class ProstoralApp {
                 clientType = 'dentist';
             }
             document.getElementById('clientType').value = clientType;
-            
+
             document.getElementById('clientClinicName').value = client.clinic_name || '';
             document.getElementById('clientDentistName').value = client.dentist_name || '';
             document.getElementById('clientNif').value = client.nif || '';
@@ -662,7 +727,7 @@ function openClientModal() {
     document.getElementById('clientPaymentTerms').value = 30;
     document.getElementById('clientDiscount').value = 0;
     document.getElementById('clientIsActive').checked = true;
-    
+
     document.getElementById('clientModal').classList.remove('hidden');
 }
 
@@ -677,42 +742,42 @@ function closeViewClientModal() {
 // Inicializar app quando DOM estiver pronto
 window.addEventListener('DOMContentLoaded', () => {
     console.log('DOM carregado, aguardando authManager...');
-    
+
     // Aguardar authManager estar disponível
     const checkAuthManager = setInterval(() => {
         if (window.authManager) {
             clearInterval(checkAuthManager);
             console.log('AuthManager disponível, iniciando app...');
             window.prostoralApp = new ProstoralApp();
-            
+
             // Event listeners para botões de modal
             document.getElementById('btnNewClient')?.addEventListener('click', () => {
                 openClientModal();
             });
-            
+
             document.getElementById('btnCloseClientModal')?.addEventListener('click', () => {
                 closeClientModal();
             });
-            
+
             document.getElementById('btnCancelClientModal')?.addEventListener('click', () => {
                 closeClientModal();
             });
-            
+
             document.getElementById('btnCloseViewClientModal')?.addEventListener('click', () => {
                 closeViewClientModal();
             });
-            
+
             // Event delegation para botões de ação dos clientes
             document.getElementById('clients-table-body')?.addEventListener('click', (e) => {
                 const button = e.target.closest('.client-action-btn');
                 if (!button) return;
-                
+
                 const action = button.dataset.action;
                 const clientId = button.dataset.clientId;
-                
+
                 if (!window.prostoralApp) return;
-                
-                switch(action) {
+
+                switch (action) {
                     case 'view':
                         window.prostoralApp.viewClient(clientId);
                         break;
@@ -724,30 +789,30 @@ window.addEventListener('DOMContentLoaded', () => {
                         break;
                 }
             });
-            
+
             // Event listeners para filtros de cliente
             document.getElementById('client-search')?.addEventListener('input', debounce(() => {
                 if (window.prostoralApp) {
                     window.prostoralApp.loadClients();
                 }
             }, 500));
-            
+
             document.getElementById('client-filter-type')?.addEventListener('change', () => {
                 if (window.prostoralApp) {
                     window.prostoralApp.loadClients();
                 }
             });
-            
+
             document.getElementById('client-filter-status')?.addEventListener('change', () => {
                 if (window.prostoralApp) {
                     window.prostoralApp.loadClients();
                 }
             });
-            
+
             // Event listener para formulário de cliente
             document.getElementById('clientForm')?.addEventListener('submit', async (e) => {
                 e.preventDefault();
-                
+
                 const formData = new FormData();
                 formData.append('id', document.getElementById('clientId').value);
                 formData.append('name', document.getElementById('clientName').value);
@@ -766,14 +831,14 @@ window.addEventListener('DOMContentLoaded', () => {
                 formData.append('credit_limit', document.getElementById('clientCreditLimit').value);
                 formData.append('notes', document.getElementById('clientNotes').value);
                 formData.append('is_active', document.getElementById('clientIsActive').checked.toString());
-                
+
                 if (window.prostoralApp) {
                     await window.prostoralApp.saveClient(formData);
                 }
             });
         }
     }, 100);
-    
+
     // Timeout de segurança
     setTimeout(() => {
         clearInterval(checkAuthManager);

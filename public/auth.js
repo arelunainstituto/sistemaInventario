@@ -584,6 +584,7 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // Exportar para uso global
+window.AuthManager = AuthManager; // Explicitamente exportar a classe
 window.authManager = authManager;
 window.requireAuthentication = requireAuthentication;
 window.redirectIfAuthenticated = redirectIfAuthenticated;
@@ -593,3 +594,5 @@ window.isAuthenticated = isAuthenticated;
 window.getAccessToken = getAccessToken;
 window.getAuthHeaders = getAuthHeaders;
 window.authenticatedFetch = authenticatedFetch;
+
+console.log('✅ [AUTH] auth.js loaded successfully');

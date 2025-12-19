@@ -19,16 +19,16 @@ class LaboratorioModule {
             console.log('Módulo de Laboratório já foi inicializado');
             return;
         }
-        
+
         console.log('Iniciando Módulo de Laboratório...');
         this.setupEventListeners();
-        
+
         // Carregar produtos inicialmente
         await this.loadProducts();
-        
+
         // Carregar estatísticas dos relatórios
         await this.loadReportStats();
-        
+
         this.initialized = true;
     }
 
@@ -172,7 +172,7 @@ class LaboratorioModule {
 
     setAlertFilter(filter, clickedButton) {
         this.alertFilter = filter;
-        
+
         // Atualizar estilos dos botões
         const buttons = [
             document.getElementById('filterAllAlerts'),
@@ -245,7 +245,7 @@ class LaboratorioModule {
             // Ordenação e paginação
             const from = (this.currentPage - 1) * this.itemsPerPage;
             const to = from + this.itemsPerPage - 1;
-            
+
             const { data, error, count } = await query
                 .order('data_criacao', { ascending: false })
                 .range(from, to);
@@ -265,10 +265,10 @@ class LaboratorioModule {
             }
 
             this.products = products;
-            
+
             this.renderProducts();
-            this.updateProductsPagination({ 
-                data: products, 
+            this.updateProductsPagination({
+                data: products,
                 total: count || 0,
                 page: this.currentPage,
                 limit: this.itemsPerPage
@@ -298,11 +298,11 @@ class LaboratorioModule {
         tbody.innerHTML = this.products.map(product => {
             // Pegar quantidade do estoque
             const quantidade = product.estoquelaboratorio?.quantidade_atual || 0;
-            
+
             // Calcular status baseado na quantidade
             let statusClass = 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300';
             let statusText = 'Normal';
-            
+
             if (quantidade <= 5) {
                 statusClass = 'bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300';
                 statusText = 'Crítico';
@@ -310,7 +310,7 @@ class LaboratorioModule {
                 statusClass = 'bg-yellow-100 dark:bg-yellow-900 text-yellow-700 dark:text-yellow-300';
                 statusText = 'Baixo';
             }
-            
+
             return `
                 <tr class="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
                     <td class="py-3 px-4">
@@ -355,15 +355,15 @@ class LaboratorioModule {
                 </tr>
             `;
         }).join('');
-        
+
         // Adicionar event listeners aos botões de ação
         document.querySelectorAll('.product-action-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 e.preventDefault();
                 const action = btn.getAttribute('data-action');
                 const id = btn.getAttribute('data-id');
-                
-                switch(action) {
+
+                switch (action) {
                     case 'view':
                         this.viewProduct(id);
                         break;
@@ -405,7 +405,7 @@ class LaboratorioModule {
             'critico': { text: 'Crítico', class: 'bg-orange-100 dark:bg-orange-900 text-orange-700 dark:text-orange-300' },
             'esgotado': { text: 'Esgotado', class: 'bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300' }
         };
-        
+
         const config = statusConfig[status] || statusConfig['disponivel'];
         return `<span class="text-xs px-3 py-1 rounded-full font-medium ${config.class}">${config.text}</span>`;
     }
@@ -418,7 +418,7 @@ class LaboratorioModule {
 
         if (countEl) countEl.textContent = result.total || 0;
         if (pageInfo) pageInfo.textContent = `Página ${result.currentPage || 1} de ${result.totalPages || 1}`;
-        
+
         if (prevBtn) {
             prevBtn.disabled = (result.currentPage || 1) <= 1;
         }
@@ -431,7 +431,7 @@ class LaboratorioModule {
         const modal = document.getElementById('productModal');
         const title = document.getElementById('productModalTitle');
         const form = document.getElementById('productForm');
-        
+
         if (!modal || !form) return;
 
         // Resetar formulário
@@ -472,7 +472,7 @@ class LaboratorioModule {
 
     async saveProduct(e) {
         e.preventDefault();
-        
+
         const productId = document.getElementById('productId').value;
         const isEdit = !!productId;
 
@@ -535,7 +535,7 @@ class LaboratorioModule {
             if (!response.ok) throw new Error('Erro ao carregar produto');
 
             const product = await response.json();
-            
+
             // Criar modal de visualização
             const viewModal = document.createElement('div');
             viewModal.className = 'fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm z-50 flex items-center justify-center p-4';
@@ -649,9 +649,9 @@ class LaboratorioModule {
                     </div>
                 </div>
             `;
-            
+
             document.body.appendChild(viewModal);
-            
+
             // Gerar QR Code
             if (typeof QRCode !== 'undefined' && product.qr_code) {
                 setTimeout(() => {
@@ -662,16 +662,16 @@ class LaboratorioModule {
                     });
                 }, 100);
             }
-            
+
             // Event listeners
             viewModal.querySelectorAll('.close-view-modal').forEach(btn => {
                 btn.addEventListener('click', () => viewModal.remove());
             });
-            
+
             viewModal.querySelector('.print-product').addEventListener('click', () => {
                 window.print();
             });
-            
+
         } catch (error) {
             console.error('Erro ao visualizar produto:', error);
             this.showNotification('Erro ao carregar produto', 'error');
@@ -788,10 +788,10 @@ class LaboratorioModule {
 
     async generateQRCode(text, containerId) {
         console.log('🔍 Gerando QR Code:', { text, containerId });
-        
+
         // Aguardar um pouco para garantir que o DOM está renderizado
         await new Promise(resolve => setTimeout(resolve, 100));
-        
+
         const container = document.getElementById(containerId);
         if (!container) {
             console.error('❌ Container não encontrado:', containerId);
@@ -804,11 +804,11 @@ class LaboratorioModule {
         try {
             // Limpar loading
             container.innerHTML = '';
-            
+
             // Método 1: Tentar usar QRCode.js se disponível
             if (typeof QRCode !== 'undefined') {
                 console.log('✅ Usando QRCode.js para gerar QR Code');
-                
+
                 new QRCode(container, {
                     text: text,
                     width: 256,
@@ -817,7 +817,7 @@ class LaboratorioModule {
                     colorLight: "#ffffff",
                     correctLevel: QRCode.CorrectLevel.H
                 });
-                
+
                 console.log('✅ QR Code gerado com sucesso!');
                 return;
             }
@@ -879,7 +879,7 @@ class LaboratorioModule {
         const printWindow = window.open('', '_blank');
         const qrCanvas = document.querySelector('.qr-modal canvas');
         const qrImage = document.querySelector('.qr-modal img');
-        
+
         let qrSrc = '';
         if (qrCanvas) {
             qrSrc = qrCanvas.toDataURL();
@@ -994,25 +994,25 @@ class LaboratorioModule {
                 </div>
             </div>
         `;
-        
+
         document.body.appendChild(notification);
-        
+
         // Event listeners
         document.getElementById('btnQuickScanQR').addEventListener('click', async () => {
             document.body.removeChild(notification);
             await this.startQRScanForMovement(tipo);
         });
-        
+
         document.getElementById('btnManualSelect').addEventListener('click', () => {
             document.body.removeChild(notification);
             this.showMovementModal(tipo);
         });
-        
+
         document.getElementById('btnCancelQuickScan').addEventListener('click', () => {
             document.body.removeChild(notification);
         });
     }
-    
+
     // Iniciar scanner de QR Code para movimentação
     async startQRScanForMovement(tipo) {
         try {
@@ -1054,22 +1054,22 @@ class LaboratorioModule {
                     </div>
                 </div>
             `;
-            
+
             document.body.appendChild(scannerModal);
-            
+
             // Configurar câmera
             const video = document.getElementById('qrVideo');
             const statusDiv = document.getElementById('scannerStatus');
             let stream = null;
             let scanning = true;
-            
+
             try {
-                stream = await navigator.mediaDevices.getUserMedia({ 
-                    video: { facingMode: 'environment' } 
+                stream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: 'environment' }
                 });
                 video.srcObject = stream;
                 video.play();
-                
+
                 // Iniciar scanner híbrido (QR Code + Código de Barras)
                 this.startHybridScanner(video, statusDiv, tipo, stream, scanning);
             } catch (err) {
@@ -1077,7 +1077,7 @@ class LaboratorioModule {
                 statusDiv.textContent = 'Erro ao acessar câmera. Use entrada manual.';
                 statusDiv.className += ' bg-red-600';
             }
-            
+
             // Fechar modal
             const closeScanner = () => {
                 scanning = false;
@@ -1096,9 +1096,9 @@ class LaboratorioModule {
                     document.body.removeChild(scannerModal);
                 }
             };
-            
+
             document.getElementById('btnCloseScannerModal').addEventListener('click', closeScanner);
-            
+
             // Input manual
             document.getElementById('btnManualQRSubmit').addEventListener('click', async () => {
                 const code = document.getElementById('manualQRInput').value.trim();
@@ -1107,13 +1107,13 @@ class LaboratorioModule {
                     if (typeof Quagga !== 'undefined') {
                         try {
                             Quagga.stop();
-                        } catch (e) {}
+                        } catch (e) { }
                     }
                     closeScanner();
                     await this.findProductByQRAndOpenModal(code, tipo);
                 }
             });
-            
+
             document.getElementById('manualQRInput').addEventListener('keypress', async (e) => {
                 if (e.key === 'Enter') {
                     const code = e.target.value.trim();
@@ -1122,29 +1122,29 @@ class LaboratorioModule {
                         if (typeof Quagga !== 'undefined') {
                             try {
                                 Quagga.stop();
-                            } catch (e) {}
+                            } catch (e) { }
                         }
                         closeScanner();
                         await this.findProductByQRAndOpenModal(code, tipo);
                     }
                 }
             });
-            
+
         } catch (error) {
             console.error('Erro ao iniciar scanner:', error);
             this.showNotification('Erro ao iniciar scanner. Use seleção manual.', 'error');
             this.showMovementModal(tipo);
         }
     }
-    
+
     // Buscar produto por QR Code ou Código de Barras e abrir modal
     async findProductByQRAndOpenModal(code, tipo) {
         try {
             // Buscar produto por QR Code OU Código de Barras
-            const produto = this.products.find(p => 
+            const produto = this.products.find(p =>
                 p.qr_code === code || p.codigo_barras === code
             );
-            
+
             if (produto) {
                 // Determinar qual código foi usado
                 const codeType = produto.qr_code === code ? 'QR Code' : 'Código de Barras';
@@ -1162,34 +1162,34 @@ class LaboratorioModule {
             this.showMovementModal(tipo);
         }
     }
-    
+
     // Scanner híbrido (QR Code + Código de Barras)
     startHybridScanner(video, statusDiv, tipo, stream, scanningRef) {
         let scanning = true;
         const canvas = document.createElement('canvas');
         const context = canvas.getContext('2d');
-        
+
         // Variável para armazenar referência do scanner
         const scannerState = { scanning: true };
-        
+
         const stopScanning = (code, codeType) => {
             scannerState.scanning = false;
             scanning = false;
             stream.getTracks().forEach(track => track.stop());
-            
+
             statusDiv.textContent = `✅ ${codeType} detectado!`;
             statusDiv.className = statusDiv.className.replace('bg-black', 'bg-green-600');
-            
+
             // Remover modal
             const modal = document.getElementById('qrScannerModal');
             if (modal && document.body.contains(modal)) {
                 document.body.removeChild(modal);
             }
-            
+
             // Buscar produto
             this.findProductByQRAndOpenModal(code, tipo);
         };
-        
+
         // Tentar iniciar Quagga para código de barras
         if (typeof Quagga !== 'undefined') {
             try {
@@ -1217,7 +1217,7 @@ class LaboratorioModule {
                     if (!err) {
                         Quagga.start();
                         console.log('✅ Quagga iniciado para código de barras');
-                        
+
                         // Detectar código de barras
                         Quagga.onDetected((result) => {
                             if (scannerState.scanning && result && result.codeResult && result.codeResult.code) {
@@ -1235,20 +1235,20 @@ class LaboratorioModule {
                 console.error('Erro ao configurar Quagga:', error);
             }
         }
-        
+
         // Scanner de QR Code com jsQR (em paralelo)
         if (typeof jsQR !== 'undefined') {
             const scanQR = () => {
                 if (!scannerState.scanning) return;
-                
+
                 if (video.readyState === video.HAVE_ENOUGH_DATA) {
                     canvas.width = video.videoWidth;
                     canvas.height = video.videoHeight;
                     context.drawImage(video, 0, 0, canvas.width, canvas.height);
-                    
+
                     const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
                     const code = jsQR(imageData.data, imageData.width, imageData.height);
-                    
+
                     if (code) {
                         console.log('QR Code detectado:', code.data);
                         if (typeof Quagga !== 'undefined') {
@@ -1258,52 +1258,52 @@ class LaboratorioModule {
                         return;
                     }
                 }
-                
+
                 requestAnimationFrame(scanQR);
             };
-            
+
             scanQR();
         } else {
             statusDiv.textContent = 'jsQR não carregado. Apenas código de barras disponível.';
         }
     }
-    
+
     // Scanner com jsQR (mantido para compatibilidade)
     scanWithJsQR(video, statusDiv, tipo, stream, scanning) {
         const canvas = document.createElement('canvas');
         const context = canvas.getContext('2d');
-        
+
         const scan = () => {
             if (!scanning) return;
-            
+
             if (video.readyState === video.HAVE_ENOUGH_DATA) {
                 canvas.width = video.videoWidth;
                 canvas.height = video.videoHeight;
                 context.drawImage(video, 0, 0, canvas.width, canvas.height);
-                
+
                 const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
                 const code = jsQR(imageData.data, imageData.width, imageData.height);
-                
+
                 if (code) {
                     scanning = false;
                     stream.getTracks().forEach(track => track.stop());
-                    
+
                     statusDiv.textContent = '✅ QR Code detectado!';
                     statusDiv.className += ' bg-green-600';
-                    
+
                     // Remover modal
                     const modal = document.getElementById('qrScannerModal');
                     if (modal) document.body.removeChild(modal);
-                    
+
                     // Buscar produto
                     this.findProductByQRAndOpenModal(code.data, tipo);
                     return;
                 }
             }
-            
+
             requestAnimationFrame(scan);
         };
-        
+
         scan();
     }
 
@@ -1343,7 +1343,7 @@ class LaboratorioModule {
 
             const result = await response.json();
             this.movements = result.data || [];
-            
+
             this.renderMovements();
             this.updateMovementsPagination(result);
         } catch (error) {
@@ -1374,11 +1374,10 @@ class LaboratorioModule {
                     ${new Date(mov.data_movimentacao).toLocaleDateString('pt-BR')}
                 </td>
                 <td class="py-3 px-4">
-                    <span class="text-xs px-3 py-1 rounded-full font-medium ${
-                        mov.tipo === 'entrada' 
-                            ? 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300' 
-                            : 'bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300'
-                    }">
+                    <span class="text-xs px-3 py-1 rounded-full font-medium ${mov.tipo === 'entrada'
+                ? 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300'
+                : 'bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300'
+            }">
                         ${mov.tipo === 'entrada' ? 'Entrada' : 'Saída'}
                     </span>
                 </td>
@@ -1402,7 +1401,7 @@ class LaboratorioModule {
         const modal = document.getElementById('movementModal');
         const title = document.getElementById('movementModalTitle');
         const form = document.getElementById('movementForm');
-        
+
         if (!modal || !form) return;
 
         // Resetar formulário
@@ -1491,7 +1490,7 @@ class LaboratorioModule {
 
     async saveMovement(e) {
         e.preventDefault();
-        
+
         const tipo = document.getElementById('movementTipo').value;
         const movementData = {
             tipo,
@@ -1547,7 +1546,7 @@ class LaboratorioModule {
 
             const result = await response.json();
             this.alerts = result.data || [];
-            
+
             this.renderAlerts();
             this.updateAlertsStats();
         } catch (error) {
@@ -1567,8 +1566,8 @@ class LaboratorioModule {
         }
 
         if (filteredAlerts.length === 0) {
-            const mensagem = this.alertFilter === 'all' 
-                ? 'Nenhum alerta ativo' 
+            const mensagem = this.alertFilter === 'all'
+                ? 'Nenhum alerta ativo'
                 : `Nenhum alerta do tipo "${this.alertFilter}"`;
             container.innerHTML = `
                 <div class="text-center py-12 text-gray-500 dark:text-gray-400">
@@ -1582,22 +1581,22 @@ class LaboratorioModule {
         container.innerHTML = filteredAlerts.map(alert => {
             // Mapear tipo para cor e ícone
             const tipoConfig = {
-                'critico': { 
-                    icon: 'fa-exclamation-triangle', 
+                'critico': {
+                    icon: 'fa-exclamation-triangle',
                     color: 'red',
                     bgColor: 'bg-red-50 dark:bg-red-900/20',
                     borderColor: 'border-red-500',
                     textColor: 'text-red-700 dark:text-red-400'
                 },
-                'aviso': { 
-                    icon: 'fa-exclamation-circle', 
+                'aviso': {
+                    icon: 'fa-exclamation-circle',
                     color: 'yellow',
                     bgColor: 'bg-yellow-50 dark:bg-yellow-900/20',
                     borderColor: 'border-yellow-500',
                     textColor: 'text-yellow-700 dark:text-yellow-400'
                 },
-                'informativo': { 
-                    icon: 'fa-info-circle', 
+                'informativo': {
+                    icon: 'fa-info-circle',
                     color: 'blue',
                     bgColor: 'bg-blue-50 dark:bg-blue-900/20',
                     borderColor: 'border-blue-500',
@@ -1631,9 +1630,9 @@ class LaboratorioModule {
 
     updateAlertsStats() {
         const alertsCount = this.alerts.length;
-        const alertsCriticos = this.alerts.filter(a => a.tipo.includes('critico') || a.tipo.includes('esgotado') || a.tipo.includes('vencido')).length;
-        const alertsAvisos = this.alerts.filter(a => a.tipo.includes('baixo') || a.tipo.includes('proxima')).length;
-        const alertsInfo = alertsCount - alertsCriticos - alertsAvisos;
+        const alertsCriticos = this.alerts.filter(a => a.tipo === 'critico').length;
+        const alertsAvisos = this.alerts.filter(a => a.tipo === 'aviso').length;
+        const alertsInfo = this.alerts.filter(a => a.tipo === 'informativo').length;
 
         document.getElementById('alertsCriticos').textContent = alertsCriticos;
         document.getElementById('alertsAvisos').textContent = alertsAvisos;
@@ -1642,7 +1641,7 @@ class LaboratorioModule {
         // Atualizar badge na aba (mobile e desktop)
         const alertCount = document.getElementById('alertCount');
         const alertCountDesktop = document.getElementById('alertCount-desktop');
-        
+
         if (alertsCount > 0) {
             if (alertCount) {
                 alertCount.textContent = alertsCount;
@@ -1686,7 +1685,7 @@ class LaboratorioModule {
     async loadReports() {
         try {
             const token = await window.authManager.getAccessToken();
-            
+
             // Carregar KPIs de relatório
             const [valueRes, entriesRes, exitsRes, productsRes] = await Promise.all([
                 fetch(`${this.apiBaseUrl}/relatorios/valor-estoque`, {
@@ -1732,7 +1731,7 @@ class LaboratorioModule {
                     'Authorization': `Bearer ${JSON.parse(token).access_token}`
                 }
             });
-            
+
             if (valorEstoqueResponse.ok) {
                 const valorData = await valorEstoqueResponse.json();
                 const valorElement = document.getElementById('totalStockValue');
@@ -1747,7 +1746,7 @@ class LaboratorioModule {
                     'Authorization': `Bearer ${JSON.parse(token).access_token}`
                 }
             });
-            
+
             if (entradasResponse.ok) {
                 const entradasData = await entradasResponse.json();
                 const entradasElement = document.getElementById('totalMonthEntries');
@@ -1762,7 +1761,7 @@ class LaboratorioModule {
                     'Authorization': `Bearer ${JSON.parse(token).access_token}`
                 }
             });
-            
+
             if (saidasResponse.ok) {
                 const saidasData = await saidasResponse.json();
                 const saidasElement = document.getElementById('totalMonthExits');
@@ -1793,10 +1792,10 @@ class LaboratorioModule {
         // Definir datas padrão (mês atual)
         const primeiroDia = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
         const hoje = new Date();
-        
+
         const dataInicioInput = document.getElementById('filtroDataInicio');
         const dataFimInput = document.getElementById('filtroDataFim');
-        
+
         if (dataInicioInput && !dataInicioInput.value) {
             dataInicioInput.value = primeiroDia.toISOString().split('T')[0];
         }
@@ -1807,7 +1806,7 @@ class LaboratorioModule {
         // Event listeners
         const btnAplicar = document.getElementById('btnAplicarFiltro');
         const btnLimpar = document.getElementById('btnLimparFiltro');
-        
+
         if (btnAplicar) {
             btnAplicar.removeEventListener('click', this.aplicarFiltroHandler);
             this.aplicarFiltroHandler = () => this.aplicarFiltroRelatorios();
@@ -1830,8 +1829,8 @@ class LaboratorioModule {
     setFiltroPreset(preset) {
         const dataFim = new Date();
         let dataInicio = new Date();
-        
-        switch(preset) {
+
+        switch (preset) {
             case 'hoje':
                 dataInicio = new Date();
                 break;
@@ -1848,7 +1847,7 @@ class LaboratorioModule {
                 dataInicio = new Date(dataInicio.getFullYear(), 0, 1);
                 break;
         }
-        
+
         document.getElementById('filtroDataInicio').value = dataInicio.toISOString().split('T')[0];
         document.getElementById('filtroDataFim').value = dataFim.toISOString().split('T')[0];
     }
@@ -1856,7 +1855,7 @@ class LaboratorioModule {
     async aplicarFiltroRelatorios() {
         const dataInicio = document.getElementById('filtroDataInicio').value;
         const dataFim = document.getElementById('filtroDataFim').value;
-        
+
         if (!dataInicio || !dataFim) {
             this.showNotification('Por favor, selecione as datas de início e fim', 'error');
             return;
@@ -1867,24 +1866,24 @@ class LaboratorioModule {
 
         try {
             const accessToken = JSON.parse(token).access_token;
-            
+
             // Buscar movimentações com filtro
             const response = await fetch(`${this.apiBaseUrl}/relatorios/movimentacoes?dataInicio=${dataInicio}&dataFim=${dataFim}`, {
                 headers: { 'Authorization': `Bearer ${accessToken}` }
             });
-            
+
             if (!response.ok) throw new Error('Erro ao buscar movimentações');
-            
+
             const data = await response.json();
-            
+
             // Atualizar KPIs
             document.getElementById('totalMonthEntries').textContent = data.total_entradas || 0;
             document.getElementById('totalMonthExits').textContent = data.total_saidas || 0;
-            
+
             // Mensagem de sucesso
             const periodoTexto = `${new Date(dataInicio).toLocaleDateString('pt-PT')} - ${new Date(dataFim).toLocaleDateString('pt-PT')}`;
             this.showNotification(`✅ Período: ${periodoTexto} | Entradas: ${data.total_entradas} | Saídas: ${data.total_saidas}`, 'success');
-            
+
             return data;
         } catch (error) {
             console.error('Erro ao aplicar filtro:', error);
@@ -1895,10 +1894,10 @@ class LaboratorioModule {
     limparFiltroRelatorios() {
         const primeiroDia = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
         const hoje = new Date();
-        
+
         document.getElementById('filtroDataInicio').value = primeiroDia.toISOString().split('T')[0];
         document.getElementById('filtroDataFim').value = hoje.toISOString().split('T')[0];
-        
+
         // Recarregar dados do mês atual
         this.loadReportStats();
         this.showNotification('Filtro limpo! Mostrando dados do mês atual', 'info');

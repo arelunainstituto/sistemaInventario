@@ -14,10 +14,10 @@ class ProstoralOrdersApp {
         this.timerInterval = null;
         this.apiBaseUrl = '/api/prostoral';
         this.accessibleIssueIds = []; // IDs das intercorrências acessíveis (para filtrar histórico)
-        
+
         // Realtime subscriptions
         this.realtimeSubscriptions = [];
-        
+
         // Filtros
         this.filters = {
             search: '',
@@ -26,7 +26,7 @@ class ProstoralOrdersApp {
             date_from: '',
             date_to: ''
         };
-        
+
         // Paginação
         this.currentPage = 1;
         this.itemsPerPage = 20;
@@ -35,7 +35,7 @@ class ProstoralOrdersApp {
 
     async init() {
         console.log('Inicializando módulo de Ordens de Serviço...');
-        
+
         // Aguardar authManager estar pronto
         if (!window.authManager || !window.authManager.isUserAuthenticated()) {
             console.error('Usuário não autenticado');
@@ -44,49 +44,49 @@ class ProstoralOrdersApp {
 
         // Carregar dados iniciais
         await this.loadInitialData();
-        
+
         // Setup event listeners
         this.setupEventListeners();
-        
+
         // Carregar ordens
         await this.loadOrders();
-        
+
         // Iniciar subscriptions real-time
         this.setupRealtimeSubscriptions();
-        
+
         console.log('Módulo de Ordens de Serviço inicializado!');
     }
 
     async loadInitialData() {
         try {
             const token = await window.authManager.getAccessToken();
-            
+
             // Carregar clientes
             const clientsRes = await fetch(`${this.apiBaseUrl}/clients?is_active=true`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             const clientsData = await clientsRes.json();
             this.clients = clientsData.clients || [];
-            
+
             // Carregar kits
             const kitsRes = await fetch(`${this.apiBaseUrl}/kits`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             const kitsData = await kitsRes.json();
             this.kits = kitsData.kits || [];
-            
+
             // Carregar inventário
             const inventoryRes = await fetch(`${this.apiBaseUrl}/inventory`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             const inventoryData = await inventoryRes.json();
             this.inventory = inventoryData.items || [];
-            
+
             // Povoar selects
             this.populateClientSelect();
             this.populateKitSelect();
             this.populateInventorySelect();
-            
+
         } catch (error) {
             console.error('Erro ao carregar dados iniciais:', error);
         }
@@ -136,7 +136,7 @@ class ProstoralOrdersApp {
         // Paginação
         const btnPrevPage = document.getElementById('btn-prev-page');
         const btnNextPage = document.getElementById('btn-next-page');
-        
+
         if (btnPrevPage) {
             btnPrevPage.addEventListener('click', () => {
                 if (this.currentPage > 1) {
@@ -145,7 +145,7 @@ class ProstoralOrdersApp {
                 }
             });
         }
-        
+
         if (btnNextPage) {
             btnNextPage.addEventListener('click', () => {
                 if (this.currentPage < this.totalPages) {
@@ -314,10 +314,10 @@ class ProstoralOrdersApp {
                 const selectedOption = e.target.options[e.target.selectedIndex];
                 const cost = selectedOption.getAttribute('data-cost') || '0';
                 const unit = selectedOption.getAttribute('data-unit') || 'un';
-                
+
                 const costInput = document.getElementById('material-unit-cost');
                 const unitInput = document.getElementById('material-unit');
-                
+
                 if (costInput) costInput.value = cost;
                 if (unitInput) unitInput.value = unit;
             });
@@ -369,10 +369,18 @@ class ProstoralOrdersApp {
     // LISTA DE ORDENS
     // =====================================================
 
-    async loadOrders() {
+    async loadOrders(force = false) {
+        // Cache Check
+        if (!force && this.orders && this.orders.length > 0) {
+            console.log('📦 Usando cache de ordens');
+            this.renderOrdersTable();
+            this.updatePagination();
+            return;
+        }
+
         try {
             const token = await window.authManager.getAccessToken();
-            
+
             // Construir query params
             const params = new URLSearchParams({
                 page: this.currentPage,
@@ -389,7 +397,7 @@ class ProstoralOrdersApp {
             }
 
             const data = await response.json();
-            
+
             if (data.success) {
                 this.orders = data.orders || [];
                 this.totalPages = data.pagination?.totalPages || 1;
@@ -472,7 +480,7 @@ class ProstoralOrdersApp {
                 btn.addEventListener('click', (e) => {
                     const action = e.currentTarget.dataset.action;
                     const orderId = e.currentTarget.dataset.orderId;
-                    
+
                     if (action === 'view') {
                         this.viewOrderDetails(orderId);
                     } else if (action === 'edit') {
@@ -500,7 +508,7 @@ class ProstoralOrdersApp {
         };
 
         const config = statusConfig[status] || statusConfig['received'];
-        
+
         return `
             <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-${config.color}-100 text-${config.color}-800">
                 <i class="fas fa-${config.icon} mr-1"></i>
@@ -616,12 +624,12 @@ class ProstoralOrdersApp {
 
         const btnPrev = document.getElementById('btn-prev-page');
         const btnNext = document.getElementById('btn-next-page');
-        
+
         if (btnPrev) {
             btnPrev.disabled = this.currentPage === 1;
             btnPrev.classList.toggle('opacity-50', this.currentPage === 1);
         }
-        
+
         if (btnNext) {
             btnNext.disabled = this.currentPage >= this.totalPages;
             btnNext.classList.toggle('opacity-50', this.currentPage >= this.totalPages);
@@ -646,7 +654,7 @@ class ProstoralOrdersApp {
     async editOrder(orderId) {
         try {
             const token = await window.authManager.getAccessToken();
-            
+
             const response = await fetch(`${this.apiBaseUrl}/orders/${orderId}`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
@@ -656,11 +664,11 @@ class ProstoralOrdersApp {
             }
 
             const data = await response.json();
-            
+
             if (data.success && data.order) {
                 this.currentOrder = data.order;
                 this.populateOrderForm(data.order);
-                
+
                 const modal = document.getElementById('modal-order-form');
                 if (modal) {
                     document.getElementById('modal-order-title').textContent = 'Editar Ordem de Serviço';
@@ -679,7 +687,7 @@ class ProstoralOrdersApp {
         document.getElementById('order-patient-name').value = order.patient_name || '';
         document.getElementById('order-work-type').value = order.work_type || '';
         document.getElementById('order-work-description').value = order.work_description || '';
-        
+
         // Formatar data para datetime-local (YYYY-MM-DDTHH:mm)
         if (order.due_date) {
             const date = new Date(order.due_date);
@@ -689,7 +697,7 @@ class ProstoralOrdersApp {
         } else {
             document.getElementById('order-expected-delivery').value = '';
         }
-        
+
         document.getElementById('order-final-price').value = order.final_price || '';
         document.getElementById('order-status').value = order.status || 'pending';
     }
@@ -703,9 +711,9 @@ class ProstoralOrdersApp {
             }
 
             const token = await window.authManager.getAccessToken();
-            
+
             const workType = document.getElementById('order-work-type').value;
-            
+
             const formData = {
                 client_id: document.getElementById('order-client-id').value,
                 patient_name: document.getElementById('order-patient-name').value,
@@ -722,10 +730,10 @@ class ProstoralOrdersApp {
                 return;
             }
 
-            const url = this.currentOrder 
+            const url = this.currentOrder
                 ? `${this.apiBaseUrl}/orders/${this.currentOrder.id}`
                 : `${this.apiBaseUrl}/orders`;
-            
+
             const method = this.currentOrder ? 'PUT' : 'POST';
 
             console.log('📤 Enviando dados:', formData);
@@ -746,7 +754,7 @@ class ProstoralOrdersApp {
             }
 
             const data = await response.json();
-            
+
             if (data.success) {
                 this.showSuccess(this.currentOrder ? 'Ordem atualizada com sucesso!' : 'Ordem criada com sucesso!');
                 this.closeModal('modal-order-form');
@@ -766,7 +774,7 @@ class ProstoralOrdersApp {
 
         try {
             const token = await window.authManager.getAccessToken();
-            
+
             const response = await fetch(`${this.apiBaseUrl}/orders/${orderId}`, {
                 method: 'DELETE',
                 headers: { 'Authorization': `Bearer ${token}` }
@@ -777,7 +785,7 @@ class ProstoralOrdersApp {
             }
 
             const data = await response.json();
-            
+
             if (data.success) {
                 this.showSuccess('Ordem cancelada com sucesso!');
                 await this.loadOrders();
@@ -798,14 +806,14 @@ class ProstoralOrdersApp {
         };
 
         const message = confirmMessages[newStatus] || 'Deseja alterar o status desta ordem?';
-        
+
         if (!confirm(message)) {
             return;
         }
 
         try {
             const token = await window.authManager.getAccessToken();
-            
+
             const response = await fetch(`${this.apiBaseUrl}/orders/${orderId}`, {
                 method: 'PUT',
                 headers: {
@@ -821,14 +829,14 @@ class ProstoralOrdersApp {
             }
 
             const data = await response.json();
-            
+
             if (data.success) {
                 const successMessages = {
                     'design': '✅ Ordem aceita com sucesso!',
                     'production': '🔧 Ordem colocada em Produção!',
                     'delivered': '✅ Ordem finalizada com sucesso!'
                 };
-                
+
                 this.showSuccess(successMessages[newStatus] || 'Status atualizado com sucesso!');
                 await this.loadOrders();
             }
@@ -848,10 +856,10 @@ class ProstoralOrdersApp {
             console.log('📦 Carregando detalhes da OS:', orderId);
             const token = await window.authManager.getAccessToken();
             console.log('🔑 Token obtido:', token ? 'OK' : 'FALHOU');
-            
+
             const url = `${this.apiBaseUrl}/orders/${orderId}`;
             console.log('🌐 URL completa:', url);
-            
+
             const response = await fetch(url, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
@@ -866,20 +874,20 @@ class ProstoralOrdersApp {
 
             const data = await response.json();
             console.log('✅ Dados recebidos:', data);
-            
+
             if (data.success && data.order) {
                 this.currentOrder = data.order;
                 this.userNames = data.userNames || {}; // Guardar nomes de usuários
                 this.renderOrderDetails(data.order);
-                
+
                 // Configurar event listeners dos botões de ação
                 this.setupDetailsActionButtons();
-                
+
                 const modal = document.getElementById('modal-order-details');
                 if (modal) {
                     modal.classList.remove('hidden');
                 }
-                
+
                 // Gerar QR Code
                 this.generateOrderQRCode(data.order);
             }
@@ -900,23 +908,23 @@ class ProstoralOrdersApp {
         document.getElementById('detail-status').innerHTML = this.renderStatusBadge(order.status);
         document.getElementById('detail-total-cost').textContent = this.formatCurrency(order.total_cost || 0);
         document.getElementById('detail-final-price').textContent = this.formatCurrency(order.final_price || 0);
-        
+
         // Ações Rápidas dentro do Modal
         this.renderModalQuickActions(order);
-        
+
         // Materiais
         this.renderOrderMaterials(order.materials || []);
-        
+
         // Time tracking - passar order completo para calcular tempo em produção
         this.renderOrderTimeTracking(order.time_tracking || [], order.history || [], order.status);
-        
+
         // Reparos vinculados
         this.renderOrderRepairs(order);
-        
+
         // Intercorrências - guardar IDs acessíveis para filtrar histórico
         this.accessibleIssueIds = (order.issues || []).map(issue => issue.id);
         this.renderOrderIssues(order.issues || []);
-        
+
         // Histórico - filtrar baseado em intercorrências acessíveis
         this.renderOrderHistory(order.history || []);
     }
@@ -997,7 +1005,7 @@ class ProstoralOrdersApp {
             }
 
             const token = await window.authManager.getAccessToken();
-            
+
             const response = await fetch(`${this.apiBaseUrl}/orders/${this.currentOrder.id}/materials/kit`, {
                 method: 'POST',
                 headers: {
@@ -1012,11 +1020,11 @@ class ProstoralOrdersApp {
             }
 
             const data = await response.json();
-            
+
             if (data.success) {
                 this.showSuccess('Kit adicionado com sucesso!');
                 this.closeModal('modal-add-kit');
-                
+
                 // Recarregar detalhes da ordem
                 await this.viewOrderDetails(this.currentOrder.id);
             }
@@ -1046,7 +1054,7 @@ class ProstoralOrdersApp {
             }
 
             const token = await window.authManager.getAccessToken();
-            
+
             const response = await fetch(`${this.apiBaseUrl}/orders/${this.currentOrder.id}/materials`, {
                 method: 'POST',
                 headers: {
@@ -1067,18 +1075,18 @@ class ProstoralOrdersApp {
             }
 
             const data = await response.json();
-            
+
             if (data.success) {
                 this.showSuccess('Material adicionado com sucesso!');
                 this.closeModal('modal-add-material');
-                
+
                 // Limpar formulário
                 document.getElementById('material-item-id').value = '';
                 document.getElementById('material-quantity').value = '1';
                 document.getElementById('material-unit-cost').value = '';
                 document.getElementById('material-unit').value = '';
                 document.getElementById('material-notes').value = '';
-                
+
                 // Recarregar detalhes da ordem
                 await this.viewOrderDetails(this.currentOrder.id);
             }
@@ -1101,7 +1109,7 @@ class ProstoralOrdersApp {
 
         try {
             const token = await window.authManager.getAccessToken();
-            
+
             const response = await fetch(`${this.apiBaseUrl}/orders/${this.currentOrder.id}/materials/${materialId}`, {
                 method: 'DELETE',
                 headers: { 'Authorization': `Bearer ${token}` }
@@ -1112,10 +1120,10 @@ class ProstoralOrdersApp {
             }
 
             const data = await response.json();
-            
+
             if (data.success) {
                 this.showSuccess('Material removido com sucesso!');
-                
+
                 // Recarregar detalhes da ordem
                 await this.viewOrderDetails(this.currentOrder.id);
             }
@@ -1141,26 +1149,26 @@ class ProstoralOrdersApp {
 
         // Calcular tempo em produção (desde status production até delivered/cancelled)
         let productionTimeHtml = '';
-        
-        const productionStart = history.find(h => 
-            h.change_type === 'status_change' && 
+
+        const productionStart = history.find(h =>
+            h.change_type === 'status_change' &&
             h.new_status === 'production'
         );
-        
+
         if (productionStart) {
             const startDate = new Date(productionStart.changed_at);
             let endDate = new Date();
-            
+
             // Se já foi finalizada, usar a data de finalização
-            const deliveredChange = history.find(h => 
-                h.change_type === 'status_change' && 
+            const deliveredChange = history.find(h =>
+                h.change_type === 'status_change' &&
                 (h.new_status === 'delivered' || h.new_status === 'cancelled')
             );
-            
+
             if (deliveredChange) {
                 endDate = new Date(deliveredChange.changed_at);
             }
-            
+
             // Calcular diferença em minutos
             const diffMs = endDate - startDate;
             const diffMinutes = Math.floor(diffMs / (1000 * 60));
@@ -1168,7 +1176,7 @@ class ProstoralOrdersApp {
             const diffMins = diffMinutes % 60;
             const diffDays = Math.floor(diffHours / 24);
             const remainingHours = diffHours % 24;
-            
+
             let productionTimeDisplay = '';
             if (diffDays > 0) {
                 productionTimeDisplay = `${diffDays}d ${remainingHours}h ${diffMins}min`;
@@ -1177,19 +1185,19 @@ class ProstoralOrdersApp {
             } else {
                 productionTimeDisplay = `${diffMins}min`;
             }
-            
+
             const isFinished = deliveredChange ? true : false;
             const statusText = isFinished ? 'Tempo Total em Produção' : 'Tempo em Produção (Em andamento)';
-            
+
             // Classes CSS fixas para Tailwind
-            const bgClass = isFinished 
+            const bgClass = isFinished
                 ? 'bg-gradient-to-r from-emerald-50 to-emerald-100 dark:from-emerald-900/20 dark:to-emerald-900/30 border-2 border-emerald-300 dark:border-emerald-700'
                 : 'bg-gradient-to-r from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-900/30 border-2 border-blue-300 dark:border-blue-700';
-            
+
             const textClass = isFinished
                 ? 'text-emerald-600 dark:text-emerald-400'
                 : 'text-blue-600 dark:text-blue-400';
-            
+
             productionTimeHtml = `
                 <!-- Tempo em Produção -->
                 <div class="${bgClass} rounded-lg p-4 mb-4">
@@ -1214,7 +1222,7 @@ class ProstoralOrdersApp {
 
         // Calcular tempo total trabalhado
         const totalMinutes = tracking.reduce((sum, t) => sum + (t.duration_minutes || 0), 0);
-        
+
         // Agrupar por fase
         const byStage = {};
         tracking.forEach(t => {
@@ -1232,7 +1240,7 @@ class ProstoralOrdersApp {
         const mins = totalMinutes % 60;
         const days = Math.floor(hours / 24);
         const remainingHours = hours % 24;
-        
+
         let timeDisplay = '';
         if (days > 0) {
             timeDisplay = `${days}d ${remainingHours}h ${mins}min`;
@@ -1259,10 +1267,10 @@ class ProstoralOrdersApp {
                 <div class="mb-4 space-y-2">
                     <p class="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide">Por Fase:</p>
                     ${Object.entries(byStage).map(([stage, data]) => {
-                        const stageHours = Math.floor(data.minutes / 60);
-                        const stageMins = data.minutes % 60;
-                        const stageTime = stageHours > 0 ? `${stageHours}h ${stageMins}min` : `${stageMins}min`;
-                        return `
+            const stageHours = Math.floor(data.minutes / 60);
+            const stageMins = data.minutes % 60;
+            const stageTime = stageHours > 0 ? `${stageHours}h ${stageMins}min` : `${stageMins}min`;
+            return `
                             <div class="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-3 border border-gray-200 dark:border-gray-700">
                                 <div class="flex justify-between items-center">
                                     <div>
@@ -1276,7 +1284,7 @@ class ProstoralOrdersApp {
                                 </div>
                             </div>
                         `;
-                    }).join('')}
+        }).join('')}
                 </div>
             ` : ''}
 
@@ -1325,17 +1333,17 @@ class ProstoralOrdersApp {
         if (modal) {
             // Carregar etapas customizadas
             this.populateStageDropdown();
-            
+
             // Limpar seleção
             const select = document.getElementById('work-stage');
             if (select) {
                 select.value = '';
-                
+
                 // Re-adicionar listener para detectar "Adicionar etapa"
                 // (Remove listeners antigos primeiro)
                 const newSelect = select.cloneNode(true);
                 select.parentNode.replaceChild(newSelect, select);
-                
+
                 newSelect.addEventListener('change', (e) => {
                     if (e.target.value === '__add_new__') {
                         this.showAddStageModal();
@@ -1344,7 +1352,7 @@ class ProstoralOrdersApp {
                     }
                 });
             }
-            
+
             modal.classList.remove('hidden');
         }
     }
@@ -1367,7 +1375,7 @@ class ProstoralOrdersApp {
             const hourlyRate = 70.00;
 
             const token = await window.authManager.getAccessToken();
-            
+
             const response = await fetch(`${this.apiBaseUrl}/orders/${this.currentOrder.id}/time-tracking`, {
                 method: 'POST',
                 headers: {
@@ -1382,12 +1390,12 @@ class ProstoralOrdersApp {
             }
 
             const data = await response.json();
-            
+
             if (data.success) {
                 this.showSuccess('Trabalho iniciado!');
                 this.closeModal('modal-start-work');
                 this.currentTimeTracking = data.tracking;
-                
+
                 // Recarregar detalhes da ordem para mostrar o timer
                 await this.viewOrderDetails(this.currentOrder.id);
             }
@@ -1406,21 +1414,21 @@ class ProstoralOrdersApp {
 
     saveCustomStage(stageName) {
         const stages = this.loadCustomStages();
-        
+
         // Gerar ID único
         const stageId = `custom_${stageName.toLowerCase().replace(/\s+/g, '_')}`;
-        
+
         // Verificar se já existe
         if (stages.some(s => s.id === stageId)) {
             this.showError('Esta etapa já existe!');
             return false;
         }
-        
+
         stages.push({
             id: stageId,
             name: stageName
         });
-        
+
         localStorage.setItem('customWorkStages', JSON.stringify(stages));
         return true;
     }
@@ -1428,23 +1436,23 @@ class ProstoralOrdersApp {
     populateStageDropdown() {
         const select = document.getElementById('work-stage');
         if (!select) return;
-        
+
         // Carregar etapas customizadas
         const customStages = this.loadCustomStages();
-        
+
         // Remover etapas customizadas antigas (se houver)
         const options = select.querySelectorAll('option[data-custom="true"]');
         options.forEach(opt => opt.remove());
-        
+
         // Adicionar etapas customizadas antes da opção "Adicionar etapa"
         const addNewOption = select.querySelector('option[value="__add_new__"]');
-        
+
         customStages.forEach(stage => {
             const option = document.createElement('option');
             option.value = stage.id;
             option.textContent = stage.name;
             option.setAttribute('data-custom', 'true');
-            
+
             if (addNewOption) {
                 select.insertBefore(option, addNewOption);
             } else {
@@ -1456,11 +1464,11 @@ class ProstoralOrdersApp {
     showAddStageModal() {
         const modal = document.getElementById('modal-add-stage');
         const input = document.getElementById('new-stage-name');
-        
+
         if (modal && input) {
             input.value = '';
             modal.classList.remove('hidden');
-            
+
             // Focar no input
             setTimeout(() => input.focus(), 100);
         }
@@ -1476,19 +1484,19 @@ class ProstoralOrdersApp {
     saveNewStage() {
         const input = document.getElementById('new-stage-name');
         const stageName = input?.value?.trim();
-        
+
         if (!stageName) {
             this.showError('Digite um nome para a etapa');
             return;
         }
-        
+
         if (this.saveCustomStage(stageName)) {
             this.showSuccess(`Etapa "${stageName}" adicionada com sucesso!`);
             this.closeAddStageModal();
-            
+
             // Atualizar dropdown
             this.populateStageDropdown();
-            
+
             // Selecionar a nova etapa
             const select = document.getElementById('work-stage');
             const stageId = `custom_${stageName.toLowerCase().replace(/\s+/g, '_')}`;
@@ -1506,7 +1514,7 @@ class ProstoralOrdersApp {
 
         try {
             const token = await window.authManager.getAccessToken();
-            
+
             const response = await fetch(
                 `${this.apiBaseUrl}/orders/${this.currentOrder.id}/time-tracking/${this.currentTimeTracking.id}`,
                 {
@@ -1524,7 +1532,7 @@ class ProstoralOrdersApp {
             }
 
             const data = await response.json();
-            
+
             if (data.success) {
                 this.showSuccess('Trabalho pausado!');
                 this.currentTimeTracking = data.tracking;
@@ -1546,7 +1554,7 @@ class ProstoralOrdersApp {
 
         try {
             const token = await window.authManager.getAccessToken();
-            
+
             const response = await fetch(
                 `${this.apiBaseUrl}/orders/${this.currentOrder.id}/time-tracking/${this.currentTimeTracking.id}`,
                 {
@@ -1564,7 +1572,7 @@ class ProstoralOrdersApp {
             }
 
             const data = await response.json();
-            
+
             if (data.success) {
                 this.showSuccess('Trabalho retomado!');
                 this.currentTimeTracking = data.tracking;
@@ -1589,7 +1597,7 @@ class ProstoralOrdersApp {
 
         try {
             const token = await window.authManager.getAccessToken();
-            
+
             const response = await fetch(
                 `${this.apiBaseUrl}/orders/${this.currentOrder.id}/time-tracking/${this.currentTimeTracking.id}`,
                 {
@@ -1607,12 +1615,12 @@ class ProstoralOrdersApp {
             }
 
             const data = await response.json();
-            
+
             if (data.success) {
                 this.showSuccess('Trabalho finalizado!');
                 this.currentTimeTracking = null;
                 this.stopTimer();
-                
+
                 // Recarregar detalhes da ordem
                 await this.viewOrderDetails(this.currentOrder.id);
             }
@@ -1628,11 +1636,11 @@ class ProstoralOrdersApp {
         const stageDisplay = document.getElementById('active-timer-stage');
         const btnPause = document.getElementById('btn-pause-work');
         const btnResume = document.getElementById('btn-resume-work');
-        
+
         if (!timerContainer) return;
 
         timerContainer.classList.remove('hidden');
-        
+
         if (stageDisplay) {
             stageDisplay.textContent = `Etapa: ${this.formatStage(tracking.stage)}`;
         }
@@ -1658,24 +1666,24 @@ class ProstoralOrdersApp {
 
     startTimer(startedAt) {
         this.stopTimer(); // Parar qualquer timer existente
-        
+
         const updateTimer = () => {
             const now = new Date();
             const start = new Date(startedAt);
             const diff = now - start;
-            
+
             const hours = Math.floor(diff / (1000 * 60 * 60));
             const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
             const seconds = Math.floor((diff % (1000 * 60)) / 1000);
-            
+
             const display = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
-            
+
             const timerDisplay = document.getElementById('active-timer-display');
             if (timerDisplay) {
                 timerDisplay.textContent = display;
             }
         };
-        
+
         updateTimer(); // Atualizar imediatamente
         this.timerInterval = setInterval(updateTimer, 1000); // Atualizar a cada segundo
     }
@@ -1728,7 +1736,7 @@ class ProstoralOrdersApp {
             document.getElementById('issue-severity').value = 'medium';
             document.getElementById('issue-title').value = '';
             document.getElementById('issue-description').value = '';
-            
+
             modal.classList.remove('hidden');
         }
     }
@@ -1751,7 +1759,7 @@ class ProstoralOrdersApp {
             }
 
             const token = await window.authManager.getAccessToken();
-            
+
             const response = await fetch(`${this.apiBaseUrl}/orders/${this.currentOrder.id}/issues`, {
                 method: 'POST',
                 headers: {
@@ -1772,11 +1780,11 @@ class ProstoralOrdersApp {
             }
 
             const data = await response.json();
-            
+
             if (data.success) {
                 this.showSuccess('Intercorrência registrada com sucesso!');
                 this.closeModal('modal-add-issue');
-                
+
                 // Recarregar detalhes da ordem
                 await this.viewOrderDetails(this.currentOrder.id);
             }
@@ -1827,13 +1835,13 @@ class ProstoralOrdersApp {
                 <div class="absolute left-6 top-0 bottom-0 w-0.5 bg-gray-200"></div>
                 
                 ${filteredHistory.map((h, index) => {
-                    const icon = this.getHistoryIcon(h.change_type);
-                    const iconColor = this.getHistoryIconColor(h.change_type);
-                    const time = new Date(h.changed_at);
-                    const timeStr = time.toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' });
-                    const dateStr = time.toLocaleDateString('pt-PT', { day: '2-digit', month: 'short' });
-                    
-                    return `
+            const icon = this.getHistoryIcon(h.change_type);
+            const iconColor = this.getHistoryIconColor(h.change_type);
+            const time = new Date(h.changed_at);
+            const timeStr = time.toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' });
+            const dateStr = time.toLocaleDateString('pt-PT', { day: '2-digit', month: 'short' });
+
+            return `
                         <div class="relative pb-4 last:pb-0">
                             <!-- Ícone na linha -->
                             <div class="absolute left-4 flex items-center justify-center w-5 h-5 ${iconColor} rounded-full border-2 border-white shadow">
@@ -1861,7 +1869,7 @@ class ProstoralOrdersApp {
                             </div>
                         </div>
                     `;
-                }).join('')}
+        }).join('')}
             </div>
         `;
     }
@@ -1887,14 +1895,14 @@ class ProstoralOrdersApp {
     // Metadata compacto
     renderCompactMetadata(metadata) {
         if (!metadata) return '';
-        
+
         const items = [];
         if (metadata.quantity) items.push(`Qtd: ${metadata.quantity}`);
         if (metadata.unit_cost) items.push(`€${metadata.unit_cost}`);
         if (metadata.duration_minutes) items.push(`${metadata.duration_minutes}min`);
         if (metadata.labor_cost) items.push(`€${metadata.labor_cost}`);
         if (metadata.item_name) items.push(metadata.item_name);
-        
+
         return items.join(' • ');
     }
 
@@ -1963,7 +1971,7 @@ class ProstoralOrdersApp {
 
         // Extrair informações relevantes do metadata
         const details = [];
-        
+
         if (metadata.item_name) {
             details.push(`Item: ${metadata.item_name}`);
         }
@@ -2004,7 +2012,7 @@ class ProstoralOrdersApp {
         if (!qrContainer) return;
 
         qrContainer.innerHTML = '';
-        
+
         // Verificar se a biblioteca QRCode está disponível
         if (typeof QRCode === 'undefined') {
             console.error('Biblioteca QRCode não está carregada');
@@ -2014,7 +2022,7 @@ class ProstoralOrdersApp {
 
         // URL do QR Code (se não existir, usar o ID da ordem)
         const qrText = order.qr_code_url || `https://erp.institutoareluna.pt/prostoral/order/${order.id}`;
-        
+
         try {
             new QRCode(qrContainer, {
                 text: qrText,
@@ -2024,7 +2032,7 @@ class ProstoralOrdersApp {
                 colorLight: '#ffffff',
                 correctLevel: QRCode.CorrectLevel.H
             });
-            
+
             // Adicionar informação do QR Code
             const infoDiv = document.createElement('div');
             infoDiv.className = 'text-center mt-2';
@@ -2167,9 +2175,9 @@ class ProstoralOrdersApp {
         if (!modal) return;
 
         modal.classList.remove('hidden');
-        
+
         const statusEl = document.getElementById('qr-scanner-status');
-        
+
         try {
             // Verificar se a biblioteca está disponível
             if (typeof Html5Qrcode === 'undefined') {
@@ -2178,12 +2186,12 @@ class ProstoralOrdersApp {
 
             // Inicializar scanner
             this.html5QrcodeScanner = new Html5Qrcode("qr-reader");
-            
+
             statusEl.textContent = 'Iniciando câmera...';
             statusEl.className = 'mt-3 text-center text-sm text-blue-600 dark:text-blue-400';
 
             // Configurações do scanner
-            const config = { 
+            const config = {
                 fps: 10,
                 qrbox: { width: 250, height: 250 },
                 aspectRatio: 1.0
@@ -2211,7 +2219,7 @@ class ProstoralOrdersApp {
             console.error('Erro ao iniciar scanner:', error);
             statusEl.textContent = `❌ Erro: ${error.message}`;
             statusEl.className = 'mt-3 text-center text-sm text-red-600 dark:text-red-400';
-            
+
             // Se falhar, mostrar alerta
             this.showError('Não foi possível acessar a câmera. Verifique as permissões do navegador.');
         }
@@ -2327,7 +2335,7 @@ class ProstoralOrdersApp {
     async renderOrderRepairs(order) {
         const repairsSection = document.getElementById('repairs-section');
         const repairsList = document.getElementById('order-repairs-list');
-        
+
         if (!repairsSection || !repairsList) return;
 
         // Só mostrar seção para OSs finalizadas que NÃO são reparos
@@ -2339,10 +2347,10 @@ class ProstoralOrdersApp {
 
         // Mostrar seção (mesmo se não houver reparos ou houver erro)
         repairsSection.classList.remove('hidden');
-        
+
         // Carregar reparos vinculados
         const data = await this.loadOrderRepairs(order.id);
-        
+
         if (!data || !data.success) {
             // Mostrar mensagem de que não há reparos
             repairsList.innerHTML = `
@@ -2355,7 +2363,7 @@ class ProstoralOrdersApp {
         }
 
         const repairs = data.repairs || [];
-        
+
         if (repairs.length === 0) {
             repairsList.innerHTML = `
                 <div class="text-center py-4 text-gray-500 dark:text-gray-400">
@@ -2420,7 +2428,7 @@ class ProstoralOrdersApp {
         document.getElementById('repair-parent-order-number').textContent = this.currentOrder.order_number;
         document.getElementById('repair-client-name').textContent = this.currentOrder.client?.name || 'N/A';
         document.getElementById('repair-patient-name').textContent = this.currentOrder.patient_name || 'N/A';
-        
+
         // Preview do número da OS de reparo
         this.updateRepairNumberPreview();
 
@@ -2436,7 +2444,7 @@ class ProstoralOrdersApp {
 
     async updateRepairNumberPreview() {
         if (!this.currentOrder) return;
-        
+
         const previewEl = document.getElementById('repair-preview-number');
         if (!previewEl) return;
 
@@ -2486,12 +2494,12 @@ class ProstoralOrdersApp {
             }
 
             const data = await response.json();
-            
+
             this.showSuccess('✅ OS de Reparo criada com sucesso!');
-            
+
             // Fechar modal
             document.getElementById('modal-create-repair').classList.add('hidden');
-            
+
             // Recarregar detalhes da OS para atualizar a lista de reparos
             await this.viewOrderDetails(this.currentOrder.id);
 
@@ -2507,19 +2515,19 @@ class ProstoralOrdersApp {
 
     setupRealtimeSubscriptions() {
         console.log('🔴 Configurando subscriptions real-time...');
-        
+
         // Verificar se o Supabase está disponível
         if (!window.authManager || !window.authManager.supabase) {
             console.warn('⚠️ Supabase não disponível ainda, tentando novamente em 2s...');
             setTimeout(() => this.setupRealtimeSubscriptions(), 2000);
             return;
         }
-        
+
         // Unsubscribe de qualquer subscription anterior
         this.cleanupRealtimeSubscriptions();
-        
+
         const supabase = window.authManager.supabase;
-        
+
         // Subscribe a mudanças nas work orders
         const ordersSubscription = supabase
             .channel('prostoral_work_orders_changes')
@@ -2533,9 +2541,9 @@ class ProstoralOrdersApp {
                 (payload) => this.handleOrderChange(payload)
             )
             .subscribe();
-        
+
         this.realtimeSubscriptions.push(ordersSubscription);
-        
+
         // Subscribe a mudanças nas intercorrências
         const issuesSubscription = supabase
             .channel('prostoral_work_order_issues_changes')
@@ -2549,9 +2557,9 @@ class ProstoralOrdersApp {
                 (payload) => this.handleIssueChange(payload)
             )
             .subscribe();
-        
+
         this.realtimeSubscriptions.push(issuesSubscription);
-        
+
         // Subscribe a mudanças no histórico
         const historySubscription = supabase
             .channel('prostoral_work_order_status_history_changes')
@@ -2565,9 +2573,9 @@ class ProstoralOrdersApp {
                 (payload) => this.handleHistoryChange(payload)
             )
             .subscribe();
-        
+
         this.realtimeSubscriptions.push(historySubscription);
-        
+
         console.log('✅ Real-time subscriptions ativas');
     }
 
@@ -2583,16 +2591,16 @@ class ProstoralOrdersApp {
 
     handleOrderChange(payload) {
         console.log('🔔 Mudança detectada em Work Order:', payload);
-        
+
         const { eventType, new: newRecord, old: oldRecord } = payload;
-        
+
         // Se estamos vendo a lista de ordens, atualizar
         const ordersContent = document.getElementById('orders-content');
         if (ordersContent && !ordersContent.classList.contains('hidden')) {
             this.showRealtimeNotification('Uma ordem foi atualizada. Atualizando lista...');
             this.loadOrders();
         }
-        
+
         // Se estamos vendo os detalhes desta ordem específica, atualizar
         if (this.currentOrder && (newRecord?.id === this.currentOrder.id || oldRecord?.id === this.currentOrder.id)) {
             if (eventType === 'DELETE') {
@@ -2608,10 +2616,10 @@ class ProstoralOrdersApp {
 
     handleIssueChange(payload) {
         console.log('🔔 Mudança detectada em Intercorrência:', payload);
-        
+
         const { new: newRecord, old: oldRecord } = payload;
         const workOrderId = newRecord?.work_order_id || oldRecord?.work_order_id;
-        
+
         // Se estamos vendo os detalhes desta ordem, atualizar
         if (this.currentOrder && workOrderId === this.currentOrder.id) {
             this.showRealtimeNotification('Nova intercorrência adicionada');
@@ -2621,9 +2629,9 @@ class ProstoralOrdersApp {
 
     handleHistoryChange(payload) {
         console.log('🔔 Novo registro de histórico:', payload);
-        
+
         const { new: newRecord } = payload;
-        
+
         // Se estamos vendo os detalhes desta ordem, atualizar histórico
         if (this.currentOrder && newRecord?.work_order_id === this.currentOrder.id) {
             this.viewOrderDetails(this.currentOrder.id);
@@ -2640,9 +2648,9 @@ class ProstoralOrdersApp {
                 <span>${message}</span>
             </div>
         `;
-        
+
         document.body.appendChild(notification);
-        
+
         // Remover após 3 segundos
         setTimeout(() => {
             notification.classList.add('animate-fade-out-up');

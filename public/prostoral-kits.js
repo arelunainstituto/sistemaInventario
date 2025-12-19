@@ -61,7 +61,12 @@
     // CARREGAR DADOS
     // ============================================
 
-    async function loadKits() {
+    async function loadKits(force = false) {
+        if (!force && allKits.length > 0) {
+            console.log('📦 Kits carregados do cache');
+            renderKits();
+            return;
+        }
         try {
             const { data, error } = await window.authManager.supabase
                 .from('kits')
@@ -97,14 +102,29 @@
     async function loadProdutos() {
         try {
             const { data, error } = await window.authManager.supabase
-                .from('prostoral_inventory')
-                .select('*')
-                .gt('quantity', 0)
-                .order('name');
+                .from('produtoslaboratorio')
+                .select(`
+                    id,
+                    nome_material,
+                    codigo_barras,
+                    unidade_medida,
+                    estoquelaboratorio (
+                        quantidade_atual
+                    )
+                `)
+                .eq('ativo', true)
+                .order('nome_material');
 
             if (error) throw error;
 
-            allProdutos = data || [];
+            allProdutos = (data || []).map(p => ({
+                id: p.id,
+                name: p.nome_material,
+                code: p.codigo_barras,
+                unit: p.unidade_medida,
+                quantity: p.estoquelaboratorio ? p.estoquelaboratorio.quantidade_atual : 0
+            }));
+
             console.log('✅ Produtos carregados:', allProdutos.length);
         } catch (error) {
             console.error('❌ Erro ao carregar produtos:', error);
@@ -260,10 +280,12 @@
                 if (updateError) throw updateError;
 
                 // Remover produtos antigos
-                await window.authManager.supabase
+                const { error: deleteError } = await window.authManager.supabase
                     .from('kit_produtos')
                     .delete()
                     .eq('kit_id', editingKitId);
+
+                if (deleteError) throw deleteError;
             } else {
                 // Criar novo kit
                 const { data: newKit, error: insertError } = await window.authManager.supabase
@@ -283,13 +305,14 @@
                 quantidade: p.quantidade
             }));
 
-            await window.authManager.supabase
+            const { error: productsError } = await window.authManager.supabase
                 .from('kit_produtos')
                 .insert(kitProdutosData);
 
+            if (productsError) throw productsError;
             showNotification(`Kit ${editingKitId ? 'atualizado' : 'criado'} com sucesso!`, 'success');
             closeKitModal();
-            await loadKits();
+            await loadKits(true); // Forçar recarregamento sem cache
         } catch (error) {
             console.error('❌ Erro ao salvar kit:', error);
             showNotification('Erro ao salvar kit: ' + error.message, 'error');
@@ -312,24 +335,14 @@
             document.getElementById('kitDescricao').value = kit.descricao || '';
 
             // Carregar produtos do kit
-            kitProdutos = kit.kit_produtos
-                .filter(kp => kp.produtoslaboratorio) // Safety check for deleted products
-                .map(kp => {
-                    const prod = kp.produtoslaboratorio;
-                    // Handle nested estoque which might be object or array depending on relation
-                    const estoque = Array.isArray(prod.estoquelaboratorio)
-                        ? prod.estoquelaboratorio[0]
-                        : prod.estoquelaboratorio;
-
-                    return {
-                        produto_id: prod.id,
-                        nome: prod.nome_material,
-                        codigo: prod.qr_code,
-                        quantidade: kp.quantidade,
-                        unidade_medida: prod.unidade_medida,
-                        quantidade_estoque: estoque?.quantidade_atual || 0
-                    };
-                });
+            kitProdutos = kit.kit_produtos.map(kp => ({
+                produto_id: kp.produtoslaboratorio.id,
+                nome: kp.produtoslaboratorio.nome_material,
+                codigo: kp.produtoslaboratorio.qr_code,
+                quantidade: kp.quantidade,
+                unidade_medida: kp.produtoslaboratorio.unidade_medida,
+                quantidade_estoque: kp.produtoslaboratorio.estoquelaboratorio ? kp.produtoslaboratorio.estoquelaboratorio.quantidade_atual : 0
+            }));
 
             updateProdutosList();
             showModal('kitModal');
@@ -617,6 +630,7 @@
 
     window.kitsModule = {
         init: initOnce,
+        loadKits,
         editKit,
         deleteKit,
         selectProduto,

@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug Test</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+
+<body class="bg-gray-900 text-white p-10 font-mono">
+    <h1 class="text-2xl mb-4 text-yellow-400">Diagnóstico de Conexão</h1>
+
+    <div id="steps" class="space-y-2"></div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="config.js"></script>
+    <script src="auth.js"></script>
+
+    <script>
+        const steps = document.getElementById('steps');
+        function log(msg, status = 'info') {
+            const div = document.createElement('div');
+            const color = status === 'success' ? 'text-green-400' :
+                status === 'error' ? 'text-red-400' : 'text-gray-300';
+            div.className = `${color} border-l-2 border-gray-700 pl-2`;
+            div.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+            steps.appendChild(div);
+        }
+
+        async function runTests() {
+            log('Iniciando testes...');
+
+            // 1. Validar Config
+            if (!window.SUPABASE_CONFIG) {
+                log('ERRO: SUPABASE_CONFIG não encontrado', 'error');
+                return;
+            }
+            log('Configuração carregada OK', 'success');
+
+            // 2. Validar AuthManager
+            if (!window.AuthManager && typeof AuthManager === 'undefined') {
+                log('ERRO: Classe AuthManager não encontrada (nem window.AuthManager nem global)', 'error');
+                return;
+            }
+            log('AuthManager script carregado OK', 'success');
+
+            const auth = new AuthManager();
+
+            // 3. Testar Inicialização Auth
+            try {
+                log('Inicializando AuthManager...');
+                await auth.init();
+                log('AuthManager inicializado', 'success');
+            } catch (e) {
+                log('Falha no init do Auth: ' + e.message, 'error');
+            }
+
+            // 4. Testar API Status
+            try {
+                log('Testando fetch direto para /api/auth/me...');
+                const token = auth.session?.access_token;
+
+                if (!token) {
+                    log('Sem token de sessão - usuário não logado?', 'error');
+                } else {
+                    const res = await fetch('/api/auth/me', {
+                        headers: {
+                            'Authorization': `Bearer ${token}`
+                        }
+                    });
+
+                    if (res.ok) {
+                        const data = await res.json();
+                        log('API respondeu OK: ' + JSON.stringify(data), 'success');
+                    } else {
+                        log(`API respondeu com erro: ${res.status} ${res.statusText}`, 'error');
+                    }
+                }
+            } catch (e) {
+                log('Erro na requisição API: ' + e.message, 'error');
+            }
+        }
+
+        runTests();
+    </script>
+</body>
+
+</html>

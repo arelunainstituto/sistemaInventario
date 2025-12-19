@@ -15,11 +15,29 @@ class ModuleManager {
                 id: 'inventory',
                 name: 'Inventário',
                 icon: 'fas fa-warehouse',
+                emoji: '📦',
+                url: 'index.html',
                 tabs: [
                     { id: 'dashboard', name: 'Dashboard', icon: 'fas fa-chart-pie', permission: 'read' },
                     { id: 'add-item', name: 'Adicionar', icon: 'fas fa-plus-circle', permission: 'create' },
                     { id: 'inventory', name: 'Inventário', icon: 'fas fa-warehouse', permission: 'read' }
                 ]
+            },
+            {
+                id: 'prostoral',
+                name: 'Prostoral',
+                icon: 'fas fa-tooth',
+                emoji: '🦷',
+                url: 'prostoral.html',
+                tabs: []
+            },
+            {
+                id: 'laboratory',
+                name: 'Laboratório',
+                icon: 'fas fa-flask',
+                emoji: '🧪',
+                url: 'laboratorio-produtos.html',
+                tabs: []
             }
         ];
         this.init();
@@ -45,12 +63,12 @@ class ModuleManager {
             const response = await authenticatedFetch('/api/auth/me');
             if (response.ok) {
                 const userData = await response.json();
-                
+
                 // Extrair permissões e roles do objeto user
                 const user = userData.user || userData;
                 this.userPermissions = user.permissions || [];
                 this.userRoles = user.roles || [];
-                
+
                 console.log('Permissões carregadas:', this.userPermissions);
                 console.log('Roles carregadas:', this.userRoles);
             } else {
@@ -80,21 +98,21 @@ class ModuleManager {
      */
     setActiveModule(moduleId) {
         console.log(`Definindo módulo ativo: ${moduleId}`);
-        
+
         // Encontra o módulo selecionado
         const selectedModule = this.availableModules.find(module => module.id === moduleId);
         if (!selectedModule) {
             console.error(`Módulo não encontrado: ${moduleId}`);
             return;
         }
-        
+
         // Verifica se o usuário tem acesso ao módulo
         if (!this.hasModuleAccess(moduleId)) {
             console.error(`Usuário não tem acesso ao módulo: ${moduleId}`);
             this.showNoAccessMessage();
             return;
         }
-        
+
         // Renderiza apenas o módulo selecionado
         this.renderSingleModule(selectedModule);
     }
@@ -177,7 +195,7 @@ class ModuleManager {
         }
 
         // Verifica se tem pelo menos uma permissão no módulo (formato "module:action")
-        return this.userPermissions.some(permission => 
+        return this.userPermissions.some(permission =>
             permission.startsWith(`${moduleId}:`)
         );
     }
@@ -186,7 +204,7 @@ class ModuleManager {
      * Filtra as abas baseado nas permissões do usuário
      */
     getAccessibleTabs(module) {
-        return module.tabs.filter(tab => 
+        return module.tabs.filter(tab =>
             this.hasPermission(module.id, tab.permission)
         );
     }
@@ -252,6 +270,9 @@ class ModuleManager {
                     emoji: module.emoji
                 };
                 const button = this.createTabButton(mainTab, isActive);
+                if (module.url) {
+                    button.setAttribute('data-url', module.url);
+                }
                 navContainer.appendChild(button);
             }
         });
@@ -267,7 +288,7 @@ class ModuleManager {
         const button = document.createElement('button');
         button.className = `nav-tab ${activeClass} group flex flex-col md:flex-row items-center justify-center gap-2 px-6 py-4 rounded-2xl font-semibold transition-all duration-300 hover:scale-105 text-center`;
         button.setAttribute('data-tab', tab.id);
-        
+
         button.innerHTML = `
             <i class="${tab.icon} text-lg group-hover:rotate-12 transition-transform duration-300"></i>
             <span class="text-sm md:text-base">${tab.emoji ? `${tab.emoji} ` : ''}${tab.name}</span>
@@ -285,7 +306,13 @@ class ModuleManager {
             tab.addEventListener('click', (e) => {
                 e.preventDefault();
                 const tabId = tab.getAttribute('data-tab');
-                this.switchTab(tabId);
+                const url = tab.getAttribute('data-url');
+
+                if (url) {
+                    window.location.href = url;
+                } else {
+                    this.switchTab(tabId);
+                }
             });
         });
     }
@@ -294,6 +321,13 @@ class ModuleManager {
      * Troca de aba
      */
     switchTab(tabId) {
+        // Encontrar se o ID corresponde a um módulo com URL
+        const module = this.availableModules.find(m => m.id === tabId);
+        if (module && module.url) {
+            window.location.href = module.url;
+            return;
+        }
+
         // Remove classe active de todas as abas
         document.querySelectorAll('.nav-tab').forEach(tab => {
             tab.classList.remove('active');

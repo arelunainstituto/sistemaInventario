@@ -1,3 +1,10 @@
+// Polyfills for Node.js 16 environment
+const nodeFetch = require('node-fetch');
+global.Headers = nodeFetch.Headers;
+global.Request = nodeFetch.Request;
+global.Response = nodeFetch.Response;
+global.fetch = nodeFetch;
+
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
@@ -3572,15 +3579,16 @@ app.get('/api/prostoral/dashboard/kpis', authenticateToken, async (req, res) => 
         const paidRevenue = invoices?.filter(inv => inv.status === 'paid')
             .reduce((sum, inv) => sum + (parseFloat(inv.total_amount) || 0), 0) || 0;
 
-        // Estoque baixo - buscar itens onde quantity <= min_stock
-        const { data: inventoryItems } = await supabaseAdmin
-            .from('prostoral_inventory')
-            .select('id, quantity, min_stock')
-            .eq('tenant_id', tenant_id);
+        // Estoque baixo - buscar itens do laboratório com lógica ajustada (mínimo definido ou padrão 20)
+        const { data: laboratoryItems } = await supabaseAdmin
+            .from('vw_produtos_estoque')
+            .select('quantidade_atual, quantidade_minima')
+            .eq('ativo', true);
 
-        const lowStockCount = inventoryItems?.filter(item =>
-            item.quantity <= (item.min_stock || 0)
-        ).length || 0;
+        const lowStockCount = laboratoryItems?.filter(item => {
+            const minStock = (item.quantidade_minima && item.quantidade_minima > 0) ? item.quantidade_minima : 20;
+            return item.quantidade_atual <= minStock;
+        }).length || 0;
 
         // Intercorrências abertas
         const { count: openIncidents } = await supabaseAdmin
@@ -4728,7 +4736,7 @@ app.post('/api/laboratorio/produtos', authenticateToken, async (req, res) => {
                 .from('estoquelaboratorio')
                 .insert({
                     produto_id: produto.id,
-                    quantidade_atual: quantidade_inicial,
+                    quantidade_atual: 0, // Fix: Iniciar com 0 pois o trigger irá somar a movimentação
                     quantidade_minima: quantidadeMin || 0,
                     quantidade_maxima: quantidadeMax || null,
                     atualizado_por: userId
@@ -4876,31 +4884,35 @@ app.get('/api/laboratorio/alertas', authenticateToken, async (req, res) => {
         em30Dias.setDate(hoje.getDate() + 30);
 
         produtos.forEach(produto => {
-            // Alerta: Estoque Crítico (esgotado)
-            if (parseFloat(produto.quantidade_atual || 0) === 0) {
+            const qtdAtual = parseFloat(produto.quantidade_atual || 0);
+            const qtdMin = parseFloat(produto.quantidade_minima || 0);
+            const qtdCritica = 5; // Default critical threshold
+            const qtdBaixa = qtdMin > 0 ? qtdMin : 20; // Default low threshold if min not set
+
+            // Alerta: Estoque Crítico (esgotado ou muito baixo)
+            if (qtdAtual <= qtdCritica) {
                 alertas.push({
                     id: `critico-${produto.id}`,
                     tipo: 'critico',
-                    titulo: 'Estoque Esgotado',
-                    mensagem: `${produto.nome_material} está sem estoque`,
+                    titulo: qtdAtual === 0 ? 'Estoque Esgotado' : 'Estoque Crítico',
+                    mensagem: `${produto.nome_material} está com estoque ${qtdAtual === 0 ? 'esgotado' : 'crítico'} (${qtdAtual} ${produto.unidade_medida})`,
                     produto_id: produto.id,
                     produto_nome: produto.nome_material,
-                    quantidade_atual: produto.quantidade_atual,
+                    quantidade_atual: qtdAtual,
                     data_criacao: new Date().toISOString()
                 });
             }
             // Alerta: Estoque Baixo
-            else if (parseFloat(produto.quantidade_atual || 0) <= parseFloat(produto.quantidade_minima || 0) &&
-                parseFloat(produto.quantidade_minima || 0) > 0) {
+            else if (qtdAtual <= qtdBaixa) {
                 alertas.push({
                     id: `aviso-${produto.id}`,
                     tipo: 'aviso',
                     titulo: 'Estoque Baixo',
-                    mensagem: `${produto.nome_material} está com estoque baixo (${produto.quantidade_atual} ${produto.unidade_medida})`,
+                    mensagem: `${produto.nome_material} está com estoque baixo (${qtdAtual} ${produto.unidade_medida})`,
                     produto_id: produto.id,
                     produto_nome: produto.nome_material,
-                    quantidade_atual: produto.quantidade_atual,
-                    quantidade_minima: produto.quantidade_minima,
+                    quantidade_atual: qtdAtual,
+                    quantidade_minima: qtdMin,
                     data_criacao: new Date().toISOString()
                 });
             }
@@ -5166,38 +5178,7 @@ app.post('/api/laboratorio/movimentacoes/saida', authenticateToken, async (req, 
     }
 });
 
-// Get alertas
-app.get('/api/laboratorio/alertas', authenticateToken, async (req, res) => {
-    try {
-        const { page = 1, limit = 20, tipo, prioridade, status = 'ativos' } = req.query;
-        const offset = (page - 1) * limit;
 
-        let query = supabase
-            .from('vw_alertas_ativos')
-            .select('*', { count: 'exact' });
-
-        if (status !== 'todos') {
-            query = query.eq('resolvido', status === 'resolvidos');
-        }
-        if (tipo) query = query.eq('tipo_alerta', tipo);
-        if (prioridade) query = query.eq('prioridade', prioridade);
-
-        query = query.range(offset, offset + parseInt(limit) - 1);
-
-        const { data, error, count } = await query;
-        if (error) throw error;
-
-        res.json({
-            data: data || [],
-            currentPage: parseInt(page),
-            totalPages: Math.ceil((count || 0) / limit),
-            total: count || 0
-        });
-    } catch (error) {
-        console.error('Erro ao buscar alertas:', error);
-        res.status(500).json({ error: error.message });
-    }
-});
 
 // Get alertas stats
 app.get('/api/laboratorio/alertas/stats', authenticateToken, async (req, res) => {

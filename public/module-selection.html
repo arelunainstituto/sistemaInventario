@@ -1,10 +1,11 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Seleção de Módulos - Sistema AreLuna</title>
-    
+
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
@@ -57,18 +58,18 @@
             }
         }
     </script>
-    
+
     <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    
+
     <!-- Supabase -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    
+
     <!-- Scripts do Sistema -->
     <script src="config.js"></script>
     <script src="auth.js"></script>
     <script src="modules.js"></script>
-    
+
     <!-- Custom Styles -->
     <style>
         .glass-effect {
@@ -76,29 +77,29 @@
             backdrop-filter: blur(20px);
             border: 1px solid rgba(255, 255, 255, 0.2);
         }
-        
+
         .dark .glass-effect {
             background: rgba(0, 0, 0, 0.2);
             border: 1px solid rgba(255, 255, 255, 0.1);
         }
-        
+
         .gradient-bg {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         }
-        
+
         .dark .gradient-bg {
             background: linear-gradient(135deg, #2D3748 0%, #1A202C 100%);
         }
-        
+
         .module-card {
             transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
-        
+
         .module-card:hover {
             transform: translateY(-8px) scale(1.02);
             box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
         }
-        
+
         .floating-shapes {
             position: absolute;
             top: 0;
@@ -108,7 +109,7 @@
             overflow: hidden;
             z-index: -1;
         }
-        
+
         .floating-shapes::before,
         .floating-shapes::after {
             content: '';
@@ -119,13 +120,13 @@
             border-radius: 50%;
             animation: float 8s ease-in-out infinite;
         }
-        
+
         .floating-shapes::before {
             top: 10%;
             left: 10%;
             animation-delay: 0s;
         }
-        
+
         .floating-shapes::after {
             bottom: 10%;
             right: 10%;
@@ -133,10 +134,11 @@
         }
     </style>
 </head>
+
 <body class="min-h-screen gradient-bg">
     <!-- Floating Background Shapes -->
     <div class="floating-shapes"></div>
-    
+
     <!-- Loading Overlay -->
     <div id="loadingOverlay" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
         <div class="glass-effect rounded-2xl p-8 text-center">
@@ -144,7 +146,7 @@
             <p class="text-white text-lg">Carregando módulos...</p>
         </div>
     </div>
-    
+
     <!-- Header -->
     <header class="relative z-10 p-6">
         <div class="max-w-6xl mx-auto flex items-center justify-between">
@@ -157,20 +159,21 @@
                     <p class="text-white/80 text-sm">Selecione um módulo para continuar</p>
                 </div>
             </div>
-            
+
             <div class="flex items-center space-x-4">
                 <div class="text-right">
                     <p class="text-white text-sm" id="userEmail">Carregando...</p>
                     <p class="text-white/80 text-xs">Usuário logado</p>
                 </div>
-                <button id="logoutBtn" class="glass-effect text-white px-4 py-2 rounded-lg hover:bg-white/20 transition-colors">
+                <button id="logoutBtn"
+                    class="glass-effect text-white px-4 py-2 rounded-lg hover:bg-white/20 transition-colors">
                     <i class="fas fa-sign-out-alt mr-2"></i>
                     Sair
                 </button>
             </div>
         </div>
     </header>
-    
+
     <!-- Main Content -->
     <main class="relative z-10 px-6 pb-12">
         <div class="max-w-6xl mx-auto">
@@ -186,21 +189,21 @@
                     Os módulos disponíveis são baseados nas suas permissões
                 </p>
             </div>
-            
+
             <!-- Botão para voltar ao módulo selecionado (se houver) -->
             <div class="text-center mb-6" id="back-to-module" style="display: none;">
-                <button onclick="window.location.href='index.html'" 
-                        class="inline-flex items-center gap-2 px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors">
+                <button onclick="window.location.href='index.html'"
+                    class="inline-flex items-center gap-2 px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors">
                     <i class="fas fa-arrow-left"></i>
                     Voltar ao Dashboard
                 </button>
             </div>
-            
+
             <!-- Modules Grid -->
             <div id="modulesContainer" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 animate-slide-up">
                 <!-- Modules will be loaded here -->
             </div>
-            
+
             <!-- No Modules Message -->
             <div id="noModulesMessage" class="hidden text-center animate-fade-in">
                 <div class="glass-effect rounded-3xl p-12 max-w-md mx-auto">
@@ -216,7 +219,7 @@
             </div>
         </div>
     </main>
-    
+
     <!-- Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="config.js"></script>
@@ -240,67 +243,67 @@
                         requiredPermissions: ['inventory.view', 'view']
                     }
                 ];
-                
+
                 this.init();
             }
-            
+
             async init() {
                 try {
                     // Aguardar o authManager ser inicializado se não estiver disponível
                     if (!window.authManager) {
                         // Aguardar um pouco para o authManager ser carregado
                         await new Promise(resolve => setTimeout(resolve, 500));
-                        
+
                         if (!window.authManager) {
                             console.error('AuthManager não disponível');
                             window.location.href = 'login.html';
                             return;
                         }
                     }
-                    
+
                     // Aguardar a inicialização do authManager
                     if (!window.authManager.session) {
                         await window.authManager.init();
                     }
-                    
+
                     // Verificar se está autenticado
                     if (!window.authManager.isUserAuthenticated()) {
                         console.log('Usuário não autenticado, redirecionando para login');
                         window.location.href = 'login.html';
                         return;
                     }
-                    
+
                     // Usar o authManager global
                     this.authManager = window.authManager;
-                    
+
                     // Carregar informações do usuário
                     await this.loadUserInfo();
-                    
+
                     // Verifica se já há um módulo selecionado
                     const selectedModule = localStorage.getItem('selectedModule');
                     if (selectedModule) {
                         console.log(`Módulo já selecionado: ${selectedModule}`);
                         this.showBackButton(selectedModule);
                     }
-                    
+
                     // Carregar permissões
                     await this.loadUserPermissions();
-                    
+
                     // Renderizar módulos
                     this.renderModules();
-                    
+
                     // Configurar eventos
                     this.setupEventListeners();
-                    
+
                     // Esconder loading
                     document.getElementById('loadingOverlay').style.display = 'none';
-                    
+
                 } catch (error) {
                     console.error('Erro ao inicializar:', error);
                     this.showError('Erro ao carregar o sistema');
                 }
             }
-            
+
             /**
              * Mostra o botão para voltar ao dashboard
              */
@@ -308,12 +311,12 @@
                 const backButton = document.getElementById('back-to-module');
                 if (backButton) {
                     backButton.style.display = 'block';
-                    
+
                     // Atualiza o texto do botão com o nome do módulo
                     const moduleNames = {
                         'inventory': 'Inventário'
                     };
-                    
+
                     const moduleName = moduleNames[moduleId] || 'Dashboard';
                     const button = backButton.querySelector('button');
                     if (button) {
@@ -324,88 +327,88 @@
                     }
                 }
             }
-            
+
             async loadUserInfo() {
                 const user = this.authManager.getCurrentUser();
                 if (user) {
                     document.getElementById('userEmail').textContent = user.email;
                 }
             }
-            
+
             async loadUserPermissions() {
                 try {
                     const user = this.authManager.getCurrentUser();
                     if (!user) return;
-                    
+
                     // Carregar permissões do usuário via API usando authenticatedFetch
                     const response = await authenticatedFetch('/api/auth/me');
-                    
+
                     if (!response.ok) {
                         throw new Error(`HTTP error! status: ${response.status}`);
                     }
-                    
+
                     const userData = await response.json();
-                    
+
                     console.log('📥 Received user data from API:', userData);
-                    
+
                     // Access the nested user object if it exists, otherwise use userData directly
                     const userInfo = userData.user || userData;
-                    
+
                     this.userRoles = userInfo.roles || [];
                     this.userPermissions = userInfo.permissions || [];
-                    
+
                     console.log('Permissões carregadas:', this.userPermissions);
                     console.log('Roles carregadas:', this.userRoles);
-                    
+
                 } catch (error) {
                     console.error('Erro ao carregar permissões:', error);
                 }
             }
-            
+
             hasModuleAccess(module) {
                 // Admin tem acesso total
                 if (this.userRoles.includes('admin')) {
                     return true;
                 }
-                
+
                 // Verificar se tem pelo menos uma permissão necessária
                 return module.requiredPermissions.some(requiredPerm => {
                     return this.userPermissions.some(userPerm => {
-                        return userPerm.name === requiredPerm || 
-                               userPerm.module_name === module.id ||
-                               (userPerm.module_name === 'inventory' && module.id === 'inventory') ||
-                               (userPerm.module_name === 'laboratory' && module.id === 'laboratory');
+                        return userPerm.name === requiredPerm ||
+                            userPerm.module_name === module.id ||
+                            (userPerm.module_name === 'inventory' && module.id === 'inventory') ||
+                            (userPerm.module_name === 'laboratory' && module.id === 'laboratory');
                     });
                 });
             }
-            
+
             renderModules() {
                 const container = document.getElementById('modulesContainer');
                 const noModulesMessage = document.getElementById('noModulesMessage');
-                
-                const accessibleModules = this.availableModules.filter(module => 
+
+                const accessibleModules = this.availableModules.filter(module =>
                     this.hasModuleAccess(module)
                 );
-                
+
                 if (accessibleModules.length === 0) {
                     container.style.display = 'none';
                     noModulesMessage.classList.remove('hidden');
                     return;
                 }
-                
+
                 container.innerHTML = '';
-                
+
                 accessibleModules.forEach((module, index) => {
                     const moduleCard = this.createModuleCard(module, index);
                     container.appendChild(moduleCard);
                 });
             }
-            
+
             createModuleCard(module, index) {
                 const card = document.createElement('div');
                 card.className = `module-card glass-effect rounded-3xl p-8 text-center cursor-pointer animate-slide-up`;
                 card.style.animationDelay = `${index * 0.1}s`;
-                
+
                 card.innerHTML = `
                     <div class="mb-6">
                         <div class="w-20 h-20 mx-auto mb-4 bg-gradient-to-r ${module.color} rounded-full flex items-center justify-center shadow-lg">
@@ -424,22 +427,22 @@
                         Acessar ${module.name}
                     </button>
                 `;
-                
+
                 card.addEventListener('click', () => {
                     this.selectModule(module);
                 });
-                
+
                 return card;
             }
-            
+
             selectModule(module) {
                 // Salvar módulo selecionado no localStorage
                 localStorage.setItem('selectedModule', module.id);
-                
+
                 // Redirecionar para o dashboard
                 window.location.href = 'index.html';
             }
-            
+
             setupEventListeners() {
                 // Logout
                 document.getElementById('logoutBtn').addEventListener('click', async () => {
@@ -451,7 +454,7 @@
                     }
                 });
             }
-            
+
             showError(message) {
                 const overlay = document.getElementById('loadingOverlay');
                 overlay.innerHTML = `
@@ -466,7 +469,7 @@
                 `;
             }
         }
-        
+
         // Inicializar quando o DOM estiver pronto
         document.addEventListener('DOMContentLoaded', async () => {
             // Aguardar o authManager ser inicializado
@@ -474,15 +477,16 @@
                 window.authManager = new AuthManager();
                 await window.authManager.init();
             }
-            
+
             new ModuleSelector();
         });
     </script>
-    
+
     <!-- Scripts necessários -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="config.js"></script>
     <script src="auth.js"></script>
     <script src="modules.js"></script>
 </body>
+
 </html>
