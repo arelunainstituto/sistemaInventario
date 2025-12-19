@@ -2702,26 +2702,10 @@ app.get('/api/prostoral/kits', authenticateToken, async (req, res) => {
     try {
         const { work_type_id, search } = req.query;
 
+        // Query simplificada para garantir funcionamento do dropdown
         let query = supabaseAdmin
             .from('kits')
-            .select(`
-                id,
-                nome,
-                tipo,
-                descricao,
-                created_at,
-                kit_produtos(
-                    id,
-                    quantidade,
-                    produto:prostoral_inventory!kit_produtos_produto_id_fkey(
-                        id,
-                        name,
-                        code,
-                        unit,
-                        unit_cost
-                    )
-                )
-            `)
+            .select('*')
             .order('nome', { ascending: true });
 
         if (search) {
@@ -2732,21 +2716,7 @@ app.get('/api/prostoral/kits', authenticateToken, async (req, res) => {
 
         if (error) throw error;
 
-        // Mapear para o formato esperado pelo frontend
-        const kitsFormatados = data.map(kit => ({
-            id: kit.id,
-            name: kit.nome,
-            tipo: kit.tipo,
-            description: kit.descricao,
-            items: kit.kit_produtos.map(kp => ({
-                id: kp.id,
-                standard_quantity: kp.quantidade,
-                unit: kp.produto?.unit || 'un',
-                inventory_item: kp.produto
-            }))
-        }));
-
-        res.json({ success: true, kits: kitsFormatados });
+        res.json({ success: true, kits: data });
     } catch (error) {
         console.error('Erro ao buscar kits:', error);
         res.status(500).json({ error: error.message });

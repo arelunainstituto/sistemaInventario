@@ -19,11 +19,11 @@ async function getUserTenant(userId) {
         .select('tenant_id')
         .eq('user_id', userId)
         .single();
-    
+
     if (error || !data) {
         throw new Error('Tenant não encontrado para o usuário');
     }
-    
+
     return data.tenant_id;
 }
 
@@ -32,38 +32,38 @@ async function getUserTenant(userId) {
 // =====================================================
 async function getUserNames(userIds) {
     if (!userIds || userIds.length === 0) return {};
-    
+
     const uniqueIds = [...new Set(userIds.filter(id => id))];
-    
+
     // Buscar profiles
     const { data: profiles, error: profileError } = await supabase
         .from('user_profiles')
         .select('user_id, display_name, first_name, last_name')
         .in('user_id', uniqueIds);
-    
+
     if (profileError) {
         console.error('Erro ao buscar profiles:', profileError);
     }
-    
+
     // Buscar emails do auth.users usando service role
     const { data: { users }, error: authError } = await supabase.auth.admin.listUsers();
-    
+
     const userMap = {};
-    
+
     uniqueIds.forEach(userId => {
         const profile = profiles?.find(p => p.user_id === userId);
         const authUser = users?.find(u => u.id === userId);
-        
+
         // Tentar nome do profile primeiro, depois email
-        const name = profile?.display_name || 
-                    (profile?.first_name && profile?.last_name ? `${profile.first_name} ${profile.last_name}` : null) ||
-                    profile?.first_name ||
-                    authUser?.email ||
-                    'Usuário';
-        
+        const name = profile?.display_name ||
+            (profile?.first_name && profile?.last_name ? `${profile.first_name} ${profile.last_name}` : null) ||
+            profile?.first_name ||
+            authUser?.email ||
+            'Usuário';
+
         userMap[userId] = name;
     });
-    
+
     return userMap;
 }
 
@@ -75,7 +75,7 @@ async function listOrders(req, res) {
     try {
         const userId = req.user.id;
         const tenantId = await getUserTenant(userId);
-        
+
         // Parâmetros de query
         const {
             page = 1,
@@ -166,7 +166,8 @@ async function getOrderDetails(req, res) {
                 client:prostoral_clients(id, name, email, phone),
                 materials:prostoral_work_order_materials(
                     *,
-                    inventory_item:prostoral_inventory(id, name, code, unit)
+                    inventory_item:prostoral_inventory(id, name, code, unit),
+                    produto:produtoslaboratorio(id, nome_material, codigo_barras, unidade_medida)
                 ),
                 time_tracking:prostoral_work_order_time_tracking(*),
                 issues:prostoral_work_order_issues(*),
@@ -242,7 +243,7 @@ async function createOrder(req, res) {
 
         // Criar ordem diretamente na tabela (não via RPC) para aceitar work_type
         const orderNumber = `OS-${Date.now()}`;
-        
+
         const { data: order, error } = await supabase
             .from('prostoral_work_orders')
             .insert({
@@ -294,17 +295,17 @@ async function updateOrder(req, res) {
 
         if (fetchError) {
             console.error('Erro ao buscar ordem:', fetchError);
-            return res.status(404).json({ 
-                success: false, 
-                error: 'Ordem não encontrada' 
+            return res.status(404).json({
+                success: false,
+                error: 'Ordem não encontrada'
             });
         }
 
         // Bloquear edição de ordem finalizada ou cancelada
         if (currentOrder.status === 'delivered' || currentOrder.status === 'cancelled') {
             console.log('🔒 Tentativa de editar ordem finalizada/cancelada:', id);
-            return res.status(403).json({ 
-                success: false, 
+            return res.status(403).json({
+                success: false,
                 error: 'Não é possível editar uma ordem finalizada ou cancelada',
                 details: 'Ordens finalizadas ou canceladas estão bloqueadas para edição'
             });
@@ -322,7 +323,7 @@ async function updateOrder(req, res) {
         delete updateData.time_tracking; // Relacionamento
         delete updateData.issues; // Relacionamento
         delete updateData.history; // Relacionamento
-        
+
         // Adicionar updated_by
         updateData.updated_by = userId;
         updateData.updated_at = new Date().toISOString();
@@ -341,8 +342,8 @@ async function updateOrder(req, res) {
         if (error) {
             console.error('❌ Erro ao atualizar ordem:', error);
             console.error('❌ Detalhes do erro:', JSON.stringify(error, null, 2));
-            return res.status(500).json({ 
-                success: false, 
+            return res.status(500).json({
+                success: false,
                 error: error.message,
                 details: error.details || error.hint
             });
@@ -409,8 +410,8 @@ async function addMaterial(req, res) {
         }
 
         if (order.status === 'delivered' || order.status === 'cancelled') {
-            return res.status(403).json({ 
-                success: false, 
+            return res.status(403).json({
+                success: false,
                 error: 'Não é possível adicionar materiais a uma ordem finalizada ou cancelada'
             });
         }
@@ -428,26 +429,67 @@ async function addMaterial(req, res) {
         if (!inventory_item_id || !used_quantity) {
             return res.status(400).json({
                 success: false,
-                error: 'Campos obrigatórios: inventory_item_id, used_quantity'
+                error: 'Campos obrigatórios: inventory_item_id (ou id do produto), used_quantity'
             });
+        }
+
+        console.log(`🔍 Adicionando material. ID recebido: ${inventory_item_id}`);
+
+        // Verificar origem do item (Inventário Antigo ou Produtos Laboratório)
+        let finalInventoryId = null;
+        let finalProdutoId = null;
+        let finalUnitCost = unit_cost;
+
+        // 1. Tentar encontrar em prostoral_inventory (Legado)
+        const { data: invItem } = await supabase
+            .from('prostoral_inventory')
+            .select('id, cost_per_unit')
+            .eq('id', inventory_item_id)
+            .maybeSingle();
+
+        console.log('📦 Busca em prostoral_inventory:', invItem ? 'Encontrado' : 'Não encontrado');
+
+        if (invItem) {
+            finalInventoryId = invItem.id;
+            if (!finalUnitCost) finalUnitCost = invItem.cost_per_unit;
+        } else {
+            // 2. Tentar encontrar em vw_produtos_estoque (View que junta dados do laboratório)
+            const { data: prodItem, error: prodError } = await supabase
+                .from('vw_produtos_estoque')
+                .select('id, custo_unitario, unidade_medida')
+                .eq('id', inventory_item_id)
+                .maybeSingle();
+
+            console.log('🧪 Busca em vw_produtos_estoque:', prodItem ? 'Encontrado' : 'Não encontrado');
+            if (prodError) console.error('Error fetching product:', prodError);
+
+            if (prodItem) {
+                finalProdutoId = prodItem.id;
+                if (!finalUnitCost) finalUnitCost = prodItem.custo_unitario;
+            } else {
+                console.warn(`❌ Produto ${inventory_item_id} não encontrado em nenhuma tabela.`);
+                return res.status(404).json({ success: false, error: 'Produto não encontrado no estoque' });
+            }
         }
 
         const { data: material, error } = await supabase
             .from('prostoral_work_order_materials')
             .insert({
                 work_order_id: workOrderId,
-                inventory_item_id,
+                inventory_item_id: finalInventoryId,
+                produto_id: finalProdutoId,
                 from_kit_id,
                 planned_quantity,
                 used_quantity,
                 unit,
-                unit_cost,
+                unit_cost: finalUnitCost,
                 notes,
                 added_by: userId
             })
             .select(`
                 *,
                 inventory_item:prostoral_inventory(id, name, code, unit),
+                produto:produtoslaboratorio(id, nome_material, codigo_barras, unidade_medida),
                 kit:kits(id, nome)
             `)
             .single();
@@ -556,8 +598,8 @@ async function startTimeTracking(req, res) {
         }
 
         if (order.status === 'delivered' || order.status === 'cancelled') {
-            return res.status(403).json({ 
-                success: false, 
+            return res.status(403).json({
+                success: false,
                 error: 'Não é possível iniciar trabalho em uma ordem finalizada ou cancelada'
             });
         }
@@ -757,7 +799,7 @@ async function updateIssue(req, res) {
         const userId = req.user.id;
 
         const updateData = { ...req.body };
-        
+
         // Se está respondendo, adicionar campos
         if (updateData.response) {
             updateData.responded_by = userId;
@@ -857,7 +899,7 @@ async function getOrderHistory(req, res) {
 async function createRepairOrder(req, res) {
     try {
         const { id: parentOrderId } = req.params;
-        const { 
+        const {
             repair_type,  // 'warranty', 'billable', 'goodwill'
             repair_reason,
             work_description,
@@ -870,9 +912,9 @@ async function createRepairOrder(req, res) {
 
         // Validar tipo de reparo
         if (!['warranty', 'billable', 'goodwill'].includes(repair_type)) {
-            return res.status(400).json({ 
-                success: false, 
-                error: 'Tipo de reparo inválido. Use: warranty, billable ou goodwill' 
+            return res.status(400).json({
+                success: false,
+                error: 'Tipo de reparo inválido. Use: warranty, billable ou goodwill'
             });
         }
 
@@ -884,17 +926,17 @@ async function createRepairOrder(req, res) {
             .single();
 
         if (parentError || !parentOrder) {
-            return res.status(404).json({ 
-                success: false, 
-                error: 'OS original não encontrada' 
+            return res.status(404).json({
+                success: false,
+                error: 'OS original não encontrada'
             });
         }
 
         // Verificar se a OS original não é ela mesma um reparo
         if (parentOrder.is_repair) {
-            return res.status(400).json({ 
-                success: false, 
-                error: 'Não é possível criar reparo de um reparo. Use a OS original.' 
+            return res.status(400).json({
+                success: false,
+                error: 'Não é possível criar reparo de um reparo. Use a OS original.'
             });
         }
 
@@ -938,9 +980,9 @@ async function createRepairOrder(req, res) {
 
         if (createError) {
             console.error('Erro ao criar OS de reparo:', createError);
-            return res.status(500).json({ 
-                success: false, 
-                error: createError.message 
+            return res.status(500).json({
+                success: false,
+                error: createError.message
             });
         }
 
@@ -960,17 +1002,17 @@ async function createRepairOrder(req, res) {
                 tenant_id: tenant_id
             }]);
 
-        return res.json({ 
-            success: true, 
+        return res.json({
+            success: true,
             order: newRepairOrder,
             message: 'OS de reparo criada com sucesso'
         });
 
     } catch (error) {
         console.error('Erro ao criar OS de reparo:', error);
-        return res.status(500).json({ 
-            success: false, 
-            error: error.message 
+        return res.status(500).json({
+            success: false,
+            error: error.message
         });
     }
 }
@@ -992,9 +1034,9 @@ async function getRelatedOrders(req, res) {
             .single();
 
         if (currentError || !currentOrder) {
-            return res.status(404).json({ 
-                success: false, 
-                error: 'OS não encontrada' 
+            return res.status(404).json({
+                success: false,
+                error: 'OS não encontrada'
             });
         }
 
@@ -1010,9 +1052,9 @@ async function getRelatedOrders(req, res) {
 
         if (parentError) {
             console.error('Erro ao buscar OS principal:', parentError);
-            return res.status(500).json({ 
-                success: false, 
-                error: parentError.message 
+            return res.status(500).json({
+                success: false,
+                error: parentError.message
             });
         }
 
@@ -1025,18 +1067,18 @@ async function getRelatedOrders(req, res) {
 
         if (repairsError) {
             console.error('Erro ao buscar reparos:', repairsError);
-            return res.status(500).json({ 
-                success: false, 
-                error: repairsError.message 
+            return res.status(500).json({
+                success: false,
+                error: repairsError.message
             });
         }
 
         // Calcular custo total (original + reparos)
-        const totalCost = (parentOrder.total_cost || 0) + 
+        const totalCost = (parentOrder.total_cost || 0) +
             (repairs || []).reduce((sum, r) => sum + (r.total_cost || 0), 0);
 
-        return res.json({ 
-            success: true, 
+        return res.json({
+            success: true,
             parent: parentOrder,
             repairs: repairs || [],
             total_cost: totalCost,
@@ -1045,9 +1087,9 @@ async function getRelatedOrders(req, res) {
 
     } catch (error) {
         console.error('Erro ao buscar OSs relacionadas:', error);
-        return res.status(500).json({ 
-            success: false, 
-            error: error.message 
+        return res.status(500).json({
+            success: false,
+            error: error.message
         });
     }
 }

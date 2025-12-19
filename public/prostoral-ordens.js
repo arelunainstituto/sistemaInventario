@@ -75,12 +75,13 @@ class ProstoralOrdersApp {
             const kitsData = await kitsRes.json();
             this.kits = kitsData.kits || [];
 
-            // Carregar inventário
-            const inventoryRes = await fetch(`${this.apiBaseUrl}/inventory`, {
+            // Carregar inventário (Produtos do Laboratório)
+            // Usando endpoint novo e limite alto para dropdown
+            const inventoryRes = await fetch(`/api/laboratorio/produtos?limit=1000`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             const inventoryData = await inventoryRes.json();
-            this.inventory = inventoryData.items || [];
+            this.inventory = inventoryData.data || [];
 
             // Povoar selects
             this.populateClientSelect();
@@ -91,6 +92,7 @@ class ProstoralOrdersApp {
             console.error('Erro ao carregar dados iniciais:', error);
         }
     }
+
 
     setupEventListeners() {
         // Botão Nova OS
@@ -838,7 +840,24 @@ class ProstoralOrdersApp {
                 };
 
                 this.showSuccess(successMessages[newStatus] || 'Status atualizado com sucesso!');
-                await this.loadOrders();
+
+                // 1. OTIMIZAÇÃO: Atualizar localmente e re-renderizar tabela IMEDIATAMENTE
+                if (this.orders) {
+                    const localOrder = this.orders.find(o => o.id === orderId);
+                    if (localOrder) {
+                        localOrder.status = newStatus;
+                        this.renderOrdersTable();
+                    }
+                }
+
+                // 2. Se estiver com modal aberto, atualizar detalhes via API (para pegar logs etc)
+                if (this.currentOrder && this.currentOrder.id === orderId) {
+                    this.currentOrder.status = newStatus; // Visual imediato no modal
+                    this.viewOrderDetails(orderId);
+                }
+
+                // 3. Atualizar dados reais do servidor em background
+                this.loadOrders(true).catch(console.error);
             }
 
         } catch (error) {
@@ -953,7 +972,7 @@ class ProstoralOrdersApp {
                 <tbody class="bg-white divide-y divide-gray-200">
                     ${materials.map(m => `
                         <tr>
-                            <td class="px-4 py-2 text-sm">${this.escapeHtml(m.inventory_item?.name || 'Material não identificado')}</td>
+                            <td class="px-4 py-2 text-sm">${this.escapeHtml(m.produto?.nome_material || m.inventory_item?.name || 'Material não identificado')}</td>
                             <td class="px-4 py-2 text-sm">${m.used_quantity} ${m.unit || ''}</td>
                             <td class="px-4 py-2 text-sm">${this.formatCurrency(m.unit_cost || 0)}</td>
                             <td class="px-4 py-2 text-sm font-medium">${this.formatCurrency(m.total_cost || 0)}</td>
@@ -2061,7 +2080,7 @@ class ProstoralOrdersApp {
         if (!select) return;
 
         select.innerHTML = '<option value="">Selecione um kit...</option>' +
-            this.kits.map(k => `<option value="${k.id}">${this.escapeHtml(k.nome || k.name)}</option>`).join('');
+            this.kits.map(k => `<option value="${k.id}">${this.escapeHtml(k.nome)}</option>`).join('');
     }
 
     populateInventorySelect() {
@@ -2069,7 +2088,7 @@ class ProstoralOrdersApp {
         if (!select) return;
 
         select.innerHTML = '<option value="">Selecione um produto...</option>' +
-            this.inventory.map(i => `<option value="${i.id}" data-cost="${i.cost_per_unit || 0}" data-unit="${i.unit || 'un'}">${this.escapeHtml(i.name)} (${i.code})</option>`).join('');
+            this.inventory.map(i => `<option value="${i.id}" data-cost="${i.custo || 0}" data-unit="${i.unidade_medida || 'un'}">${this.escapeHtml(i.nome_material)} (${i.codigo_barras || '-'})</option>`).join('');
     }
 
     // =====================================================
@@ -2598,7 +2617,7 @@ class ProstoralOrdersApp {
         const ordersContent = document.getElementById('orders-content');
         if (ordersContent && !ordersContent.classList.contains('hidden')) {
             this.showRealtimeNotification('Uma ordem foi atualizada. Atualizando lista...');
-            this.loadOrders();
+            this.loadOrders(true);
         }
 
         // Se estamos vendo os detalhes desta ordem específica, atualizar
