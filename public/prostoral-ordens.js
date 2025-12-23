@@ -225,6 +225,9 @@ class ProstoralOrdersApp {
 
         // Botões de fechar modais
         this.setupModalCloseButtons();
+
+        // Manipuladores de Anexos
+        this.setupAttachmentHandlers();
     }
 
     setupModalCloseButtons() {
@@ -853,7 +856,20 @@ class ProstoralOrdersApp {
                 // 2. Se estiver com modal aberto, atualizar detalhes via API (para pegar logs etc)
                 if (this.currentOrder && this.currentOrder.id === orderId) {
                     this.currentOrder.status = newStatus; // Visual imediato no modal
-                    this.viewOrderDetails(orderId);
+
+                    // UPDATE VISUAL IMEDIATO DO BADGE
+                    const badgeEl = document.getElementById('detail-status');
+                    if (badgeEl) {
+                        badgeEl.innerHTML = this.renderStatusBadge(newStatus);
+                    }
+
+                    // Limpar ações antigas imediatamente para evitar cliques duplos
+                    const actionsEl = document.getElementById('modal-quick-actions');
+                    if (actionsEl) {
+                        actionsEl.innerHTML = '';
+                    }
+
+                    await this.viewOrderDetails(orderId);
                 }
 
                 // 3. Atualizar dados reais do servidor em background
@@ -939,6 +955,9 @@ class ProstoralOrdersApp {
 
         // Reparos vinculados
         this.renderOrderRepairs(order);
+
+        // Anexos
+        this.renderAttachments(order.attachments || []);
 
         // Intercorrências - guardar IDs acessíveis para filtrar histórico
         this.accessibleIssueIds = (order.issues || []).map(issue => issue.id);
@@ -1293,7 +1312,7 @@ class ProstoralOrdersApp {
                             <div class="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-3 border border-gray-200 dark:border-gray-700">
                                 <div class="flex justify-between items-center">
                                     <div>
-                                        <p class="font-medium text-sm text-gray-900 dark:text-gray-100">${this.escapeHtml(stage)}</p>
+                                        <p class="font-medium text-sm text-gray-900 dark:text-gray-100">${this.escapeHtml(this.formatStage(stage))}</p>
                                         <p class="text-xs text-gray-500 dark:text-gray-400">${data.records.length} ${data.records.length === 1 ? 'período' : 'períodos'}</p>
                                     </div>
                                     <div class="text-right">
@@ -1318,11 +1337,11 @@ class ProstoralOrdersApp {
                                     <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-300 text-xs font-bold">
                                         ${index + 1}
                                     </span>
-                                    <p class="font-semibold text-sm text-gray-900 dark:text-gray-100">${this.escapeHtml(t.stage || 'Etapa não especificada')}</p>
+                                    <p class="font-semibold text-sm text-gray-900 dark:text-gray-100">${this.escapeHtml(this.formatStage(t.stage))}</p>
                                 </div>
                                 <p class="text-xs text-gray-500 dark:text-gray-400 ml-8">
                                     <i class="fas fa-user-circle mr-1"></i>
-                                    Técnico: ${t.technician_id ? 'ID: ' + t.technician_id.substring(0, 8) + '...' : 'Não atribuído'}
+                                    Técnico: ${this.getUserName(t.technician_id)}
                                 </p>
                                 <p class="text-xs text-gray-500 dark:text-gray-400 ml-8">
                                     <i class="fas fa-clock mr-1"></i>
@@ -2115,6 +2134,8 @@ class ProstoralOrdersApp {
     }
 
     formatStage(stage) {
+        if (!stage) return '-';
+
         const stages = {
             'design': 'Design',
             'production': 'Produção',
@@ -2122,7 +2143,16 @@ class ProstoralOrdersApp {
             'quality_control': 'Controle de Qualidade',
             'other': 'Outro'
         };
-        return stages[stage] || stage;
+
+        if (stages[stage]) return stages[stage];
+
+        // Formatar stages personalizados (ex: custom_polimento -> Polimento)
+        if (stage.startsWith('custom_')) {
+            const name = stage.replace('custom_', '');
+            return name.charAt(0).toUpperCase() + name.slice(1);
+        }
+
+        return stage;
     }
 
     formatStatus(status) {
@@ -2675,6 +2705,193 @@ class ProstoralOrdersApp {
             notification.classList.add('animate-fade-out-up');
             setTimeout(() => notification.remove(), 300);
         }, 3000);
+    }
+
+    showNotification(message, type = 'info') {
+        const colors = {
+            'success': 'bg-green-500',
+            'error': 'bg-red-500',
+            'info': 'bg-blue-500',
+            'warning': 'bg-yellow-500'
+        };
+        const icons = {
+            'success': 'fa-check-circle',
+            'error': 'fa-exclamation-circle',
+            'info': 'fa-info-circle',
+            'warning': 'fa-exclamation-triangle'
+        };
+        const colorClass = colors[type] || 'bg-blue-500';
+        const iconClass = icons[type] || 'fa-info-circle';
+
+        const notification = document.createElement('div');
+        notification.className = `fixed top-20 right-4 ${colorClass} text-white px-6 py-3 rounded-lg shadow-lg z-50 animate-fade-in-down flex items-center gap-3`;
+        notification.innerHTML = `
+            <i class="fas ${iconClass}"></i>
+            <span>${message}</span>
+        `;
+
+        document.body.appendChild(notification);
+
+        setTimeout(() => {
+            notification.classList.add('animate-fade-out-up');
+            setTimeout(() => notification.remove(), 300);
+        }, 3000);
+    }
+    // =====================================================
+    // ATTACHMENTS HANDLING
+    // =====================================================
+
+    setupAttachmentHandlers() {
+        const input = document.getElementById('order-attachment-input');
+        if (input) {
+            input.addEventListener('change', (e) => this.handleFileUpload(e));
+        }
+    }
+
+    async handleFileUpload(event) {
+        const files = event.target.files;
+        if (!files || files.length === 0) return;
+
+        if (!this.currentOrder) {
+            this.showNotification('Erro: Nenhuma ordem selecionada', 'error');
+            return;
+        }
+
+        await this.uploadAttachments(files);
+
+        // Limpar input
+        event.target.value = '';
+    }
+
+    async uploadAttachments(files) {
+        const formData = new FormData();
+        for (let i = 0; i < files.length; i++) {
+            formData.append('files', files[i]);
+        }
+
+        try {
+            this.showNotification('Fazendo upload dos arquivos...', 'info');
+
+            const token = await window.authManager.getAccessToken();
+            const response = await fetch(`${this.apiBaseUrl}/orders/${this.currentOrder.id}/attachments`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                },
+                body: formData
+            });
+
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.error || 'Erro no upload');
+            }
+
+            const data = await response.json();
+            this.showNotification('Arquivos enviados com sucesso!', 'success');
+
+            // Atualizar detalhes
+            await this.viewOrderDetails(this.currentOrder.id);
+
+        } catch (error) {
+            console.error('Erro no upload:', error);
+            this.showNotification(error.message, 'error');
+        }
+    }
+
+    renderAttachments(attachments) {
+        const container = document.getElementById('order-attachments-list');
+        if (!container) return;
+
+        if (!attachments || attachments.length === 0) {
+            container.innerHTML = '<p class="text-gray-500 text-sm col-span-full">Nenhum anexo adicionado.</p>';
+            return;
+        }
+
+        container.innerHTML = attachments.map(att => {
+            const isImage = att.type.startsWith('image/');
+            const icon = isImage ? 'fa-image' : 'fa-file-pdf';
+            const bgClass = isImage ? 'bg-gray-100' : 'bg-red-50';
+            const textClass = isImage ? 'text-gray-600' : 'text-red-600';
+
+            let content = '';
+            if (isImage) {
+                content = `
+                    <div class="relative group aspect-square rounded-lg overflow-hidden bg-gray-100 cursor-pointer" onclick="window.ordersApp.openImageModal('${att.url}')">
+                        <img src="${att.url}" class="w-full h-full object-cover transition-transform group-hover:scale-105" alt="${att.name}">
+                        <div class="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-all flex items-center justify-center opacity-0 group-hover:opacity-100">
+                            <i class="fas fa-search-plus text-white text-2xl drop-shadow-lg"></i>
+                        </div>
+                    </div>
+                    <p class="mt-1 text-xs text-gray-500 truncate" title="${att.name}">${att.name}</p>
+                `;
+            } else {
+                content = `
+                    <a href="${att.url}" target="_blank" class="flex flex-col items-center justify-center p-4 rounded-lg ${bgClass} hover:opacity-80 transition-all aspect-square border border-gray-200">
+                        <i class="fas ${icon} ${textClass} text-3xl mb-2"></i>
+                        <span class="text-xs text-gray-600 text-center line-clamp-2 break-all" title="${att.name}">${att.name}</span>
+                    </a>
+                `;
+            }
+
+            return `
+                <div class="relative group">
+                    ${content}
+                    <button onclick="window.ordersApp.deleteAttachment('${att.id}')" 
+                        class="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-md hover:bg-red-600 z-10"
+                        title="Excluir anexo">
+                        <i class="fas fa-trash text-xs"></i>
+                    </button>
+                </div>
+            `;
+        }).join('');
+    }
+
+    async deleteAttachment(attachmentId) {
+        if (!confirm('Tem certeza que deseja excluir este anexo?')) return;
+
+        try {
+            this.showNotification('Excluindo anexo...', 'info');
+
+            const token = await window.authManager.getAccessToken();
+            const response = await fetch(`${this.apiBaseUrl}/orders/${this.currentOrder.id}/attachments/${attachmentId}`, {
+                method: 'DELETE',
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || 'Falha ao excluir anexo');
+            }
+
+            const result = await response.json();
+
+            // Atualizar lista localmente
+            if (this.currentOrder) {
+                this.currentOrder.attachments = result.attachments;
+                this.renderAttachments(this.currentOrder.attachments);
+
+                // Se estiver com detalhes abertos, atualizar também
+                this.viewOrderDetails(this.currentOrder.id);
+            }
+
+            this.showNotification('Anexo excluído com sucesso', 'success');
+
+        } catch (error) {
+            console.error('Erro ao excluir anexo:', error);
+            this.showNotification(error.message || 'Erro ao excluir anexo', 'error');
+        }
+    }
+
+
+    openImageModal(url) {
+        const modal = document.getElementById('modal-image-preview');
+        const img = document.getElementById('preview-image-full');
+        if (modal && img) {
+            img.src = url;
+            modal.classList.remove('hidden');
+        }
     }
 }
 

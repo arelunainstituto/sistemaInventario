@@ -3974,7 +3974,9 @@ app.post('/api/admin/users', authenticateToken, async (req, res) => {
             password: password,
             email_confirm: true,
             user_metadata: {
-                full_name: full_name || null
+                full_name: full_name || null,
+                must_change_password: true,
+                last_password_change: null
             }
         });
 
@@ -5010,7 +5012,7 @@ app.get('/api/laboratorio/movimentacoes/:id', authenticateToken, async (req, res
 });
 
 // Register entrada
-app.post('/api/laboratorio/movimentacoes/entrada', authenticateToken, async (req, res) => {
+app.post('/api/laboratorio/movimentacoes/entrada', authenticateToken, upload.single('anexo'), async (req, res) => {
     try {
         const {
             produto_id,
@@ -5025,6 +5027,35 @@ app.post('/api/laboratorio/movimentacoes/entrada', authenticateToken, async (req
         } = req.body;
 
         const userId = req.user.id;
+
+        // Process file upload if exists
+        let anexoUrl = null;
+        if (req.file) {
+            const sanitizedName = sanitizeFileName(req.file.originalname);
+            const fileName = `movimentacao-${Date.now()}-${Math.random().toString(36).substring(7)}-${sanitizedName}`;
+
+            try {
+                // Upload para bucket 'anexos'
+                const { data: uploadData, error: uploadError } = await supabaseAdmin.storage
+                    .from('anexos')
+                    .upload(`laboratorio/${fileName}`, req.file.buffer, {
+                        contentType: req.file.mimetype,
+                        upsert: false
+                    });
+
+                if (uploadError) throw uploadError;
+
+                // Gerar URL pública
+                const { data: { publicUrl } } = supabaseAdmin.storage
+                    .from('anexos')
+                    .getPublicUrl(`laboratorio/${fileName}`);
+
+                anexoUrl = publicUrl;
+            } catch (uploadError) {
+                console.error('Erro ao fazer upload do anexo:', uploadError);
+                throw new Error('Erro ao fazer upload do anexo: ' + uploadError.message);
+            }
+        }
 
         // Get user profile
         const { data: profile } = await supabase
@@ -5043,7 +5074,8 @@ app.post('/api/laboratorio/movimentacoes/entrada', authenticateToken, async (req
                 responsavel: responsavel || profile?.full_name || 'Sistema',
                 motivo: motivo || 'Compra',
                 observacoes,
-                registrado_por: userId
+                registrado_por: userId,
+                anexo_url: anexoUrl
             })
             .select()
             .single();
@@ -5089,7 +5121,7 @@ app.post('/api/laboratorio/movimentacoes/entrada', authenticateToken, async (req
 });
 
 // Register saida
-app.post('/api/laboratorio/movimentacoes/saida', authenticateToken, async (req, res) => {
+app.post('/api/laboratorio/movimentacoes/saida', authenticateToken, upload.single('anexo'), async (req, res) => {
     try {
         const {
             produto_id,
@@ -5101,6 +5133,35 @@ app.post('/api/laboratorio/movimentacoes/saida', authenticateToken, async (req, 
         } = req.body;
 
         const userId = req.user.id;
+
+        // Process file upload if exists
+        let anexoUrl = null;
+        if (req.file) {
+            const sanitizedName = sanitizeFileName(req.file.originalname);
+            const fileName = `movimentacao-saida-${Date.now()}-${Math.random().toString(36).substring(7)}-${sanitizedName}`;
+
+            try {
+                // Upload para bucket 'anexos'
+                const { data: uploadData, error: uploadError } = await supabaseAdmin.storage
+                    .from('anexos')
+                    .upload(`laboratorio/${fileName}`, req.file.buffer, {
+                        contentType: req.file.mimetype,
+                        upsert: false
+                    });
+
+                if (uploadError) throw uploadError;
+
+                // Gerar URL pública
+                const { data: { publicUrl } } = supabaseAdmin.storage
+                    .from('anexos')
+                    .getPublicUrl(`laboratorio/${fileName}`);
+
+                anexoUrl = publicUrl;
+            } catch (uploadError) {
+                console.error('Erro ao fazer upload do anexo:', uploadError);
+                throw new Error('Erro ao fazer upload do anexo: ' + uploadError.message);
+            }
+        }
 
         // Check available stock
         const { data: estoque } = await supabase
@@ -5134,7 +5195,8 @@ app.post('/api/laboratorio/movimentacoes/saida', authenticateToken, async (req, 
                 numero_caso,
                 motivo: motivo || 'Uso em produção',
                 observacoes,
-                registrado_por: userId
+                registrado_por: userId,
+                anexo_url: anexoUrl
             })
             .select()
             .single();
@@ -5754,6 +5816,8 @@ app.get('/api/prostoral/orders', authenticateToken, prostoralOrders.listOrders);
 app.get('/api/prostoral/orders/:id', authenticateToken, prostoralOrders.getOrderDetails);
 app.post('/api/prostoral/orders', authenticateToken, prostoralOrders.createOrder);
 app.put('/api/prostoral/orders/:id', authenticateToken, prostoralOrders.updateOrder);
+app.post('/api/prostoral/orders/:id/attachments', authenticateToken, upload.array('files'), prostoralOrders.addAttachments);
+app.delete('/api/prostoral/orders/:id/attachments/:attachmentId', authenticateToken, prostoralOrders.deleteAttachment);
 app.delete('/api/prostoral/orders/:id', authenticateToken, prostoralOrders.deleteOrder);
 
 // Rotas de Materiais
@@ -5787,6 +5851,8 @@ app.get('/api/prostoral/client/orders', authenticateToken, prostoralClients.list
 app.get('/api/prostoral/client/orders/:id', authenticateToken, prostoralClients.getClientOrderDetails);
 app.post('/api/prostoral/client/orders', authenticateToken, prostoralClients.createClientOrder);
 app.post('/api/prostoral/client/orders/:id/issues', authenticateToken, prostoralClients.createClientIssue);
+app.post('/api/prostoral/client/orders/:id/attachments', authenticateToken, upload.array('files'), prostoralOrders.addAttachments);
+app.delete('/api/prostoral/client/orders/:id/attachments/:attachmentId', authenticateToken, prostoralOrders.deleteAttachment);
 
 // Rotas POST para gerenciamento de clientes (já declaradas acima junto com GET)
 app.post('/api/prostoral/clients/link-user', authenticateToken, prostoralClients.linkUserToClient);

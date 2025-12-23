@@ -997,20 +997,42 @@ class LaboratorioModule {
 
         document.body.appendChild(notification);
 
-        // Event listeners
-        document.getElementById('btnQuickScanQR').addEventListener('click', async () => {
-            document.body.removeChild(notification);
-            await this.startQRScanForMovement(tipo);
-        });
+        // Event listeners - Scoped to the notification element
+        const btnQuickScan = notification.querySelector('#btnQuickScanQR');
+        const btnManual = notification.querySelector('#btnManualSelect');
+        const btnCancel = notification.querySelector('#btnCancelQuickScan');
 
-        document.getElementById('btnManualSelect').addEventListener('click', () => {
-            document.body.removeChild(notification);
-            this.showMovementModal(tipo);
-        });
+        if (btnQuickScan) {
+            btnQuickScan.addEventListener('click', async () => {
+                console.log('📸 QuickScan clicado');
+                document.body.removeChild(notification);
+                try {
+                    await this.startQRScanForMovement(tipo);
+                } catch (error) {
+                    console.error('Erro ao iniciar QuickScan:', error);
+                    this.showNotification('Erro ao iniciar scanner: ' + error.message, 'error');
+                }
+            });
+        }
 
-        document.getElementById('btnCancelQuickScan').addEventListener('click', () => {
-            document.body.removeChild(notification);
-        });
+        if (btnManual) {
+            btnManual.addEventListener('click', () => {
+                console.log('👆 Seleção Manual clicada');
+                document.body.removeChild(notification);
+                try {
+                    this.showMovementModal(tipo);
+                } catch (error) {
+                    console.error('Erro ao abrir seleção manual:', error);
+                    this.showNotification('Erro ao abrir modal: ' + error.message, 'error');
+                }
+            });
+        }
+
+        if (btnCancel) {
+            btnCancel.addEventListener('click', () => {
+                document.body.removeChild(notification);
+            });
+        }
     }
 
     // Iniciar scanner de QR Code para movimentação
@@ -1384,7 +1406,10 @@ class LaboratorioModule {
                 <td class="py-3 px-4 font-medium text-gray-900 dark:text-white">${mov.nome_material}</td>
                 <td class="py-3 px-4 font-semibold">${mov.quantidade} ${mov.unidade_medida}</td>
                 <td class="py-3 px-4 text-gray-600 dark:text-gray-400">${mov.responsavel || '-'}</td>
-                <td class="py-3 px-4 text-gray-600 dark:text-gray-400">${mov.motivo}</td>
+                <td class="py-3 px-4 text-gray-600 dark:text-gray-400">
+                    ${mov.motivo}
+                    ${mov.anexo_url ? `<a href="${mov.anexo_url}" target="_blank" class="text-blue-600 hover:text-blue-800 ml-2" title="Ver anexo"><i class="fas fa-paperclip"></i></a>` : ''}
+                </td>
             </tr>
         `).join('');
     }
@@ -1492,25 +1517,40 @@ class LaboratorioModule {
         e.preventDefault();
 
         const tipo = document.getElementById('movementTipo').value;
-        const movementData = {
-            tipo,
-            produto_id: document.getElementById('movementProduto').value,
-            quantidade: parseFloat(document.getElementById('movementQuantidade').value),
-            motivo: document.getElementById('movementMotivo').value,
-            responsavel: document.getElementById('movementResponsavel')?.value || null,
-            custo_unitario: tipo === 'entrada' ? parseFloat(document.getElementById('movementCustoUnitario')?.value) || null : null,
-            observacoes: document.getElementById('movementObservacoes').value
-        };
+        const formData = new FormData();
+
+        formData.append('tipo', tipo);
+        formData.append('produto_id', document.getElementById('movementProduto').value);
+        formData.append('quantidade', document.getElementById('movementQuantidade').value);
+        formData.append('motivo', document.getElementById('movementMotivo').value);
+        formData.append('observacoes', document.getElementById('movementObservacoes').value);
+
+        const responsavel = document.getElementById('movementResponsavel')?.value;
+        if (responsavel) {
+            formData.append('responsavel', responsavel);
+        }
+
+        if (tipo === 'entrada') {
+            const custo = document.getElementById('movementCustoUnitario')?.value;
+            if (custo) {
+                formData.append('custo_unitario', custo);
+            }
+        }
+
+        const fileInput = document.getElementById('movementAnexo');
+        if (fileInput && fileInput.files[0]) {
+            formData.append('anexo', fileInput.files[0]);
+        }
 
         try {
             const token = await window.authManager.getAccessToken();
             const response = await fetch(`${this.apiBaseUrl}/movimentacoes/${tipo}`, {
                 method: 'POST',
                 headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
+                    'Authorization': `Bearer ${token}`
+                    // Content-Type header removed to allow browser to set multipart/form-data boundary
                 },
-                body: JSON.stringify(movementData)
+                body: formData
             });
 
             if (!response.ok) {

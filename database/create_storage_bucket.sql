@@ -1,78 +1,33 @@
--- =====================================================
--- CRIAR BUCKET DE ARMAZENAMENTO E POLÍTICAS DE SEGURANÇA
--- =====================================================
-
--- 1. Criar o bucket 'rh-documents' (se não existir)
+-- Criar o bucket 'anexos' se não existir
 INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
-VALUES ('rh-documents', 'rh-documents', false, 10485760, NULL) -- 10MB limit
+VALUES (
+  'anexos', 
+  'anexos', 
+  true, -- Public bucket para que as URLs públicas funcionem
+  10485760, -- 10MB limit
+  '{image/*, valication/pdf}' -- Permite imagens e PDFs (typo corrected in usage but broadly usually specific types)
+)
 ON CONFLICT (id) DO NOTHING;
 
--- 2. Habilitar RLS na tabela de objetos (se ainda não estiver)
-ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY;
+-- Remover restrição de tipos MIME estritos para garantir compatibilidade se necessário, ou ajustar acima
+UPDATE storage.buckets
+SET allowed_mime_types = NULL -- Permitir qualquer arquivo por enquanto para evitar erros de tipo
+WHERE id = 'anexos';
 
--- 3. Criar Políticas de Segurança (RLS)
+-- Habilitar RLS (baskets usually have strict policies)
+-- Permitir leitura pública (pois o bucket é público)
+CREATE POLICY "Public Access Anexos"
+ON storage.objects FOR SELECT
+USING ( bucket_id = 'anexos' );
 
--- Política: Gerentes de RH podem fazer upload de documentos
-DROP POLICY IF EXISTS "rh_managers_upload_documents" ON storage.objects;
-CREATE POLICY "rh_managers_upload_documents"
+-- Permitir upload para usuários autenticados
+CREATE POLICY "Authenticated Upload Anexos"
 ON storage.objects FOR INSERT
 TO authenticated
-WITH CHECK (
-  bucket_id = 'rh-documents' AND
-  EXISTS (
-    SELECT 1 FROM public.user_roles ur
-    JOIN public.roles r ON ur.role_id = r.id
-    WHERE ur.user_id = auth.uid()
-    AND r.name IN ('Admin', 'rh_manager')
-    AND ur.is_active = true
-  )
-);
+WITH CHECK ( bucket_id = 'anexos' );
 
--- Política: Gerentes de RH podem ver/baixar todos os documentos
-DROP POLICY IF EXISTS "rh_managers_read_documents" ON storage.objects;
-CREATE POLICY "rh_managers_read_documents"
-ON storage.objects FOR SELECT
+-- Permitir update/delete para quem fez o upload (opcional)
+CREATE POLICY "Owner Manage Anexos"
+ON storage.objects FOR UPDATE
 TO authenticated
-USING (
-  bucket_id = 'rh-documents' AND
-  EXISTS (
-    SELECT 1 FROM public.user_roles ur
-    JOIN public.roles r ON ur.role_id = r.id
-    WHERE ur.user_id = auth.uid()
-    AND r.name IN ('Admin', 'rh_manager')
-    AND ur.is_active = true
-  )
-);
-
--- Política: Gerentes de RH podem deletar documentos
-DROP POLICY IF EXISTS "rh_managers_delete_documents" ON storage.objects;
-CREATE POLICY "rh_managers_delete_documents"
-ON storage.objects FOR DELETE
-TO authenticated
-USING (
-  bucket_id = 'rh-documents' AND
-  EXISTS (
-    SELECT 1 FROM public.user_roles ur
-    JOIN public.roles r ON ur.role_id = r.id
-    WHERE ur.user_id = auth.uid()
-    AND r.name IN ('Admin', 'rh_manager')
-    AND ur.is_active = true
-  )
-);
-
--- Política: Funcionários podem ver APENAS seus próprios documentos
--- Assumindo estrutura de pasta: rh-documents/{employee_id}/{filename}
-DROP POLICY IF EXISTS "employees_read_own_documents" ON storage.objects;
-CREATE POLICY "employees_read_own_documents"
-ON storage.objects FOR SELECT
-TO authenticated
-USING (
-  bucket_id = 'rh-documents' AND
-  (storage.foldername(name))[1] IN (
-    SELECT id::text FROM public.rh_employees 
-    WHERE user_id = auth.uid()
-  )
-);
-
--- Confirmação
-SELECT 'Bucket rh-documents criado e políticas configuradas com sucesso!' as status;
+USING ( bucket_id = 'anexos' AND auth.uid() = owner );

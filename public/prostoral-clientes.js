@@ -521,6 +521,25 @@ class ClientPortalApp {
                 </div>
             </div>
 
+            <!-- Anexos -->
+            <div class="bg-gray-50 dark:bg-gray-900 rounded-xl p-6 mb-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h4 class="font-bold text-lg text-gray-900 dark:text-white">
+                        <i class="fas fa-paperclip text-emerald-600 mr-2"></i>Anexos
+                    </h4>
+                    <div>
+                        <input type="file" id="client-attachment-input" multiple class="hidden" accept="image/*,application/pdf">
+                        <button id="btn-add-attachment" type="button" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-all shadow-sm hover:shadow-md">
+                            <i class="fas fa-plus mr-1"></i>Adicionar Anexo
+                        </button>
+                    </div>
+                </div>
+                <!-- Lista de Anexos -->
+                <div id="client-attachments-list" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                    ${this.renderAttachmentsHTML(order.attachments || [])}
+                </div>
+            </div>
+
             <!-- Minhas Intercorrências -->
             <div class="bg-gray-50 dark:bg-gray-900 rounded-xl p-6 mb-6">
                 <div class="flex justify-between items-center mb-4">
@@ -552,6 +571,20 @@ class ClientPortalApp {
                 </div>
             </div>
         `;
+
+
+        // Manipuladores de Anexos
+        setTimeout(() => {
+            const btnAddAtt = document.getElementById('btn-add-attachment');
+            const inputAtt = document.getElementById('client-attachment-input');
+            if (btnAddAtt && inputAtt) {
+                btnAddAtt.onclick = (e) => {
+                    e.preventDefault();
+                    inputAtt.click();
+                };
+                inputAtt.onchange = (e) => this.handleFileUpload(e);
+            }
+        }, 100);
     }
 
     renderIssue(issue) {
@@ -575,19 +608,75 @@ class ClientPortalApp {
                     ${this.formatDate(issue.created_at)}
                 </p>
             </div>
-        `;
+            `;
     }
 
     renderHistoryItem(item) {
+        // Mapa de traduções para change_type
+        const typeTranslations = {
+            'status_change': 'Alteração de Status',
+            'order_created': 'Ordem Criada',
+            'attachments_added': 'Anexos Adicionados',
+            'attachment_removed': 'Anexo Removido',
+            'issue_created': 'Intercorrência Criada',
+            'issue_updated': 'Intercorrência Atualizada',
+            'material_added': 'Material Adicionado',
+            'material_removed': 'Material Removido'
+        };
+
+        // Mapa de traduções para status
+        const statusTranslations = {
+            'received': 'Recebido',
+            'design': 'Design',
+            'production': 'Produção',
+            'finishing': 'Acabamento',
+            'quality_control': 'Controle de Qualidade',
+            'delivered': 'Entregue',
+            'cancelled': 'Cancelado'
+        };
+
+        const title = typeTranslations[item.change_type] || item.change_type || 'Alteração';
+        let details = '';
+
+        // Se for mudança de status, mostrar old > new
+        if (item.change_type === 'status_change') {
+            const oldStatus = statusTranslations[item.old_status] || item.old_status || '-';
+            const newStatus = statusTranslations[item.new_status] || item.new_status || item.status; // fallback
+
+            if (newStatus) {
+                details = `
+                    <div class="flex items-center text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        <span>${oldStatus}</span>
+                        <i class="fas fa-arrow-right mx-2 text-gray-300"></i>
+                        <span class="font-semibold text-emerald-600 dark:text-emerald-400">${newStatus}</span>
+                    </div>
+                `;
+            }
+        }
+
+        // Se houver change_details (para outros tipos)
+        if (item.change_details) {
+            details += `<p class="text-xs text-gray-500 dark:text-gray-400 mt-1">${item.change_details}</p>`;
+        }
+
+        // Se houver notas
+        if (item.notes) {
+            details += `<p class="text-xs text-gray-400 dark:text-gray-500 mt-1 italic">"${item.notes}"</p>`;
+        }
+
         return `
             <div class="flex items-start space-x-3 p-3 bg-white dark:bg-gray-700 rounded-lg">
                 <i class="fas fa-circle text-xs text-emerald-600 mt-1"></i>
                 <div class="flex-1">
-                    <p class="text-sm text-gray-900 dark:text-white">${item.change_type || 'Alteração'}</p>
-                    <p class="text-xs text-gray-500 dark:text-gray-400">${this.formatDate(item.changed_at)}</p>
+                    <p class="text-sm font-medium text-gray-900 dark:text-white">${title}</p>
+                    ${details}
+                    <p class="text-xs text-gray-400 dark:text-gray-500 mt-1 flex items-center gap-1">
+                        <i class="far fa-clock text-[10px]"></i>
+                        ${this.formatDate(item.changed_at)}
+                    </p>
                 </div>
             </div>
-        `;
+            `;
     }
 
     // =====================================================
@@ -631,7 +720,7 @@ class ClientPortalApp {
                     </div>
                 </div>
             </div>
-        `;
+            `;
 
         document.body.insertAdjacentHTML('beforeend', modalHtml);
 
@@ -654,7 +743,7 @@ class ClientPortalApp {
             }
 
             const token = await window.authManager.getAccessToken();
-            const response = await fetch(`${this.apiBaseUrl}/client/orders/${this.currentOrder.id}/issues`, {
+            const response = await fetch(`${this.apiBaseUrl} /client/orders / ${this.currentOrder.id}/issues`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -729,6 +818,157 @@ class ClientPortalApp {
         setTimeout(() => {
             toast.remove();
         }, 3000);
+    }
+    // =====================================================
+    // ATTACHMENTS HANDLING
+    // =====================================================
+
+    renderAttachmentsHTML(attachments) {
+        if (!attachments || attachments.length === 0) {
+            return '<p class="text-gray-500 text-sm col-span-full">Nenhum anexo adicionado.</p>';
+        }
+
+        return attachments.map(att => {
+            const isImage = att.type.startsWith('image/');
+            const icon = isImage ? 'fa-image' : 'fa-file-pdf';
+            const bgClass = isImage ? 'bg-gray-100' : 'bg-red-50';
+            const textClass = isImage ? 'text-gray-600' : 'text-red-600';
+
+            let content = '';
+            if (isImage) {
+                content = `
+                    <div class="relative group aspect-square rounded-lg overflow-hidden bg-gray-100 cursor-pointer" onclick="window.clientPortalApp.openImageModal('${att.url}')">
+                        <img src="${att.url}" class="w-full h-full object-cover transition-transform group-hover:scale-105" alt="${att.name}">
+                        <div class="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-all flex items-center justify-center opacity-0 group-hover:opacity-100">
+                            <i class="fas fa-search-plus text-white text-2xl drop-shadow-lg"></i>
+                        </div>
+                    </div>
+                    <p class="mt-1 text-xs text-gray-500 truncate" title="${att.name}">${att.name}</p>
+                `;
+            } else {
+                content = `
+                    <a href="${att.url}" target="_blank" class="flex flex-col items-center justify-center p-4 rounded-lg ${bgClass} hover:opacity-80 transition-all aspect-square border border-gray-200">
+                        <i class="fas ${icon} ${textClass} text-3xl mb-2"></i>
+                        <span class="text-xs text-gray-600 text-center line-clamp-2 break-all" title="${att.name}">${att.name}</span>
+                    </a>
+                `;
+            }
+
+            return `
+                <div class="relative group">
+                    ${content}
+                    <button onclick="window.clientPortalApp.deleteAttachment('${att.id}')" 
+                        class="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-md hover:bg-red-600 z-10"
+                        title="Excluir anexo">
+                        <i class="fas fa-trash text-xs"></i>
+                    </button>
+                </div>
+            `;
+        }).join('');
+    }
+
+    async deleteAttachment(attachmentId) {
+        if (!confirm('Tem certeza que deseja excluir este anexo?')) return;
+
+        try {
+            // Toast simplificado (ou adicionar sistema de notificação ao client portal)
+            console.log('Excluindo anexo...');
+
+            const token = await window.authManager.getAccessToken();
+            // Nota: Usando rota de cliente
+            const response = await fetch(`${this.apiBaseUrl}/client/orders/${this.currentOrder.id}/attachments/${attachmentId}`, {
+                method: 'DELETE',
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || 'Falha ao excluir anexo');
+            }
+
+            const result = await response.json();
+
+            // Atualizar lista localmente
+            if (this.currentOrder) {
+                this.currentOrder.attachments = result.attachments;
+                // Re-renderizar lista
+                const listContainer = document.getElementById('client-attachments-list');
+                if (listContainer) {
+                    listContainer.innerHTML = this.renderAttachmentsHTML(this.currentOrder.attachments);
+                    // Reattach event listeners not needed due to inline onclick
+                }
+            }
+
+            this.showSuccess('Anexo excluído com sucesso!');
+
+        } catch (error) {
+            console.error('Erro ao excluir anexo:', error);
+            this.showError('Erro ao excluir anexo: ' + error.message);
+        }
+    }
+
+    openImageModal(url) {
+        const modal = document.getElementById('modal-image-preview');
+        const img = document.getElementById('preview-image-full');
+        if (modal && img) {
+            img.src = url;
+            modal.classList.remove('hidden');
+        }
+    }
+
+    async handleFileUpload(event) {
+        const files = event.target.files;
+        if (!files || files.length === 0) return;
+
+        if (!this.currentOrder) {
+            this.showError('Erro: Nenhuma ordem selecionada');
+            return;
+        }
+
+        await this.uploadAttachments(files);
+
+        // Limpar input
+        event.target.value = '';
+    }
+
+    async uploadAttachments(files) {
+        const formData = new FormData();
+        for (let i = 0; i < files.length; i++) {
+            formData.append('files', files[i]);
+        }
+
+        try {
+            // Mostrar toast de carregamento se possível ou apenas aguardar
+            const loadingToast = document.createElement('div');
+            // ... (simplificado: usar consoles ou apenas status)
+            console.log('Enviando arquivos...');
+
+            const token = await window.authManager.getAccessToken();
+            const response = await fetch(`${this.apiBaseUrl}/client/orders/${this.currentOrder.id}/attachments`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                },
+                body: formData
+            });
+
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.error || 'Erro no upload');
+            }
+
+            const data = await response.json();
+            this.showSuccess('Arquivos enviados com sucesso!');
+
+            // Atualizar detalhes
+            await this.viewOrderDetails(this.currentOrder.id);
+
+        } catch (error) {
+            console.error('Erro no upload:', error);
+            this.showError(error.message);
+        }
     }
 }
 

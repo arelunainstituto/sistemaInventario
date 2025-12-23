@@ -64,6 +64,31 @@ class AuthManager {
         localStorage.setItem('user', JSON.stringify(this.currentUser));
         localStorage.setItem('isAuthenticated', 'true');
         localStorage.setItem('access_token', session.access_token); // ✅ Armazenar token
+        if (this.currentUser.user_metadata?.must_change_password) {
+            console.warn('⚠️ Usuário precisa alterar a senha (flag explícita).');
+            if (!window.location.href.includes('settings-password.html')) {
+                window.location.href = 'settings-password.html?force=true';
+            }
+            return;
+        }
+
+        // Check for 30-day expiration
+        const lastChangeDate = this.currentUser.user_metadata?.last_password_change;
+        if (!lastChangeDate) {
+            console.warn('⚠️ Usuário nunca alterou a senha (expirada).');
+            if (!window.location.href.includes('settings-password.html')) {
+                window.location.href = 'settings-password.html?force=true&reason=expired';
+            }
+            return;
+        }
+
+        const daysSinceLastChange = (new Date() - new Date(lastChangeDate)) / (1000 * 60 * 60 * 24);
+        if (daysSinceLastChange > 30) {
+            console.warn(`⚠️ Senha expirada. Última alteração há ${Math.floor(daysSinceLastChange)} dias.`);
+            if (!window.location.href.includes('settings-password.html')) {
+                window.location.href = 'settings-password.html?force=true&reason=expired';
+            }
+        }
 
         console.log('Usuário autenticado:', this.currentUser.email);
         console.log('✅ Token armazenado no localStorage');
@@ -153,13 +178,40 @@ class AuthManager {
                 throw new Error('Senha atual incorreta');
             }
 
+            const now = new Date().toISOString();
+
             // Se o login foi bem-sucedido, alterar a senha
             const { data, error } = await this.supabase.auth.updateUser({
-                password: newPassword
+                password: newPassword,
+                data: {
+                    must_change_password: false,
+                    last_password_change: now
+                }
             });
 
             if (error) {
                 throw error;
+            }
+
+            // CRITICAL FIX: Explicitly update session with key returned data
+            if (data.user) {
+                // Update current user references
+                this.currentUser = data.user;
+
+                // Update the session object with the new user data
+                if (this.session) {
+                    this.session.user = data.user;
+
+                    // Force update of local storage and run validation checks
+                    // This ensures the new metadata (must_change_password = false) is respected immediately
+                    this.setSession(this.session);
+                }
+
+                // Force a true session refresh from server to ensure token claims are updated if needed
+                const { data: refreshData, error: refreshError } = await this.supabase.auth.refreshSession();
+                if (refreshData?.session) {
+                    this.setSession(refreshData.session);
+                }
             }
 
             return { success: true, data };
@@ -208,13 +260,37 @@ class AuthManager {
      */
     redirectIfAuthenticated() {
         if (this.isUserAuthenticated()) {
+
+            // Re-run expiration check here in case they try to navigate manually
+            if (this.currentUser.user_metadata?.must_change_password) {
+                if (!window.location.href.includes('settings-password.html')) {
+                    window.location.href = 'settings-password.html?force=true';
+                }
+                return true;
+            }
+
+            const lastChangeDate = this.currentUser.user_metadata?.last_password_change;
+            if (!lastChangeDate) {
+                if (!window.location.href.includes('settings-password.html')) {
+                    window.location.href = 'settings-password.html?force=true&reason=expired';
+                }
+                return true;
+            }
+
+            const daysSinceLastChange = (new Date() - new Date(lastChangeDate)) / (1000 * 60 * 60 * 24);
+            if (daysSinceLastChange > 30) {
+                if (!window.location.href.includes('settings-password.html')) {
+                    window.location.href = 'settings-password.html?force=true&reason=expired';
+                }
+                return true;
+            }
+
             console.log('Usuário já autenticado, redirecionando para dashboard');
             window.location.href = 'dashboard.html';
             return true;
         }
         return false;
     }
-
     /**
      * Obter token de acesso
      */
@@ -445,19 +521,14 @@ class AuthManager {
 
         return true;
     }
-
 }
 
-/**
- * Instância global do gerenciador de autenticação
- * IMPORTANTE: Deve ser criada ANTES das funções que a utilizam
- */
+// Instância global do gerenciador de autenticação
+// IMPORTANTE: Deve ser criada ANTES das funções que a utilizam
 const authManager = new AuthManager();
 
-/**
- * Funções utilitárias para uso nas páginas
- */
-
+// Funções utilitárias para uso nas páginas
+// ----------------------------------------
 
 /**
  * Proteger página atual
@@ -531,6 +602,28 @@ async function authenticatedFetch(url, options = {}) {
         ...options,
         headers
     });
+
+    if (response.status === 401) {
+        // Se der erro de autenticação, tentar renovar e tentar novamente
+        console.log('Erro 401, tentando renovar token...');
+        const refreshed = await authManager.refreshTokenIfNeeded();
+
+        if (refreshed) {
+            console.log('Token renovado, tentando requisição novamente...');
+            const newHeaders = {
+                ...getAuthHeaders(),
+                ...options.headers
+            };
+
+            return fetch(url, {
+                ...options,
+                headers: newHeaders
+            });
+        } else {
+            // Se não conseguir renovar, redirecionar para login
+            authManager.signOut();
+        }
+    }
 
     return response;
 }

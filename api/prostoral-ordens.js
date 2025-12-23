@@ -5,6 +5,7 @@
 console.log('🔧 Carregando módulo prostoral-ordens.js...');
 
 const { createClient } = require('@supabase/supabase-js');
+const crypto = require('crypto');
 
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -1097,6 +1098,232 @@ async function getRelatedOrders(req, res) {
 // =====================================================
 // EXPORTS
 // =====================================================
+// =====================================================
+// HELPER: Create History Entry
+// =====================================================
+async function createHistoryEntry(workOrderId, changeType, changeDetails, userId) {
+    try {
+        const { error } = await supabase
+            .from('prostoral_work_order_history')
+            .insert([{
+                work_order_id: workOrderId,
+                change_type: changeType,
+                change_details: changeDetails,
+                changed_by: userId,
+                changed_at: new Date().toISOString()
+            }]);
+
+        if (error) {
+            console.error('Erro ao criar histórico:', error);
+        }
+    } catch (error) {
+        console.error('Erro ao criar histórico:', error);
+    }
+}
+
+// =====================================================
+// ANEXOS
+// POST /api/prostoral/orders/:id/attachments
+// =====================================================
+async function addAttachments(req, res) {
+    try {
+        const { id } = req.params;
+        const userId = req.user.id;
+        const tenantId = await getUserTenant(userId);
+
+        console.log(`📎 Adicionando anexos à ordem ${id}`);
+
+        if (!req.files || req.files.length === 0) {
+            return res.status(400).json({ error: 'Nenhum arquivo enviado' });
+        }
+
+        // 1. Buscar ordem atual para obter anexos existentes
+        const { data: order, error: orderError } = await supabase
+            .from('prostoral_work_orders')
+            .select('attachments')
+            .eq('id', id)
+            .eq('tenant_id', tenantId)
+            .single();
+
+        if (orderError) {
+            console.error('Erro ao buscar ordem:', orderError);
+            return res.status(404).json({ error: 'Ordem não encontrada' });
+        }
+
+        const currentAttachments = order.attachments || [];
+        const newAttachments = [];
+
+        // 2. Processar cada arquivo
+        for (const file of req.files) {
+            // Sanitizar nome do arquivo
+            const sanitizedName = file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_');
+            const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}-${sanitizedName}`;
+            const filePath = `${tenantId}/${id}/${fileName}`;
+
+            console.log(`📤 Uploading: ${filePath}`);
+
+            // Upload para Supabase Storage
+            const { error: uploadError } = await supabase.storage
+                .from('prostoral-attachments')
+                .upload(filePath, file.buffer, {
+                    contentType: file.mimetype,
+                    upsert: false
+                });
+
+            if (uploadError) {
+                console.error('Erro no upload:', uploadError);
+                // Continuar com outros arquivos ou abortar? Vamos registrar o erro mas continuar se possível
+                continue;
+            }
+
+            // Obter URL pública
+            const { data: publicUrlData } = supabase.storage
+                .from('prostoral-attachments')
+                .getPublicUrl(filePath);
+
+            newAttachments.push({
+                id: crypto.randomUUID(), // ID único para o anexo
+                name: file.originalname,
+                path: filePath,
+                url: publicUrlData.publicUrl,
+                type: file.mimetype,
+                size: file.size,
+                uploaded_by: userId,
+                uploaded_at: new Date().toISOString()
+            });
+        }
+
+        if (newAttachments.length === 0) {
+            return res.status(500).json({ error: 'Falha ao fazer upload dos arquivos' });
+        }
+
+        // 3. Atualizar ordem com novos anexos
+        const updatedAttachments = [...currentAttachments, ...newAttachments];
+
+        const { data: updatedOrder, error: updateError } = await supabase
+            .from('prostoral_work_orders')
+            .update({
+                attachments: updatedAttachments,
+                updated_by: userId,
+                updated_at: new Date().toISOString()
+            })
+            .eq('id', id)
+            .select()
+            .single();
+
+        if (updateError) {
+            console.error('Erro ao atualizar anexos no banco:', updateError);
+            return res.status(500).json({ error: 'Erro ao salvar referências dos arquivos' });
+        }
+
+        // Registrar no histórico
+        await createHistoryEntry(
+            id,
+            'attachments_added',
+            `Adicionados ${newAttachments.length} anexo(s)`,
+            userId
+        );
+
+        res.json({
+            success: true,
+            attachments: updatedAttachments,
+            newAttachments: newAttachments,
+            message: `${newAttachments.length} arquivo(s) adicionado(s) com sucesso`
+        });
+
+    } catch (error) {
+        console.error('Erro ao adicionar anexos:', error);
+        res.status(500).json({ error: error.message });
+    }
+}
+
+// =====================================================
+// DELETAR ANEXO
+// DELETE /api/prostoral/orders/:id/attachments/:attachmentId
+// =====================================================
+async function deleteAttachment(req, res) {
+    try {
+        const { id, attachmentId } = req.params;
+        const userId = req.user.id;
+        const tenantId = await getUserTenant(userId);
+
+        console.log(`🗑️ Removendo anexo ${attachmentId} da ordem ${id}`);
+
+        // 1. Buscar ordem atual para encontrar o anexo
+        const { data: order, error: orderError } = await supabase
+            .from('prostoral_work_orders')
+            .select('attachments')
+            .eq('id', id)
+            .eq('tenant_id', tenantId)
+            .single();
+
+        if (orderError) {
+            console.error('Erro ao buscar ordem:', orderError);
+            return res.status(404).json({ error: 'Ordem não encontrada' });
+        }
+
+        const currentAttachments = order.attachments || [];
+        const attachmentToDelete = currentAttachments.find(a => a.id === attachmentId);
+
+        if (!attachmentToDelete) {
+            return res.status(404).json({ error: 'Anexo não encontrado' });
+        }
+
+        // 2. Remover do Supabase Storage
+        // Extrair o path do arquivo a partir da URL ou do objeto salvo
+        const filePath = attachmentToDelete.path;
+
+        if (filePath) {
+            const { error: storageError } = await supabase.storage
+                .from('prostoral-attachments')
+                .remove([filePath]);
+
+            if (storageError) {
+                console.error('Erro ao remover arquivo do Storage:', storageError);
+                // Não impedir a remoção do banco caso falhe no storage? 
+                // Melhor deixar remover do banco para não ficar link quebrado.
+            } else {
+                console.log('Arquivo removido do Storage com sucesso');
+            }
+        }
+
+        // 3. Atualizar ordem removendo o anexo
+        const updatedAttachments = currentAttachments.filter(a => a.id !== attachmentId);
+
+        const { error: updateError } = await supabase
+            .from('prostoral_work_orders')
+            .update({
+                attachments: updatedAttachments,
+                updated_by: userId,
+                updated_at: new Date().toISOString()
+            })
+            .eq('id', id);
+
+        if (updateError) {
+            console.error('Erro ao atualizar anexos no banco:', updateError);
+            return res.status(500).json({ error: 'Erro ao remover referência do arquivo' });
+        }
+
+        // Registrar no histórico
+        await createHistoryEntry(
+            id,
+            'attachment_removed',
+            `Arquivo removido: ${attachmentToDelete.name}`,
+            userId
+        );
+
+        res.json({
+            success: true,
+            attachments: updatedAttachments,
+            message: 'Anexo removido com sucesso'
+        });
+
+    } catch (error) {
+        console.error('Erro ao deletar anexo:', error);
+        res.status(500).json({ error: error.message });
+    }
+}
+
 module.exports = {
     listOrders,
     getOrderDetails,
@@ -1114,7 +1341,9 @@ module.exports = {
     listIssues,
     getOrderHistory,
     createRepairOrder,
-    getRelatedOrders
+    getRelatedOrders,
+    addAttachments,
+    deleteAttachment
 };
 
 console.log('✅ Módulo prostoral-ordens.js exportado com sucesso!');
