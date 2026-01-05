@@ -1028,6 +1028,15 @@ window.handleEmployeeSubmit = async function (e) {
         }
     }
 
+    // Validar se pelo menos um email foi preenchido
+    const hasEmail = form.elements['corporate_email'].value.trim() || form.elements['personal_email'].value.trim();
+    if (!hasEmail) {
+        alert('É obrigatório fornecer pelo menos um email (Pessoal ou Corporativo).');
+        if (window.switchModalTab) window.switchModalTab('personal');
+        if (form.elements['personal_email']) setTimeout(() => form.elements['personal_email'].focus(), 100);
+        return;
+    }
+
     window.showLoading();
 
     const id = document.getElementById('employeeId').value;
@@ -1069,7 +1078,7 @@ window.handleEmployeeSubmit = async function (e) {
     const employeeData = {
         // Dados Pessoais
         name: rawData.name,
-        email: rawData.email,
+        email: rawData.corporate_email || rawData.personal_email,
         nif: rawData.nif,
         birth_date: rawData.birth_date || null,
         nationality: rawData.nationality,
