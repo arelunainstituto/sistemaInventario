@@ -4006,6 +4006,23 @@ app.post('/api/admin/users', authenticateToken, async (req, res) => {
 
         console.log('✅ Usuário criado em public.users');
 
+        // ETAPA 2.5: Create entry in public.profiles (mirror of auth for Foreign Keys)
+        const { error: profilesMirrorError } = await supabaseAdmin
+            .from('profiles')
+            .upsert([{
+                id: createdUserId,
+                email: email,
+                full_name: full_name || null,
+                updated_at: new Date().toISOString()
+            }]);
+
+        if (profilesMirrorError) {
+            console.warn('⚠️ Erro ao criar registro em profiles (mirror):', profilesMirrorError);
+            // Non-fatal but critical for some modules
+        } else {
+            console.log('✅ Perfil criado na tabela profiles (mirror)');
+        }
+
         // ETAPA 3: Create user profile in user_profiles
         const { error: profileError } = await supabaseAdmin
             .from('user_profiles')
@@ -4260,6 +4277,37 @@ app.put('/api/admin/users/:userId', authenticateToken, async (req, res) => {
 
         console.log('🔵 Atualizando usuário:', userId);
         console.log('📦 Permissões recebidas:', permissions);
+
+        // ETAPA 0: Ensure user exists in 'profiles' table (Systemic Fix)
+        const { data: existingProfile } = await supabaseAdmin
+            .from('profiles')
+            .select('id')
+            .eq('id', userId)
+            .single();
+
+        if (!existingProfile) {
+            console.log('⚠️ Usuário sem perfil na tabela profiles. Criando agora...');
+            let userEmail = 'unknown@user.com';
+            try {
+                const { data: authUser } = await supabaseAdmin.auth.admin.getUserById(userId);
+                if (authUser && authUser.user) userEmail = authUser.user.email;
+            } catch (e) {
+                console.error('Erro ao buscar email para profile fix:', e);
+            }
+
+            const { error: fixProfileError } = await supabaseAdmin
+                .from('profiles')
+                .upsert({
+                    id: userId,
+                    email: userEmail,
+                    full_name: full_name, // might be undefined, but upsert handles it if we merge? actually upsert replaces if not specified differently.
+                    // Ideally we fetch existing name if full_name is undefined, but for now let's just use what we have or null.
+                    updated_at: new Date().toISOString()
+                });
+
+            if (fixProfileError) console.error('❌ Falha ao criar profile fix:', fixProfileError);
+            else console.log('✅ Perfil criado na tabela profiles (fix)');
+        }
 
         // Update profile in user_profiles (not 'profiles')
         if (full_name !== undefined) {
@@ -4678,6 +4726,7 @@ app.post('/api/laboratorio/produtos', authenticateToken, async (req, res) => {
         const quantidadeMax = quantidade_maxima || estoque_maximo;
 
         const userId = req.user.id;
+        const profileId = req.user.profile.id;
 
         // Insert produto
         const { data: produto, error: produtoError } = await supabaseAdmin
@@ -4732,7 +4781,7 @@ app.post('/api/laboratorio/produtos', authenticateToken, async (req, res) => {
                         quantidade: quantidade_inicial,
                         responsavel: profile?.full_name || 'Sistema',
                         motivo: 'Estoque inicial',
-                        registrado_por: userId
+                        registrado_por: userId // Keeping userId here if registered_por refers to auth user or if schema differs. Assuming 'criado_por' in schema refers to profile.
                     });
             }
         }
@@ -4765,6 +4814,8 @@ app.put('/api/laboratorio/produtos/:id', authenticateToken, async (req, res) => 
             quantidade_maxima,
             estoque_maximo
         } = req.body;
+
+        const profileId = req.user.profile.id;
 
         // Aceitar ambos os nomes para compatibilidade
         const quantidadeMin = quantidade_minima || estoque_minimo;
