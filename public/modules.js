@@ -38,6 +38,16 @@ class ModuleManager {
                 emoji: '🧪',
                 url: 'laboratorio-produtos.html',
                 tabs: []
+            },
+            {
+                id: 'marketing',
+                name: 'Marketing',
+                icon: 'fas fa-bullhorn',
+                emoji: '📢',
+                url: 'marketing.html',
+                tabs: [
+                    { id: 'blog', name: 'Blog', icon: 'fas fa-newspaper', permission: 'read' }
+                ]
             }
         ];
         this.init();

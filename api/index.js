@@ -158,7 +158,8 @@ app.use(helmet({
                 "'unsafe-inline'",
                 "https://cdn.jsdelivr.net",
                 "https://cdn.tailwindcss.com",
-                "https://unpkg.com"
+                "https://unpkg.com",
+                "https://cdnjs.cloudflare.com"
             ],
             scriptSrcAttr: ["'unsafe-inline'"], // Allow inline event handlers
             imgSrc: ["'self'", "data:", "https:"],
@@ -166,6 +167,7 @@ app.use(helmet({
             connectSrc: [
                 "'self'",
                 "https://cdn.jsdelivr.net", // Allow Chart.js source maps
+                "https://cdnjs.cloudflare.com", // Allow Quill source maps
                 process.env.SUPABASE_URL,
                 process.env.SUPABASE_URL?.replace('https://', 'wss://') // WebSocket para Realtime
             ]
@@ -180,6 +182,8 @@ const allowedOrigins = [
     'https://erp.institutoareluna.pt',
     'https://*.vercel.app' // Permitir preview deployments do Vercel
 ];
+
+app.use('/api/public/marketing', require('./marketing/public'));
 
 app.use(cors({
     origin: function (origin, callback) {
@@ -240,6 +244,11 @@ app.use('/api/auth', tokenExchangeRoutes);
 
 // Rotas do Módulo de RH
 app.use('/api/rh', rhRoutes);
+
+// Rotas do Módulo de Marketing
+app.use('/api/marketing', require('./marketing'));
+
+
 
 // Rotas da API
 

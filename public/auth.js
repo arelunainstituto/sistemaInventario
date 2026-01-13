@@ -423,6 +423,36 @@ class AuthManager {
     }
 
     /**
+     * Obter papéis (roles) do usuário
+     */
+    async getUserRoles() {
+        try {
+            if (!this.isUserAuthenticated()) {
+                return [];
+            }
+
+            const { data, error } = await this.supabase
+                .from('user_roles')
+                .select(`
+                    roles!inner(name)
+                `)
+                .eq('user_id', this.currentUser.id)
+                .eq('is_active', true);
+
+            if (error) {
+                console.error('Erro ao buscar roles:', error);
+                return [];
+            }
+
+            return data.map(r => r.roles.name);
+
+        } catch (error) {
+            console.error('Erro ao buscar roles:', error);
+            return [];
+        }
+    }
+
+    /**
      * Obter todas as permissões do usuário
      */
     async getUserPermissions() {
