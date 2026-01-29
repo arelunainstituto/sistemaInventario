@@ -82,8 +82,9 @@ class LaboratorioModule {
         if (btnCancelProduct) {
             btnCancelProduct.addEventListener('click', () => this.hideProductModal());
         }
-        if (productForm) {
+        if (productForm && !productForm.dataset.listenerAttached) {
             productForm.addEventListener('submit', (e) => this.saveProduct(e));
+            productForm.dataset.listenerAttached = 'true';
         }
 
         // Modals - Movimentação
@@ -97,8 +98,9 @@ class LaboratorioModule {
         if (btnCancelMovement) {
             btnCancelMovement.addEventListener('click', () => this.hideMovementModal());
         }
-        if (movementForm) {
+        if (movementForm && !movementForm.dataset.listenerAttached) {
             movementForm.addEventListener('submit', (e) => this.saveMovement(e));
+            movementForm.dataset.listenerAttached = 'true';
         }
 
         // Filtros de produtos

@@ -4821,10 +4821,12 @@ app.put('/api/laboratorio/produtos/:id', authenticateToken, async (req, res) => 
             estoque_minimo,
             quantidade_minima,
             quantidade_maxima,
-            estoque_maximo
+            estoque_maximo,
+            quantidade_inicial // Added: Handle quantity updates
         } = req.body;
 
         const profileId = req.user.profile.id;
+        const userId = req.user.id;
 
         // Aceitar ambos os nomes para compatibilidade
         const quantidadeMin = quantidade_minima || estoque_minimo;
@@ -4869,6 +4871,43 @@ app.put('/api/laboratorio/produtos/:id', authenticateToken, async (req, res) => 
                 });
 
             if (estoqueError) throw estoqueError;
+        }
+
+        // Handle quantidade_inicial changes (NEW LOGIC)
+        if (quantidade_inicial !== undefined && quantidade_inicial !== null) {
+            // Get current stock quantity
+            const { data: estoqueData } = await supabaseAdmin
+                .from('estoquelaboratorio')
+                .select('quantidade_atual')
+                .eq('produto_id', req.params.id)
+                .single();
+
+            const currentQty = estoqueData?.quantidade_atual || 0;
+            const newQty = parseFloat(quantidade_inicial);
+            const difference = newQty - currentQty;
+
+            // Only create adjustment if there's a difference
+            if (difference !== 0) {
+                const { data: profile } = await supabase
+                    .from('profiles')
+                    .select('full_name')
+                    .eq('id', userId)
+                    .single();
+
+                // Create adjustment movement
+                await supabaseAdmin
+                    .from('movimentacoeslaboratorio')
+                    .insert({
+                        produto_id: req.params.id,
+                        tipo: difference > 0 ? 'entrada' : 'saida',
+                        quantidade: Math.abs(difference),
+                        responsavel: profile?.full_name || 'Sistema',
+                        motivo: 'Ajuste de estoque (edição de produto)',
+                        registrado_por: userId
+                    });
+
+                console.log(`✅ Ajuste de estoque criado: ${difference > 0 ? '+' : ''}${difference} unidades`);
+            }
         }
 
         res.json({ success: true, message: 'Produto atualizado com sucesso' });
