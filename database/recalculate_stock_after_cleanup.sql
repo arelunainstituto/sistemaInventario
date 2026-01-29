@@ -21,8 +21,7 @@ SET
             WHERE m.produto_id = e.produto_id
         ), 
         0
-    ),
-    data_atualizacao = NOW()
+    )
 WHERE EXISTS (
     SELECT 1 FROM produtoslaboratorio p 
     WHERE p.id = e.produto_id AND p.ativo = true

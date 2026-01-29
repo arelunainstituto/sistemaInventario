@@ -3,6 +3,7 @@
 -- 
 -- Remove produtos duplicados, mantendo apenas o PRIMEIRO criado
 -- Os duplicados serão marcados como inativos e deleted_at será preenchido
+-- Agora valida também o LOTE para maior precisão
 
 BEGIN;
 
@@ -10,14 +11,19 @@ BEGIN;
 CREATE TEMP TABLE produtos_to_deactivate AS
 WITH duplicates AS (
     SELECT 
-        nome_material,
-        marca,
-        data_criacao::date as dia_criacao,
-        ARRAY_AGG(id ORDER BY data_criacao) as ids
-    FROM produtoslaboratorio
-    WHERE ativo = true AND deleted_at IS NULL
-    GROUP BY nome_material, marca, data_criacao::date
+        p.nome_material,
+        p.marca,
+        COALESCE(p.referencia_lote, 'SEM_LOTE') as lote,
+        p.data_criacao::date as dia_criacao,
+        ARRAY_AGG(p.id ORDER BY p.data_criacao) as ids,
+        ARRAY_AGG(DISTINCT COALESCE(e.quantidade_atual, 0)) as estoques
+    FROM produtoslaboratorio p
+    LEFT JOIN estoquelaboratorio e ON e.produto_id = p.id
+    WHERE p.ativo = true AND p.deleted_at IS NULL
+    GROUP BY p.nome_material, p.marca, COALESCE(p.referencia_lote, 'SEM_LOTE'), p.data_criacao::date
     HAVING COUNT(*) > 1
+    -- Apenas considerar duplicatas onde os estoques são idênticos (mais seguro)
+    AND ARRAY_LENGTH(ARRAY_AGG(DISTINCT COALESCE(e.quantidade_atual, 0)), 1) = 1
 )
 SELECT UNNEST(ids[2:]) as id_to_deactivate
 FROM duplicates;
@@ -27,8 +33,11 @@ SELECT
     p.id,
     p.nome_material,
     p.marca,
-    p.data_criacao
+    p.referencia_lote,
+    p.data_criacao,
+    COALESCE(e.quantidade_atual, 0) as estoque_atual
 FROM produtoslaboratorio p
+LEFT JOIN estoquelaboratorio e ON e.produto_id = p.id
 JOIN produtos_to_deactivate d ON p.id = d.id_to_deactivate
 ORDER BY p.nome_material, p.data_criacao;
 
