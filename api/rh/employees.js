@@ -374,6 +374,74 @@ router.post('/', requirePermission('HR', 'create'), async (req, res) => {
                 .upsert(moduleAccessInserts, { onConflict: 'user_id, module_id' });
 
             if (modulesError) console.error('Erro ao atribuir módulos:', modulesError);
+
+            // --- AUTOMATIC ROLE ASSIGNMENT LOGIC ---
+            try {
+                // 1. Get IDs for HR module and rh_manager role
+                const { data: hrModule } = await supabase.from('modules').select('id').eq('code', 'HR').single();
+                const { data: rhManagerRole } = await supabase.from('roles').select('id').eq('name', 'rh_manager').single();
+                const { data: empRole } = await supabase.from('roles').select('id').eq('name', 'employee').single();
+
+                if (hrModule && rhManagerRole) {
+                    const hasHRAccess = modules.includes(hrModule.id);
+
+                    // Fetch tenant_id from current user (admin/manager) or the new user's profile if created
+                    // Better to fetch from the creator's profile to propagate correct tenant
+                    const { data: creatorProfile } = await supabase
+                        .from('user_profiles')
+                        .select('tenant_id')
+                        .eq('user_id', req.user.id)
+                        .single();
+
+                    const tenantId = creatorProfile?.tenant_id;
+
+                    if (hasHRAccess) {
+                        console.log(`[RH] Auto-assigning 'rh_manager' to ${userId}`);
+                        const rolePayload = {
+                            user_id: userId,
+                            role_id: rhManagerRole.id
+                        };
+                        if (tenantId) rolePayload.tenant_id = tenantId;
+
+                        await supabase.from('user_roles').insert([rolePayload]);
+                    } else if (empRole) {
+                        // Default to employee if not HR
+                        console.log(`[RH] Auto-assigning 'employee' to ${userId}`);
+                        const rolePayload = {
+                            user_id: userId,
+                            role_id: empRole.id
+                        };
+                        if (tenantId) rolePayload.tenant_id = tenantId;
+
+                        await supabase.from('user_roles').insert([rolePayload]);
+                    }
+                }
+            } catch (roleAutoError) {
+                console.error('Erro na atribuição automática de role (POST):', roleAutoError);
+            }
+            // ---------------------------------------
+        } else {
+            // Default to employee role if no modules selected
+            try {
+                const { data: empRole } = await supabase.from('roles').select('id').eq('name', 'employee').single();
+                if (empRole) {
+                    // Fetch tenant_id
+                    const { data: creatorProfile } = await supabase
+                        .from('user_profiles')
+                        .select('tenant_id')
+                        .eq('user_id', req.user.id)
+                        .single();
+                    const tenantId = creatorProfile?.tenant_id;
+
+                    const rolePayload = {
+                        user_id: userId,
+                        role_id: empRole.id
+                    };
+                    if (tenantId) rolePayload.tenant_id = tenantId;
+
+                    await supabase.from('user_roles').insert([rolePayload]);
+                }
+            } catch (e) { console.error(e); }
         }
 
         // 7. Vincular a cliente (se fornecido)
@@ -590,8 +658,60 @@ router.put('/:id', requirePermission('HR', 'update'), async (req, res) => {
 
                 if (modulesError) {
                     console.error('Erro ao atualizar módulos:', modulesError);
-                    // Não falhar a atualização do funcionário por isso
                 }
+
+                // --- AUTOMATIC ROLE ASSIGNMENT LOGIC ---
+                try {
+                    // 1. Get IDs for HR module and rh_manager role
+                    const { data: hrModule } = await supabase.from('modules').select('id').eq('code', 'HR').single();
+                    const { data: rhManagerRole } = await supabase.from('roles').select('id').eq('name', 'rh_manager').single();
+
+                    if (hrModule && rhManagerRole) {
+                        const hasHRAccess = modules.includes(hrModule.id);
+
+                        if (hasHRAccess) {
+                            // IF user has HR access -> Ensure they have rh_manager role
+                            const { data: existingRole } = await supabase
+                                .from('user_roles')
+                                .select('*')
+                                .eq('user_id', currentEmployee.user_id)
+                                .eq('role_id', rhManagerRole.id)
+                                .single();
+
+                            if (!existingRole) {
+                                console.log(`[RH] Auto-assigning 'rh_manager' to ${currentEmployee.user_id}`);
+
+                                // Fetch tenant_id from current user
+                                const { data: creatorProfile } = await supabase
+                                    .from('user_profiles')
+                                    .select('tenant_id')
+                                    .eq('user_id', req.user.id)
+                                    .single();
+                                const tenantId = creatorProfile?.tenant_id;
+
+                                const rolePayload = {
+                                    user_id: currentEmployee.user_id,
+                                    role_id: rhManagerRole.id
+                                };
+                                if (tenantId) rolePayload.tenant_id = tenantId;
+
+                                await supabase.from('user_roles').insert([rolePayload]);
+                            }
+                        } else {
+                            // IF user does NOT have HR access -> Remove rh_manager role (if exists)
+                            // Crucial: Do NOT remove if they are Admin. But here we only target rh_manager role row.
+                            console.log(`[RH] Auto-removing 'rh_manager' from ${currentEmployee.user_id}`);
+                            await supabase
+                                .from('user_roles')
+                                .delete()
+                                .eq('user_id', currentEmployee.user_id)
+                                .eq('role_id', rhManagerRole.id);
+                        }
+                    }
+                } catch (roleAutoError) {
+                    console.error('Erro na atribuição automática de role:', roleAutoError);
+                }
+                // ---------------------------------------
             }
         }
 
