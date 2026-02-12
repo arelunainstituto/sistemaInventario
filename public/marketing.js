@@ -8,7 +8,12 @@ document.addEventListener('DOMContentLoaded', async () => {
             await authManager.init();
 
             // Check Access
-            if (!authManager.hasPermission('marketing:read') && !authManager.userRoles.includes('Marketing') && !authManager.userRoles.includes('admin')) {
+            const hasRead = await authManager.hasPermission('marketing:read');
+            const roles = await authManager.getUserRoles();
+            const isAdmin = await authManager.isAdmin() || roles.some(r => r.toLowerCase() === 'admin');
+            const isMarketing = roles.some(r => r.toLowerCase() === 'marketing');
+
+            if (!hasRead && !isMarketing && !isAdmin) {
                 alert('Acesso negado. Você não tem permissão para acessar este módulo.');
                 window.location.href = '/dashboard.html';
                 return;

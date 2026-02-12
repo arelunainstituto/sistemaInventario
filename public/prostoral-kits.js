@@ -372,7 +372,7 @@
                 .eq('id', kitId);
 
             showNotification('Kit excluído com sucesso!', 'success');
-            await loadKits();
+            await loadKits(true);
         } catch (error) {
             console.error('❌ Erro ao excluir kit:', error);
             showNotification('Erro ao excluir kit: ' + error.message, 'error');

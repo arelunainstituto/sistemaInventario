@@ -763,7 +763,7 @@ class ProstoralOrdersApp {
             if (data.success) {
                 this.showSuccess(this.currentOrder ? 'Ordem atualizada com sucesso!' : 'Ordem criada com sucesso!');
                 this.closeModal('modal-order-form');
-                await this.loadOrders();
+                await this.loadOrders(true);
             }
 
         } catch (error) {
@@ -793,7 +793,7 @@ class ProstoralOrdersApp {
 
             if (data.success) {
                 this.showSuccess('Ordem cancelada com sucesso!');
-                await this.loadOrders();
+                await this.loadOrders(true);
             }
 
         } catch (error) {
