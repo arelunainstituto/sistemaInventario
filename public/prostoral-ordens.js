@@ -228,6 +228,9 @@ class ProstoralOrdersApp {
 
         // Manipuladores de Anexos
         this.setupAttachmentHandlers();
+
+        // Configurar Event Delegation Global (Tabela + Dashboard)
+        this.setupGlobalEventListeners();
     }
 
     setupModalCloseButtons() {
@@ -450,7 +453,7 @@ class ProstoralOrdersApp {
                     ${this.formatDate(order.created_at)}
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                    ${this.formatCurrency(order.total_cost || 0)}
+                    ${this.formatCurrency(parseFloat(order.final_price) || parseFloat(order.total_cost) || 0)}
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                     ${this.renderQuickActions(order)}
@@ -479,26 +482,38 @@ class ProstoralOrdersApp {
             </tr>
         `).join('');
 
-        // Adicionar event listeners aos botões de ação
-        setTimeout(() => {
-            document.querySelectorAll('.btn-order-action').forEach(btn => {
-                btn.addEventListener('click', (e) => {
-                    const action = e.currentTarget.dataset.action;
-                    const orderId = e.currentTarget.dataset.orderId;
+        // Event delegation is now handled in setupEventListeners
+    }
 
-                    if (action === 'view') {
-                        this.viewOrderDetails(orderId);
-                    } else if (action === 'edit') {
-                        this.editOrder(orderId);
-                    } else if (action === 'delete') {
-                        this.deleteOrder(orderId);
-                    } else if (action === 'quick-status') {
-                        const newStatus = e.currentTarget.dataset.newStatus;
-                        this.quickStatusChange(orderId, newStatus);
-                    }
-                });
-            });
-        }, 0);
+    setupGlobalEventListeners() {
+        console.log('🌍 Configurando event delegation global para ações de ordem');
+
+        document.addEventListener('click', (e) => {
+            const btn = e.target.closest('.btn-order-action');
+            if (!btn) return;
+
+            e.preventDefault();
+
+            // Se estiver dentro de um modal/dropdown que não deve fechar, stopPropagation pode ser útil
+            // Mas cuidado para não quebrar outros listeners globais
+            // e.stopPropagation(); 
+
+            const action = btn.dataset.action;
+            const orderId = btn.dataset.orderId;
+            const newStatus = btn.dataset.newStatus;
+
+            console.log('🖱️ Clique detectado (global):', { action, orderId, newStatus });
+
+            if (action === 'view') {
+                this.viewOrderDetails(orderId);
+            } else if (action === 'edit') {
+                this.editOrder(orderId);
+            } else if (action === 'delete') {
+                this.deleteOrder(orderId);
+            } else if (action === 'quick-status') {
+                this.quickStatusChange(orderId, newStatus);
+            }
+        });
     }
 
     renderStatusBadge(status) {
@@ -887,74 +902,143 @@ class ProstoralOrdersApp {
     // =====================================================
 
     async viewOrderDetails(orderId) {
+        // 1. Abrir modal imediatamente para feedback visual
+        const modal = document.getElementById('modal-order-details');
+        if (modal) {
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+
+            // Resetar conteúdo
+            document.getElementById('detail-order-number').textContent = 'Carregando...';
+            // Assuming order-materials-list is a container
+            const materialsList = document.getElementById('order-materials-list');
+            if (materialsList) {
+                materialsList.innerHTML = '<div class="text-center p-4 text-gray-500">Carregando...</div>';
+            }
+        } else {
+            console.error('❌ Elemento modal-order-details não encontrado!');
+            alert('Erro interno: Modal de detalhes não encontrado.');
+            return;
+        }
+
         try {
             console.log('📦 Carregando detalhes da OS:', orderId);
             const token = await window.authManager.getAccessToken();
-            console.log('🔑 Token obtido:', token ? 'OK' : 'FALHOU');
 
             const url = `${this.apiBaseUrl}/orders/${orderId}`;
-            console.log('🌐 URL completa:', url);
-
             const response = await fetch(url, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
 
-            console.log('📡 Status da resposta:', response.status);
-
-            if (!response.ok) {
-                const errorText = await response.text();
-                console.error('❌ Erro na resposta:', errorText);
-                throw new Error(`Erro ${response.status}: ${errorText || 'Erro ao carregar detalhes'}`);
-            }
+            if (!response.ok) throw new Error(`Erro ${response.status}`);
 
             const data = await response.json();
-            console.log('✅ Dados recebidos:', data);
 
             if (data.success && data.order) {
                 this.currentOrder = data.order;
-                this.userNames = data.userNames || {}; // Guardar nomes de usuários
-                this.renderOrderDetails(data.order);
+                this.userNames = data.userNames || {};
 
-                // Configurar event listeners dos botões de ação
-                this.setupDetailsActionButtons();
-
-                const modal = document.getElementById('modal-order-details');
-                if (modal) {
-                    modal.classList.remove('hidden');
+                // Renderizar com try-catch para não quebrar o modal se algo falhar
+                try {
+                    await this.renderOrderDetails(data.order);
+                } catch (renderError) {
+                    console.error('❌ Erro ao renderizar detalhes:', renderError);
+                    document.getElementById('detail-order-number').textContent = `Erro: ${renderError.message}`;
+                    // Tentar exibir dados básicos mesmo com erro
+                    if (data.order) {
+                        try {
+                            document.getElementById('detail-order-number').textContent = data.order.order_number || '-';
+                            document.getElementById('detail-client-name').textContent = data.order.client?.name || 'Cliente não especificado';
+                        } catch (e) { console.error('Falha no fallback:', e); }
+                    }
                 }
-
-                // Gerar QR Code
-                this.generateOrderQRCode(data.order);
+            } else {
+                throw new Error(data.error || 'Erro desconhecido');
             }
 
         } catch (error) {
-            console.error('Erro ao carregar detalhes:', error);
-            this.showError('Erro ao carregar detalhes da ordem');
+            console.error('❌ Erro ao carregar detalhes:', error);
+            const modal = document.getElementById('modal-order-details');
+            if (modal) modal.classList.add('hidden');
+            this.showError('Erro ao carregar detalhes: ' + error.message);
         }
     }
 
-    renderOrderDetails(order) {
-        // Informações gerais
-        document.getElementById('detail-order-number').textContent = order.order_number || '-';
-        document.getElementById('detail-client-name').textContent = order.client?.name || 'Cliente não especificado';
-        document.getElementById('detail-patient-name').textContent = order.patient_name || 'Paciente não especificado';
-        document.getElementById('detail-work-type').textContent = order.work_type || 'Tipo não especificado';
-        document.getElementById('detail-work-description').textContent = order.work_description || 'Sem descrição';
-        document.getElementById('detail-status').innerHTML = this.renderStatusBadge(order.status);
-        document.getElementById('detail-total-cost').textContent = this.formatCurrency(order.total_cost || 0);
-        document.getElementById('detail-final-price').textContent = this.formatCurrency(order.final_price || 0);
+    async renderOrderDetails(order) {
+        console.log('📊 Renderizando detalhes da ordem:', {
+            id: order.id,
+            materials: order.materials?.length,
+            final_price: order.final_price
+        });
 
+        // 1. Cabeçalho
+        document.getElementById('detail-order-number').textContent = order.order_number || 'N/A';
+
+        // Renderizar status (verificar se elemento existe)
+        const statusEl = document.getElementById('detail-status');
+        if (statusEl) statusEl.innerHTML = this.renderStatusBadge(order.status);
+
+        // Clientes e datas
+        document.getElementById('detail-client-name').textContent = order.client?.name || 'Cliente não encontrado';
+        document.getElementById('detail-patient-name').textContent = order.patient_name || 'N/A';
+        document.getElementById('detail-created-at').textContent = order.created_at ? new Date(order.created_at).toLocaleDateString() : '-';
+        document.getElementById('detail-due-date').textContent = order.due_date ? new Date(order.due_date).toLocaleDateString() : 'Não definida';
+
+        // Descrição
+        document.getElementById('detail-work-description').textContent = order.work_description || 'Sem descrição';
+        document.getElementById('detail-work-type').textContent = order.work_type || 'Tipo não especificado';
+
+        // 2. Cálculos de Custo
+        const materialsCost = (order.materials || []).reduce((sum, m) => {
+            const qtd = parseFloat(m.used_quantity || 0);
+            const cost = parseFloat(m.unit_cost || 0);
+            return sum + (qtd * cost);
+        }, 0);
+
+        // Se houver technician_id e hourly_rate no time_tracking, calcular
+        const laborCost = (order.time_tracking || []).reduce((sum, t) => {
+            // Lógica simplificada: se tiver duração (duration_minutes) e hourly_rate
+            if (t.duration_minutes) {
+                return sum + ((t.duration_minutes / 60) * (parseFloat(t.hourly_rate) || 0));
+            }
+            return sum;
+        }, 0);
+
+        const totalCalculated = materialsCost + laborCost;
+
+        // Prioridade: final_price > total_cost (do banco) > calculado
+        const displayCost = order.final_price
+            ? parseFloat(order.final_price)
+            : (order.total_cost ? parseFloat(order.total_cost) : totalCalculated);
+
+        console.log('💰 Custo:', {
+            materials: materialsCost,
+            labor: laborCost,
+            totalCalculated: totalCalculated,
+            finalPrice: order.final_price,
+            display: displayCost
+        });
+
+        const totalCostEl = document.getElementById('detail-total-cost');
+        if (totalCostEl) totalCostEl.textContent = this.formatCurrency(displayCost);
+
+        const finalPriceEl = document.getElementById('detail-final-price');
+        if (finalPriceEl) finalPriceEl.textContent = this.formatCurrency(order.final_price || 0);
+
+        // 3. Renderizar Listas (Materiais, etc)
         // Ações Rápidas dentro do Modal
         this.renderModalQuickActions(order);
 
         // Materiais
         this.renderOrderMaterials(order.materials || []);
 
-        // Time tracking - passar order completo para calcular tempo em produção
+        // Time tracking
         this.renderOrderTimeTracking(order.time_tracking || [], order.history || [], order.status);
 
-        // Reparos vinculados
-        this.renderOrderRepairs(order);
+        // Reparos vinculados (se existir método)
+        if (typeof this.renderOrderRepairs === 'function') {
+            this.renderOrderRepairs(order);
+        }
 
         // Anexos
         this.renderAttachments(order.attachments || []);
@@ -967,46 +1051,60 @@ class ProstoralOrdersApp {
         this.renderOrderHistory(order.history || []);
     }
 
+
     renderOrderMaterials(materials) {
         const container = document.getElementById('order-materials-list');
         if (!container) return;
 
         if (materials.length === 0) {
-            container.innerHTML = '<p class="text-gray-500 text-sm">Nenhum material adicionado</p>';
+            container.innerHTML = '<div class="text-center p-4 text-gray-500">Nenhum material adicionado</div>';
             return;
         }
 
+        const rows = materials.map(m => `
+            <tr>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
+                    ${this.escapeHtml(m.produto?.nome_material || m.inventory_item?.name || 'Material não identificado')}
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                    ${m.used_quantity} ${m.unit || ''}
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                    ${this.formatCurrency(m.unit_cost || 0)}
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
+                    ${this.formatCurrency(m.total_cost || ((m.unit_cost || 0) * (m.used_quantity || 0)))}
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                    ${m.from_kit_id ? '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">Kit</span>' : '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300">Manual</span>'}
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                    <button onclick="window.ordersModule.removeMaterial('${m.id}')" 
+                            class="text-red-600 hover:text-red-900 dark:hover:text-red-400 transition-colors" title="Remover">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </td>
+            </tr>
+        `).join('');
+
         container.innerHTML = `
-            <table class="min-w-full divide-y divide-gray-200">
-                <thead class="bg-gray-50">
-                    <tr>
-                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Material</th>
-                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Quantidade</th>
-                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Custo Unit.</th>
-                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Total</th>
-                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Origem</th>
-                        <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Ação</th>
-                    </tr>
-                </thead>
-                <tbody class="bg-white divide-y divide-gray-200">
-                    ${materials.map(m => `
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                    <thead class="bg-gray-50 dark:bg-gray-800">
                         <tr>
-                            <td class="px-4 py-2 text-sm">${this.escapeHtml(m.produto?.nome_material || m.inventory_item?.name || 'Material não identificado')}</td>
-                            <td class="px-4 py-2 text-sm">${m.used_quantity} ${m.unit || ''}</td>
-                            <td class="px-4 py-2 text-sm">${this.formatCurrency(m.unit_cost || 0)}</td>
-                            <td class="px-4 py-2 text-sm font-medium">${this.formatCurrency(m.total_cost || 0)}</td>
-                            <td class="px-4 py-2 text-sm">
-                                ${m.from_kit_id ? `<span class="text-blue-600"><i class="fas fa-box"></i> Kit</span>` : '<span class="text-gray-600">Manual</span>'}
-                            </td>
-                            <td class="px-4 py-2 text-right">
-                                <button data-action="remove-material" data-material-id="${m.id}" class="btn-remove-material text-red-600 hover:text-red-900 text-sm" title="Remover">
-                                    <i class="fas fa-trash"></i>
-                                </button>
-                            </td>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Material</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Qtd</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Custo Un.</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Total</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Origem</th>
+                            <th scope="col" class="relative px-6 py-3"><span class="sr-only">Ações</span></th>
                         </tr>
-                    `).join('')}
-                </tbody>
-            </table>
+                    </thead>
+                    <tbody class="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-800">
+                        ${rows}
+                    </tbody>
+                </table>
+            </div>
         `;
     }
 
