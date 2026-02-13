@@ -23,6 +23,10 @@ const employeesTemplate = `
                 <i class="fas fa-plus"></i>
                 Novo Funcionário
             </button>
+            <button onclick="exportEmployeesCSV()" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2" title="Exportar para Excel/CSV">
+                <i class="fas fa-file-csv"></i>
+                Exportar
+            </button>
         </div>
 
         <!-- Table -->
@@ -560,6 +564,105 @@ window.loadEmployees = async function () {
     }
 
     await loadEmployeesList();
+};
+
+// Export to CSV
+window.exportEmployeesCSV = async function () {
+    if (!confirm('Deseja exportar a lista completa de funcionários para CSV?')) return;
+
+    window.showLoading();
+    try {
+        const response = await window.authenticatedFetch('/api/rh/employees/export');
+        if (!response.ok) throw new Error('Erro ao gerar exportação');
+
+        const data = await response.json();
+
+        if (!data || data.length === 0) {
+            alert('Não há dados para exportar.');
+            return;
+        }
+
+        // Generate CSV content
+        const headers = {
+            id: 'ID',
+            status: 'Status',
+            name: 'Nome',
+            email: 'Email (Login)',
+            nif: 'NIF',
+            birth_date: 'Data Nascimento',
+            nationality: 'Nacionalidade',
+            marital_status: 'Estado Civil',
+            id_document_type: 'Tipo Doc.',
+            id_document_number: 'Num. Doc.',
+            niss: 'NISS',
+            personal_email: 'Email Pessoal',
+            mobile: 'Telemóvel',
+            address: 'Morada',
+            department: 'Departamento',
+            role: 'Cargo',
+            professional_category: 'Categoria Prof.',
+            employee_number: 'Num. Mecanográfico',
+            contract_type: 'Tipo Contrato',
+            hire_date: 'Data Admissão',
+            work_schedule: 'Horário',
+            work_location: 'Local Trabalho',
+            supervisor: 'Supervisor Direto',
+            corporate_email: 'Email Corporativo',
+            uniform_size: 'Tamanho Uniforme',
+            has_access_card: 'Cartão Acesso',
+            has_keys: 'Chaves',
+            linked_client: 'Cliente Vinculado',
+            iban: 'IBAN',
+            bank_name: 'Banco',
+            salary_currency: 'Moeda Salário',
+            base_salary: 'Salário Base',
+            variable_compensation: 'Rem. Variável',
+            meal_allowance: 'Sub. Alimentação',
+            allowances: 'Outros Subsídios',
+            transport_allowance: 'Sub. Transporte',
+            tax_dependents: 'Dependentes IRS',
+            tax_withholding_option: 'Opção Retenção',
+            bank_country: 'País Banco',
+            bank_agency: 'Agência',
+            bank_account_number: 'Conta',
+            pix_key: 'Chave PIX',
+            emergency_contacts: 'Contatos Emergência',
+            doc_cc: 'Doc. (CC/Passaporte)',
+            doc_address: 'Doc. (Morada)',
+            doc_iban: 'Doc. (IBAN)',
+            doc_nif: 'Doc. (NIF)',
+            doc_niss: 'Doc. (NISS)',
+            notes: 'Notas'
+        };
+
+        const csvContent = [
+            Object.values(headers).join(';'), // Header Row
+            ...data.map(row =>
+                Object.keys(headers).map(key => {
+                    let val = row[key];
+                    if (val === null || val === undefined) val = '';
+                    val = String(val).replace(/"/g, '""'); // Escape quotes
+                    return `"${val}"`; // Wrap in quotes
+                }).join(';')
+            )
+        ].join('\n');
+
+        // Create Blob and Download
+        const blob = new Blob(["\ufeff" + csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.setAttribute("href", url);
+        link.setAttribute("download", `funcionarios_export_${new Date().toISOString().split('T')[0]}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+
+    } catch (error) {
+        console.error('Erro na exportação:', error);
+        alert('Erro ao exportar dados.');
+    } finally {
+        window.hideLoading();
+    }
 };
 
 // Load List

@@ -78,6 +78,148 @@ router.get('/', requirePermission('HR', 'read_own'), async (req, res) => {
 
 
 
+
+// GET /export - Exportar todos os funcionários (CSV friendly data)
+router.get('/export', requirePermission('HR', 'read'), async (req, res) => {
+    try {
+        console.log('[RH] Exporting employees...');
+
+        // 1. Fetch Employees
+        const { data: employees, error: empError } = await supabase
+            .from('rh_employees')
+            .select('*')
+            .order('name');
+
+        if (empError) throw empError;
+
+        // 2. Fetch Related Data (Payroll, Emergency Contacts, Modules, Clients, Documents)
+        // We fetch all and map in memory to avoid N+1 queries
+
+        const { data: payrolls } = await supabase.from('rh_payroll_data').select('*');
+        const { data: contacts } = await supabase.from('rh_emergency_contacts').select('*');
+        const { data: clients } = await supabase.from('prostoral_clients').select('id, name, user_id');
+        const { data: documents } = await supabase.from('rh_documents').select('employee_id, document_type');
+
+        // Map for quick lookup
+        const payrollMap = new Map(payrolls?.map(p => [p.employee_id, p]) || []);
+        const contactsMap = new Map(); // employee_id -> [contacts]
+        (contacts || []).forEach(c => {
+            if (!contactsMap.has(c.employee_id)) contactsMap.set(c.employee_id, []);
+            contactsMap.get(c.employee_id).push(c);
+        });
+
+        // Create user_id -> client_name map
+        const clientMap = new Map(clients?.filter(c => c.user_id).map(c => [c.user_id, c.name]) || []);
+
+        // Create employee_id -> documents map (set of types)
+        const documentsMap = new Map(); // employee_id -> Set(document_types)
+        (documents || []).forEach(d => {
+            if (!documentsMap.has(d.employee_id)) documentsMap.set(d.employee_id, new Set());
+            documentsMap.get(d.employee_id).add(d.document_type);
+        });
+
+        // Create ID -> Name map for supervisors
+        const employeeNameMap = new Map(employees.map(e => [e.id, e.name]));
+
+        // 3. Merge Data
+        const exportData = employees.map(emp => {
+            const payroll = payrollMap.get(emp.id) || {};
+            const empContacts = contactsMap.get(emp.id) || [];
+            const linkedClient = emp.user_id ? clientMap.get(emp.user_id) : '';
+            const empDocs = documentsMap.get(emp.id) || new Set();
+
+            // Supervisor Name
+            const supervisorName = emp.supervisor_id ? employeeNameMap.get(emp.supervisor_id) : '';
+
+            // Format contacts as string
+            const contactsString = empContacts.map(c =>
+                `${c.name} (${c.relationship}): ${c.phone}${c.is_primary ? ' [Principal]' : ''}`
+            ).join(' | ');
+
+            // Checklist Status
+            const hasCC = empDocs.has('Identificação') || empDocs.has('CC') ? 'Sim' : 'Não';
+            const hasAddress = empDocs.has('Comprovativo de Morada') ? 'Sim' : 'Não';
+            const hasIBAN = empDocs.has('Comprovativo de IBAN') ? 'Sim' : 'Não';
+            const hasNIF = empDocs.has('NIF') ? 'Sim' : 'Não';
+            const hasNISS = empDocs.has('NISS') ? 'Sim' : 'Não';
+
+            return {
+                // ID & Status
+                id: emp.id,
+                status: emp.status,
+
+                // Personal
+                name: emp.name,
+                email: emp.email,
+                nif: emp.nif,
+                birth_date: emp.birth_date,
+                nationality: emp.nationality,
+                marital_status: emp.marital_status,
+                id_document_type: emp.id_document_type,
+                id_document_number: emp.id_document_number,
+                niss: emp.niss,
+                personal_email: emp.personal_email,
+                mobile: emp.mobile,
+                address: emp.address,
+
+                // Professional
+                department: emp.department,
+                role: emp.role,
+                professional_category: emp.professional_category,
+                employee_number: emp.employee_number,
+                contract_type: emp.contract_type,
+                hire_date: emp.hire_date,
+                work_schedule: emp.work_schedule,
+                work_location: emp.work_location,
+                supervisor: supervisorName, // Added
+
+                // Corporate
+                corporate_email: emp.corporate_email,
+                uniform_size: emp.uniform_size,
+                has_access_card: emp.has_access_card ? 'Sim' : 'Não',
+                has_keys: emp.has_keys ? 'Sim' : 'Não',
+                linked_client: linkedClient,
+
+                // Financial (Payroll)
+                iban: payroll.iban,
+                bank_name: payroll.bank_name,
+                salary_currency: payroll.salary_currency || 'EUR',
+                base_salary: payroll.base_salary,
+                variable_compensation: payroll.variable_compensation,
+                meal_allowance: payroll.meal_allowance,
+                allowances: payroll.allowances,
+                transport_allowance: payroll.transport_allowance,
+                tax_dependents: payroll.tax_dependents,
+                tax_withholding_option: payroll.tax_withholding_option,
+
+                // Banking (International/Pix)
+                bank_country: payroll.bank_country,
+                bank_agency: payroll.bank_agency,
+                bank_account_number: payroll.bank_account_number,
+                pix_key: payroll.pix_key,
+
+                // Emergency
+                emergency_contacts: contactsString,
+
+                // Documents Checklist
+                doc_cc: hasCC,
+                doc_address: hasAddress,
+                doc_iban: hasIBAN,
+                doc_nif: hasNIF,
+                doc_niss: hasNISS,
+
+                notes: emp.notes
+            };
+        });
+
+        res.json(exportData);
+
+    } catch (error) {
+        console.error('Erro ao exportar funcionários:', error);
+        res.status(500).json({ error: 'Erro interno ao exportar dados' });
+    }
+});
+
 // GET /:id - Detalhes do funcionário
 router.get('/:id', async (req, res) => {
     try {
