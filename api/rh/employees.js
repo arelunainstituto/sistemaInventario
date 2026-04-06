@@ -8,6 +8,112 @@ const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY; // Usar Service Role para operações administrativas
 const supabase = createClient(supabaseUrl, supabaseKey);
 
+/**
+ * Helper: Garante que um employee tenha uma conta Auth + public.users + user_profiles.
+ * Chamado quando o admin configura senha/módulos para um employee sem user_id.
+ * @param {string} email - Email do employee
+ * @param {string} name - Nome completo do employee
+ * @param {string} password - Senha inicial (obrigatória se criando novo usuário)
+ * @param {string} creatorUserId - user_id de quem está executando a ação (para pegar tenant_id)
+ * @returns {string|null} - userId criado/encontrado, ou null em caso de falha
+ */
+async function ensureAuthUserAndProfile(email, name, password, creatorUserId) {
+    try {
+        let userId = null;
+
+        // 1. Tentar criar usuário Auth
+        const { data: newAuthUser, error: createAuthErr } = await supabase.auth.admin.createUser({
+            email: email,
+            password: password || 'Mudar@' + Math.random().toString(36).slice(2, 10),
+            email_confirm: true,
+            user_metadata: { full_name: name }
+        });
+
+        if (createAuthErr) {
+            if (createAuthErr.code === 'email_exists') {
+                // Usuário já existe no Auth — obter seu ID via generateLink
+                console.log(`[RH] Auth user já existe para ${email}, obtendo ID via generateLink...`);
+                const { data: linkData, error: linkErr } = await supabase.auth.admin.generateLink({
+                    type: 'magiclink',
+                    email: email,
+                });
+                if (linkErr || !linkData?.user?.id) {
+                    console.error('[RH] Falha ao obter user_id via generateLink:', linkErr?.message);
+                    return null;
+                }
+                userId = linkData.user.id;
+                console.log(`[RH] user_id obtido via generateLink: ${userId}`);
+
+                // Se foi fornecida nova senha, atualizar
+                if (password) {
+                    await supabase.auth.admin.updateUserById(userId, { password, email_confirm: true });
+                }
+            } else {
+                console.error('[RH] Erro ao criar Auth user:', createAuthErr.message);
+                return null;
+            }
+        } else {
+            userId = newAuthUser.user.id;
+            console.log(`[RH] Novo Auth user criado para ${email}: ${userId}`);
+        }
+
+        // 2. Garantir entrada em public.users (referenciada por FK de user_profiles)
+        const { data: existPublicUser } = await supabase
+            .from('users')
+            .select('id')
+            .eq('id', userId)
+            .maybeSingle();
+
+        if (!existPublicUser) {
+            const { error: pubUserErr } = await supabase.from('users').insert([{
+                id: userId,
+                name: name,
+                email: email
+            }]);
+            if (pubUserErr) console.error('[RH] Erro ao criar public.users:', pubUserErr.message);
+            else console.log(`[RH] Inserido em public.users: ${userId}`);
+        }
+
+        // 3. Obter tenant_id do criador
+        const { data: creatorProfile } = await supabase
+            .from('user_profiles')
+            .select('tenant_id')
+            .eq('user_id', creatorUserId)
+            .maybeSingle();
+        const tenantId = creatorProfile?.tenant_id || null;
+
+        // 4. Criar user_profiles se não existir
+        const { data: existProfile } = await supabase
+            .from('user_profiles')
+            .select('user_id')
+            .eq('user_id', userId)
+            .maybeSingle();
+
+        if (!existProfile) {
+            if (!tenantId) {
+                console.error('[RH] tenant_id não encontrado para criador. Não é possível criar user_profiles sem tenant_id.');
+            } else {
+                const { error: profileErr } = await supabase.from('user_profiles').insert([{
+                    user_id: userId,
+                    display_name: name,
+                    first_name: name.split(' ')[0],
+                    tenant_id: tenantId,
+                    is_active: true
+                }]);
+                if (profileErr) console.error('[RH] Erro ao criar user_profiles:', profileErr.message);
+                else console.log(`[RH] user_profiles criado para ${userId}`);
+            }
+        } else {
+            console.log(`[RH] user_profiles já existia para ${userId}`);
+        }
+
+        return userId;
+    } catch (err) {
+        console.error('[RH] Erro inesperado em ensureAuthUserAndProfile:', err.message);
+        return null;
+    }
+}
+
 // GET /clients - Listar todos os clientes disponíveis para vinculação
 router.get('/clients', requirePermission('HR', 'read'), async (req, res) => {
     console.log('[RH] GET /clients endpoint hit');
@@ -356,36 +462,14 @@ router.post('/', requirePermission('HR', 'create'), async (req, res) => {
             return res.status(400).json({ error: 'Campos obrigatórios: Nome, Email, NIF' });
         }
 
-        // 1. Verificar/Criar Usuário no Supabase Auth
-        let userId = null;
+        // 1. Verificar/Criar Usuário no Supabase Auth + public.users + user_profiles
+        // Usa o helper ensureAuthUserAndProfile para lidar com casos onde o usuário já existe
+        const userId = await ensureAuthUserAndProfile(email, name, password || 'Mudar123!', req.user.id);
 
-        // Verificar se usuário já existe
-        const { data: existingUsers, error: searchError } = await supabase.auth.admin.listUsers();
-        const existingUser = existingUsers?.users.find(u => u.email === email);
-
-        if (existingUser) {
-            userId = existingUser.id;
-            console.log(`[RH] Usuário existente encontrado para ${email}: ${userId}`);
-        } else {
-            // Criar novo usuário
-            const { data: newUser, error: createError } = await supabase.auth.admin.createUser({
-                email: email,
-                password: password || 'Mudar123!', // Use provided password or default
-                email_confirm: true,
-                user_metadata: {
-                    full_name: name,
-                    department: department
-                }
-            });
-
-            if (createError) {
-                console.error('Erro ao criar usuário Auth:', createError);
-                return res.status(400).json({ error: 'Erro ao criar conta de usuário', details: createError.message });
-            }
-
-            userId = newUser.user.id;
-            console.log(`[RH] Novo usuário criado para ${email}: ${userId}`);
+        if (!userId) {
+            return res.status(400).json({ error: 'Erro ao criar conta de usuário. Verifique o email e tente novamente.' });
         }
+        console.log(`[RH] userId obtido para ${email}: ${userId}`);
 
         // 2. Criar funcionário na tabela rh_employees
         const { data: employee, error: empError } = await supabase
@@ -644,11 +728,59 @@ router.put('/:id', requirePermission('HR', 'update'), async (req, res) => {
         // Buscar dados atuais do funcionário
         const { data: currentEmployee, error: fetchError } = await supabase
             .from('rh_employees')
-            .select('salary_base, user_id')
+            .select('salary_base, user_id, email, name')
             .eq('id', id)
             .single();
 
         if (fetchError) throw fetchError;
+
+        // =====================================================================
+        // CORREÇÃO CRÍTICA: Se o employee não tem user_id mas admin está
+        // definindo senha ou módulos, criar a conta Auth + profile agora.
+        // =====================================================================
+        const wantsAccess = (password && password.length >= 6) ||
+                            (modules && Array.isArray(modules) && modules.length > 0);
+
+        if (wantsAccess && !currentEmployee.user_id) {
+            const employeeEmail = req.body.email || req.body.corporate_email || currentEmployee.email;
+            const employeeName = req.body.name || currentEmployee.name;
+
+            console.log(`[RH] Employee ${id} não tem user_id. Criando conta Auth para ${employeeEmail}...`);
+            const newUserId = await ensureAuthUserAndProfile(employeeEmail, employeeName, password, req.user.id);
+
+            if (newUserId) {
+                // Salvar user_id no employee
+                await supabase.from('rh_employees').update({ user_id: newUserId }).eq('id', id);
+                currentEmployee.user_id = newUserId;
+                console.log(`[RH] user_id ${newUserId} vinculado ao employee ${id}`);
+
+                // Atribuir role padrão
+                try {
+                    const { data: empRole } = await supabase.from('roles').select('id').eq('name', 'employee').single();
+                    const { data: creatorProfile } = await supabase
+                        .from('user_profiles').select('tenant_id').eq('user_id', req.user.id).maybeSingle();
+                    const tenantId = creatorProfile?.tenant_id;
+
+                    if (empRole && tenantId) {
+                        const { data: existRole } = await supabase
+                            .from('user_roles').select('id').eq('user_id', newUserId).maybeSingle();
+                        if (!existRole) {
+                            await supabase.from('user_roles').insert([{
+                                user_id: newUserId,
+                                role_id: empRole.id,
+                                tenant_id: tenantId,
+                                is_active: true
+                            }]);
+                            console.log(`[RH] Role 'employee' atribuída ao novo user ${newUserId}`);
+                        }
+                    }
+                } catch (roleErr) {
+                    console.error('[RH] Erro ao atribuir role padrão:', roleErr.message);
+                }
+            } else {
+                console.error(`[RH] Falha ao criar conta Auth para employee ${id}. Módulos e senha não serão salvos.`);
+            }
+        }
 
         // Atualizar dados do funcionário (exceto salary_base)
         // Atualizar dados do funcionário (exceto salary_base)
