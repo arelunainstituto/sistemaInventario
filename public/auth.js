@@ -346,7 +346,8 @@ class AuthManager {
                 return false;
             }
 
-            const { data, error } = await this.supabase
+            // Check roles and role_permissions
+            const { data: roleData, error: roleError } = await this.supabase
                 .from('user_roles')
                 .select(`
                     roles!inner(
@@ -361,25 +362,40 @@ class AuthManager {
                 .eq('user_id', this.currentUser.id)
                 .eq('is_active', true);
 
-            if (error) {
-                console.error('Erro ao verificar permissões:', error);
-                return false;
-            }
+            if (!roleError && roleData) {
+                // Verificar se o usuário tem a permissão específica ou é admin
+                for (const userRole of roleData) {
+                    const role = userRole.roles;
 
-            // Verificar se o usuário tem a permissão específica ou é admin
-            for (const userRole of data) {
-                const role = userRole.roles;
-
-                // Admin tem acesso total
-                if (role.name === 'admin') {
-                    return true;
-                }
-
-                // Verificar permissões específicas
-                for (const rolePermission of role.role_permissions) {
-                    if (rolePermission.permissions.name === permissionName) {
+                    // Admin tem acesso total
+                    if (role.name === 'admin') {
                         return true;
                     }
+
+                    // Verificar permissões específicas
+                    for (const rolePermission of role.role_permissions) {
+                        if (rolePermission.permissions.name === permissionName) {
+                            return true;
+                        }
+                    }
+                }
+            }
+
+            // Se for uma permissão de leitura de módulo (ex: "marketing:read"), verificar acesso direto ao módulo
+            if (permissionName.endsWith(':read')) {
+                const moduleCode = permissionName.split(':')[0];
+                
+                const { data: moduleData, error: moduleError } = await this.supabase
+                    .from('user_module_access')
+                    .select(`
+                        modules!inner(code)
+                    `)
+                    .eq('user_id', this.currentUser.id)
+                    .eq('is_active', true)
+                    .eq('modules.code', moduleCode);
+                    
+                if (!moduleError && moduleData && moduleData.length > 0) {
+                    return true;
                 }
             }
 

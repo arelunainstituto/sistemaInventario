@@ -209,7 +209,7 @@ function requirePermission(module, action) {
         }
 
         // BYPASS: Admins always have access
-        if (req.user.roles && req.user.roles.includes('Admin')) {
+        if (req.user.roles && req.user.roles.some(role => role.toLowerCase() === 'admin')) {
             console.log('✅ [PERMISSION] Admin bypass - Access granted');
             return next();
         }
