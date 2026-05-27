@@ -46,7 +46,7 @@ async function uploadImageToStorage(file) {
 }
 
 // GET / - List all posts
-router.get('/', requireRole(['Marketing', 'Admin']), async (req, res) => {
+router.get('/', requireRole(['Marketing', 'Admin', 'admin', 'employee']), async (req, res) => {
     try {
         const { status, limit = 50, page = 1 } = req.query;
         const offset = (page - 1) * limit;
@@ -138,7 +138,7 @@ router.get('/', requireRole(['Marketing', 'Admin']), async (req, res) => {
 });
 
 // GET /:id - Get single post
-router.get('/:id', requireRole(['Marketing', 'Admin']), async (req, res) => {
+router.get('/:id', requireRole(['Marketing', 'Admin', 'admin', 'employee']), async (req, res) => {
     try {
         const { id } = req.params;
 
@@ -191,7 +191,7 @@ router.get('/:id', requireRole(['Marketing', 'Admin']), async (req, res) => {
 });
 
 // POST / - Create post
-router.post('/', requireRole(['Marketing', 'Admin']), upload.single('image'), async (req, res) => {
+router.post('/', requireRole(['Marketing', 'Admin', 'admin', 'employee']), upload.single('image'), async (req, res) => {
     try {
         let { title, content, excerpt, status = 'draft', tags = '[]', image_url, author_id, custom_author } = req.body;
 
@@ -250,7 +250,7 @@ router.post('/', requireRole(['Marketing', 'Admin']), upload.single('image'), as
 });
 
 // PUT /:id - Update post
-router.put('/:id', requireRole(['Marketing', 'Admin']), upload.single('image'), async (req, res) => {
+router.put('/:id', requireRole(['Marketing', 'Admin', 'admin', 'employee']), upload.single('image'), async (req, res) => {
     try {
         const { id } = req.params;
         let { title, content, excerpt, status, tags, image_url, author_id, custom_author } = req.body;
@@ -322,7 +322,7 @@ router.put('/:id', requireRole(['Marketing', 'Admin']), upload.single('image'), 
 });
 
 // DELETE /:id - Delete post
-router.delete('/:id', requireRole(['Marketing', 'Admin']), async (req, res) => {
+router.delete('/:id', requireRole(['Marketing', 'Admin', 'admin', 'employee']), async (req, res) => {
     try {
         const { id } = req.params;
 
