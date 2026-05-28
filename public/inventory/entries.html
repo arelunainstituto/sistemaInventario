@@ -72,12 +72,20 @@ document.getElementById('pageContent').innerHTML = `
 let items = [], locations = [], suppliers = [];
 
 async function bootstrap() {
-    const [it, lo, su] = await Promise.all([
-        apiCall('/api/inventory/items?limit=1000'),
-        apiCall('/api/inventory/locations'),
-        apiCall('/api/inventory/suppliers')
-    ]);
-    items = it.data; locations = lo.data; suppliers = su.data;
+    try {
+        const [it, lo, su] = await Promise.all([
+            apiCall('/api/inventory/items?limit=1000'),
+            apiCall('/api/inventory/locations'),
+            apiCall('/api/inventory/suppliers')
+        ]);
+        items = it.data || []; locations = lo.data || []; suppliers = su.data || [];
+        if (!items.length)     toast('Nenhum item cadastrado — crie um em Itens', 'warn');
+        if (!suppliers.length) toast('Nenhum fornecedor cadastrado', 'warn');
+        if (!locations.length) toast('Nenhuma localização cadastrada — crie sublocais em Localizações', 'warn');
+    } catch (err) {
+        toast('Falha ao carregar dados: ' + err.message, 'error');
+        console.error('Bootstrap error:', err);
+    }
 }
 
 async function load() {

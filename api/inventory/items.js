@@ -15,12 +15,15 @@ const upload = multer({
     limits: { fileSize: 8 * 1024 * 1024 }
 });
 
+// Hint explícito de FK é necessário porque inv_items tem 3 FKs para
+// inv_units_of_measure (base/purchase/consumption). Sem o "!fk_column"
+// o PostgREST falha ao tentar resolver a relação.
 const ITEM_SELECT = `
     *,
-    subcategory:inv_categories(id, parent_macro, name),
-    base_uom:base_uom_id(id, code, name),
-    purchase_uom:purchase_uom_id(id, code, name),
-    consumption_uom:consumption_uom_id(id, code, name)
+    subcategory:inv_categories!subcategory_id(id, parent_macro, name),
+    base_uom:inv_units_of_measure!base_uom_id(id, code, name),
+    purchase_uom:inv_units_of_measure!purchase_uom_id(id, code, name),
+    consumption_uom:inv_units_of_measure!consumption_uom_id(id, code, name)
 `;
 
 // Validação de payload por macro_category
