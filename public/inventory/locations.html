@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Inventário · Localizações</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/styles.css">
+    <script>if (!localStorage.getItem('access_token')) window.location.href = '/login.html';</script>
+</head>
+<body class="bg-gray-50" style="font-family: 'Inter', sans-serif;">
+<div id="layoutRoot"></div>
+<script src="_layout.js"></script>
+<script>
+const LOC_TYPES = [
+    ['gabinete','Gabinete'],['area_operacional','Área operacional'],
+    ['armazem','Armazém'],['laboratorio','Laboratório'],
+    ['dispensa','Dispensa'],['outro','Outro']
+];
+
+renderInventoryLayout({ activePage: 'locations', title: 'Localizações', subtitle: 'Unidades (Marquês / Cristal / ProStoral) e sublocais' });
+
+document.getElementById('pageContent').innerHTML = `
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <section class="bg-white rounded-lg shadow p-6">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="font-bold text-gray-800"><i class="fas fa-building text-blue-600"></i> Unidades</h3>
+                <button id="btnNewUnit" class="text-sm bg-blue-600 text-white px-3 py-1.5 rounded-lg"><i class="fas fa-plus"></i></button>
+            </div>
+            <ul id="unitsList" class="divide-y divide-gray-100"></ul>
+        </section>
+        <section class="bg-white rounded-lg shadow p-6 lg:col-span-2">
+            <div class="flex justify-between items-center mb-4">
+                <div>
+                    <h3 class="font-bold text-gray-800"><i class="fas fa-map-marker-alt text-blue-600"></i> Sublocais</h3>
+                    <p class="text-xs text-gray-500" id="selectedUnitLabel">Selecione uma unidade ao lado</p>
+                </div>
+                <button id="btnNewLoc" disabled class="text-sm bg-blue-600 text-white px-3 py-1.5 rounded-lg opacity-50"><i class="fas fa-plus"></i> Novo sublocal</button>
+            </div>
+            <table class="w-full text-sm">
+                <thead class="bg-gray-50 text-xs uppercase text-gray-600">
+                    <tr><th class="text-left p-2">Nome</th><th class="text-left p-2">Tipo</th><th class="text-center p-2">Recebe</th><th class="text-center p-2">Envia</th><th class="text-center p-2">Estado</th><th class="p-2"></th></tr>
+                </thead>
+                <tbody id="locsTbody"><tr><td colspan="6" class="p-6 text-center text-gray-400">—</td></tr></tbody>
+            </table>
+        </section>
+    </div>
+
+    <div id="modal" class="hidden fixed inset-0 bg-black/40 z-50 flex items-center justify-center">
+        <div class="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
+            <div class="flex justify-between items-center p-4 border-b">
+                <h3 id="modalTitle" class="font-bold text-gray-800">—</h3>
+                <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600"><i class="fas fa-times"></i></button>
+            </div>
+            <form id="modalForm" class="p-6 space-y-4"></form>
+        </div>
+    </div>
+`;
+
+let units = [], locs = [], currentUnit = null;
+
+async function loadUnits() {
+    const r = await apiCall('/api/inventory/units?include_inactive=1');
+    units = r.data;
+    document.getElementById('unitsList').innerHTML = units.map(u => `
+        <li class="flex justify-between items-center py-2 cursor-pointer hover:bg-gray-50 px-2 rounded ${currentUnit?.id === u.id ? 'bg-blue-50' : ''}"
+            onclick='selectUnit(${JSON.stringify(u)})'>
+            <div>
+                <p class="font-medium text-gray-800">${escapeHtml(u.name)}</p>
+                <p class="text-xs text-gray-500">${escapeHtml(u.code)}</p>
+            </div>
+            <button onclick='event.stopPropagation(); openUnitForm(${JSON.stringify(u)})' class="text-gray-400 hover:text-blue-600"><i class="fas fa-edit"></i></button>
+        </li>`).join('') || '<li class="text-sm text-gray-400 p-4">Nenhuma unidade.</li>';
+}
+
+async function selectUnit(u) {
+    currentUnit = u;
+    document.getElementById('selectedUnitLabel').textContent = `Sublocais de: ${u.name}`;
+    document.getElementById('btnNewLoc').disabled = false;
+    document.getElementById('btnNewLoc').classList.remove('opacity-50');
+    await loadUnits();
+    const r = await apiCall(`/api/inventory/locations?unit_id=${u.id}&include_inactive=1`);
+    locs = r.data;
+    document.getElementById('locsTbody').innerHTML = locs.map(l => `
+        <tr class="border-t border-gray-100">
+            <td class="p-2 font-medium">${escapeHtml(l.name)}</td>
+            <td class="p-2 text-xs text-gray-600">${escapeHtml((LOC_TYPES.find(t=>t[0]===l.type)||['',l.type])[1])}</td>
+            <td class="p-2 text-center">${l.can_receive ? '✓' : '—'}</td>
+            <td class="p-2 text-center">${l.can_send ? '✓' : '—'}</td>
+            <td class="p-2 text-center">${l.is_active ? '<span class="text-green-600">●</span>' : '<span class="text-gray-300">●</span>'}</td>
+            <td class="p-2 text-right"><button onclick='openLocForm(${JSON.stringify(l)})' class="text-blue-600 hover:text-blue-800"><i class="fas fa-edit"></i></button></td>
+        </tr>`).join('') || '<tr><td colspan="6" class="p-6 text-center text-gray-400">Sem sublocais.</td></tr>';
+}
+
+document.getElementById('btnNewUnit').onclick = () => openUnitForm(null);
+document.getElementById('btnNewLoc').onclick = () => openLocForm(null);
+
+function openUnitForm(unit) {
+    document.getElementById('modalTitle').textContent = unit ? 'Editar Unidade' : 'Nova Unidade';
+    document.getElementById('modalForm').innerHTML = `
+        <div><label class="text-xs text-gray-500">Código *</label><input name="code" required ${unit ? 'readonly' : ''} value="${unit?.code || ''}" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"></div>
+        <div><label class="text-xs text-gray-500">Nome *</label><input name="name" required value="${unit?.name || ''}" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"></div>
+        <label class="flex items-center gap-2 text-sm"><input type="checkbox" name="is_active" ${(!unit || unit.is_active) ? 'checked' : ''}> Ativa</label>
+        <button type="submit" class="w-full bg-blue-600 text-white py-2 rounded-lg">Salvar</button>`;
+    document.getElementById('modalForm').onsubmit = async e => {
+        e.preventDefault();
+        const fd = Object.fromEntries(new FormData(e.target));
+        fd.is_active = !!fd.is_active;
+        try {
+            if (unit) await apiCall(`/api/inventory/units/${unit.id}`, { method:'PUT', body: JSON.stringify(fd) });
+            else      await apiCall('/api/inventory/units', { method:'POST', body: JSON.stringify(fd) });
+            closeModal(); toast('Unidade salva'); loadUnits();
+        } catch (err) { toast(err.message, 'error'); }
+    };
+    document.getElementById('modal').classList.remove('hidden');
+}
+
+function openLocForm(loc) {
+    if (!currentUnit) return;
+    document.getElementById('modalTitle').textContent = loc ? 'Editar Sublocal' : 'Novo Sublocal';
+    document.getElementById('modalForm').innerHTML = `
+        <div><label class="text-xs text-gray-500">Nome *</label><input name="name" required value="${loc?.name || ''}" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"></div>
+        <div><label class="text-xs text-gray-500">Tipo *</label>
+            <select name="type" required class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                ${LOC_TYPES.map(([v,l]) => `<option value="${v}" ${loc?.type===v?'selected':''}>${l}</option>`).join('')}
+            </select>
+        </div>
+        <div class="flex gap-4 text-sm">
+            <label><input type="checkbox" name="can_receive" ${(!loc || loc.can_receive)?'checked':''}> Pode receber</label>
+            <label><input type="checkbox" name="can_send" ${(!loc || loc.can_send)?'checked':''}> Pode enviar</label>
+            <label><input type="checkbox" name="is_active" ${(!loc || loc.is_active)?'checked':''}> Ativa</label>
+        </div>
+        <button type="submit" class="w-full bg-blue-600 text-white py-2 rounded-lg">Salvar</button>`;
+    document.getElementById('modalForm').onsubmit = async e => {
+        e.preventDefault();
+        const fd = Object.fromEntries(new FormData(e.target));
+        const payload = { ...fd, unit_id: currentUnit.id, can_receive: !!fd.can_receive, can_send: !!fd.can_send, is_active: !!fd.is_active };
+        try {
+            if (loc) await apiCall(`/api/inventory/locations/${loc.id}`, { method:'PUT', body: JSON.stringify(payload) });
+            else     await apiCall('/api/inventory/locations', { method:'POST', body: JSON.stringify(payload) });
+            closeModal(); toast('Sublocal salvo'); selectUnit(currentUnit);
+        } catch (err) { toast(err.message, 'error'); }
+    };
+    document.getElementById('modal').classList.remove('hidden');
+}
+
+function closeModal() { document.getElementById('modal').classList.add('hidden'); }
+function escapeHtml(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+loadUnits();
+</script>
+</body>
+</html>

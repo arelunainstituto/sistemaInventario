@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Inventário · Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/styles.css">
+    <script>
+        if (!localStorage.getItem('access_token')) window.location.href = '/login.html';
+    </script>
+</head>
+<body class="bg-gray-50" style="font-family: 'Inter', sans-serif;">
+
+<div id="layoutRoot"></div>
+
+<script src="_layout.js"></script>
+<script>
+    renderInventoryLayout({
+        activePage: 'dashboard',
+        title: 'Dashboard',
+        subtitle: 'Visão geral do inventário'
+    });
+
+    document.getElementById('pageContent').innerHTML = `
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+            ${card('Total de itens', 'total_items', 'fa-boxes-stacked', 'blue')}
+            ${card('Itens ativos', 'active_items', 'fa-check-circle', 'green')}
+            ${card('Abaixo do mínimo', 'below_min', 'fa-triangle-exclamation', 'yellow')}
+            ${card('Valor total (CMP × qtd)', 'total_value', 'fa-euro-sign', 'purple', '€')}
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <section class="bg-white rounded-lg shadow p-6">
+                <h3 class="font-bold text-gray-800 mb-4 flex items-center gap-2">
+                    <i class="fas fa-flag text-red-500"></i> Itens críticos
+                </h3>
+                <div id="criticalItems" class="text-sm text-gray-500">Carregando…</div>
+            </section>
+            <section class="bg-white rounded-lg shadow p-6">
+                <h3 class="font-bold text-gray-800 mb-4 flex items-center gap-2">
+                    <i class="fas fa-clock-rotate-left text-blue-500"></i> Últimas entradas
+                </h3>
+                <div id="recentEntries" class="text-sm text-gray-500">Carregando…</div>
+            </section>
+        </div>
+    `;
+
+    function card(label, key, icon, color, prefix = '') {
+        return `<div class="bg-white rounded-lg shadow p-5">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-xs uppercase text-gray-500 font-medium">${label}</p>
+                    <p class="text-2xl font-bold text-gray-800 mt-1" data-card="${key}" data-prefix="${prefix}">—</p>
+                </div>
+                <div class="w-10 h-10 rounded-lg bg-${color}-100 flex items-center justify-center text-${color}-600">
+                    <i class="fas ${icon}"></i>
+                </div>
+            </div>
+        </div>`;
+    }
+
+    (async function loadDashboard() {
+        try {
+            const items = await apiCall('/api/inventory/items?limit=1000');
+            const totalItems = items.pagination?.total ?? items.data.length;
+            const active = items.data.filter(i => i.is_active).length;
+
+            // Stock e valor: somar via item detail seria caro — usar aggregate simples no client
+            // (Fase 3 vai trazer view materializada própria)
+            let belowMin = 0, totalValue = 0;
+            const critical = [];
+            for (const item of items.data) {
+                // Soma de stock por item (vamos buscar do detail no Fase 3)
+                // Aqui só usamos campos do listing
+                totalValue += parseFloat(item.cmp || 0) * 0; // sem stock no listing
+                if (parseFloat(item.min_stock) > 0) belowMin++;
+            }
+            setCard('total_items', totalItems);
+            setCard('active_items', active);
+            setCard('below_min', '—');   // será calculado por view na Fase 3
+            setCard('total_value', '—');
+
+            document.getElementById('criticalItems').innerHTML = items.data.slice(0, 5)
+                .map(i => `<div class="flex justify-between py-2 border-b border-gray-100 last:border-0">
+                    <span>${escapeHtml(i.name)}</span>
+                    <span class="text-xs text-gray-400">${escapeHtml(i.internal_code)}</span>
+                </div>`).join('') || '<p>Nenhum item.</p>';
+
+            const entries = await apiCall('/api/inventory/entries?limit=5');
+            document.getElementById('recentEntries').innerHTML = entries.data.length
+                ? entries.data.map(e => `<div class="flex justify-between py-2 border-b border-gray-100 last:border-0">
+                    <span>${escapeHtml(e.supplier?.name || '—')}</span>
+                    <span class="text-xs text-gray-400">${e.document_date} · ${escapeHtml(e.document_number)}</span>
+                </div>`).join('')
+                : '<p>Sem entradas registadas.</p>';
+        } catch (err) {
+            toast(err.message, 'error');
+        }
+    })();
+
+    function setCard(key, value) {
+        const el = document.querySelector(`[data-card="${key}"]`);
+        if (!el) return;
+        const prefix = el.dataset.prefix || '';
+        el.textContent = `${prefix}${value}`;
+    }
+
+    function escapeHtml(s) {
+        return String(s ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+    }
+</script>
+</body>
+</html>

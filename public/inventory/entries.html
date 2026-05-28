@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Inventário · Entradas</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/styles.css">
+    <script>if (!localStorage.getItem('access_token')) window.location.href = '/login.html';</script>
+</head>
+<body class="bg-gray-50" style="font-family: 'Inter', sans-serif;">
+<div id="layoutRoot"></div>
+<script src="_layout.js"></script>
+<script>
+renderInventoryLayout({ activePage: 'entries', title: 'Entradas', subtitle: 'Recepção de materiais com documento fiscal' });
+
+document.getElementById('pageContent').innerHTML = `
+    <div class="flex justify-between items-center mb-4">
+        <h3 class="text-lg font-bold text-gray-800">Registos de entradas</h3>
+        <button onclick="openNewEntryForm()" class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm"><i class="fas fa-plus"></i> Nova entrada</button>
+    </div>
+    <div class="bg-white rounded-lg shadow overflow-hidden">
+        <table class="w-full text-sm">
+            <thead class="bg-gray-50 text-xs uppercase text-gray-600">
+                <tr><th class="text-left p-3">Data</th><th class="text-left p-3">Documento</th><th class="text-left p-3">Fornecedor</th><th class="text-right p-3">Linhas</th><th class="text-right p-3">Valor total</th><th class="p-3"></th></tr>
+            </thead>
+            <tbody id="tbody" class="divide-y divide-gray-100"></tbody>
+        </table>
+    </div>
+
+    <div id="entryModal" class="hidden fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-lg shadow-xl max-w-5xl w-full max-h-[90vh] overflow-y-auto">
+            <div class="flex justify-between items-center p-4 border-b">
+                <h3 id="entryModalTitle" class="font-bold text-gray-800">Nova Entrada</h3>
+                <button onclick="closeEntryModal()" class="text-gray-400 hover:text-gray-600"><i class="fas fa-times"></i></button>
+            </div>
+            <form id="entryForm" class="p-6 space-y-4">
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
+                    <div><label class="text-xs text-gray-500">Tipo de documento *</label>
+                        <select name="document_type" required class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                            <option value="fatura">Fatura</option><option value="guia_remessa">Guia de remessa</option>
+                            <option value="nota_encomenda">Nota de encomenda</option><option value="outro">Outro</option>
+                        </select>
+                    </div>
+                    <div><label class="text-xs text-gray-500">Nº documento *</label><input name="document_number" required class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"></div>
+                    <div><label class="text-xs text-gray-500">Data do documento *</label><input name="document_date" type="date" required class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"></div>
+                    <div><label class="text-xs text-gray-500">Fornecedor *</label>
+                        <select name="supplier_id" id="supplierSelect" required class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"></select>
+                    </div>
+                    <div class="md:col-span-4"><label class="text-xs text-gray-500">Notas</label><textarea name="notes" rows="2" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"></textarea></div>
+                </div>
+
+                <div class="border border-gray-200 rounded-lg p-4">
+                    <div class="flex justify-between items-center mb-3">
+                        <h4 class="font-bold text-gray-800">Linhas</h4>
+                        <button type="button" onclick="addLine()" class="text-sm bg-gray-100 hover:bg-gray-200 px-3 py-1.5 rounded-lg"><i class="fas fa-plus"></i> Adicionar linha</button>
+                    </div>
+                    <div id="lines" class="space-y-2"></div>
+                    <div class="text-right text-sm mt-3 font-bold">Total: € <span id="grandTotal">0.00</span></div>
+                </div>
+
+                <div class="flex gap-3 justify-end border-t pt-4">
+                    <button type="button" onclick="closeEntryModal()" class="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">Cancelar</button>
+                    <button type="submit" class="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium"><i class="fas fa-save"></i> Registar entrada</button>
+                </div>
+            </form>
+        </div>
+    </div>
+`;
+
+let items = [], locations = [], suppliers = [];
+
+async function bootstrap() {
+    const [it, lo, su] = await Promise.all([
+        apiCall('/api/inventory/items?limit=1000'),
+        apiCall('/api/inventory/locations'),
+        apiCall('/api/inventory/suppliers')
+    ]);
+    items = it.data; locations = lo.data; suppliers = su.data;
+}
+
+async function load() {
+    try {
+        const r = await apiCall('/api/inventory/entries?limit=50');
+        document.getElementById('tbody').innerHTML = r.data.map(e => `
+            <tr class="hover:bg-gray-50">
+                <td class="p-3">${e.document_date}</td>
+                <td class="p-3"><span class="text-xs px-1.5 py-0.5 bg-gray-100 rounded">${e.document_type}</span> ${escapeHtml(e.document_number)}</td>
+                <td class="p-3 font-medium">${escapeHtml(e.supplier?.name || '—')}</td>
+                <td class="p-3 text-right">${e.lines?.length || 0}</td>
+                <td class="p-3 text-right">€ ${parseFloat(e.total_value || 0).toFixed(2)}</td>
+                <td class="p-3 text-right"><span class="text-xs text-gray-400">${e.lines?.length ? 'processada' : '—'}</span></td>
+            </tr>`).join('') || '<tr><td colspan="6" class="p-6 text-center text-gray-400">Nenhuma entrada.</td></tr>';
+    } catch (err) { toast(err.message, 'error'); }
+}
+
+function openNewEntryForm() {
+    document.getElementById('supplierSelect').innerHTML = '<option value="">—</option>' +
+        suppliers.map(s => `<option value="${s.id}">${escapeHtml(s.name)}</option>`).join('');
+    document.getElementById('lines').innerHTML = '';
+    addLine();
+    document.getElementById('entryForm').reset();
+    document.getElementById('entryModal').classList.remove('hidden');
+}
+
+function closeEntryModal() { document.getElementById('entryModal').classList.add('hidden'); }
+
+let lineCounter = 0;
+function addLine() {
+    const idx = lineCounter++;
+    const div = document.createElement('div');
+    div.className = 'grid grid-cols-12 gap-2 items-end p-2 border border-gray-100 rounded-lg';
+    div.dataset.line = idx;
+    div.innerHTML = `
+        <div class="col-span-3"><label class="text-xs text-gray-500">Item</label>
+            <select required onchange="onItemChange(this, ${idx})" class="line-item w-full px-2 py-1.5 border border-gray-300 rounded text-xs">
+                <option value="">—</option>
+                ${items.map(i => `<option value="${i.id}" data-controls-lot="${i.controls_lot}">${escapeHtml(i.internal_code)} · ${escapeHtml(i.name)}</option>`).join('')}
+            </select>
+        </div>
+        <div class="col-span-2"><label class="text-xs text-gray-500">Localização</label>
+            <select required class="line-location w-full px-2 py-1.5 border border-gray-300 rounded text-xs">
+                <option value="">—</option>
+                ${locations.map(l => `<option value="${l.id}">${escapeHtml(l.unit?.name)} · ${escapeHtml(l.name)}</option>`).join('')}
+            </select>
+        </div>
+        <div class="col-span-1"><label class="text-xs text-gray-500">Qtd</label><input type="number" step="0.0001" required class="line-qty w-full px-2 py-1.5 border border-gray-300 rounded text-xs" oninput="recalcTotal()"></div>
+        <div class="col-span-1"><label class="text-xs text-gray-500">Fator</label><input type="number" step="0.0001" value="1" class="line-factor w-full px-2 py-1.5 border border-gray-300 rounded text-xs"></div>
+        <div class="col-span-1"><label class="text-xs text-gray-500">€ unit</label><input type="number" step="0.0001" required class="line-cost w-full px-2 py-1.5 border border-gray-300 rounded text-xs" oninput="recalcTotal()"></div>
+        <div class="col-span-2 line-lot-area hidden"><label class="text-xs text-gray-500">Lote</label><input type="text" class="line-lot w-full px-2 py-1.5 border border-gray-300 rounded text-xs"></div>
+        <div class="col-span-1 line-expiry-area hidden"><label class="text-xs text-gray-500">Validade</label><input type="date" class="line-expiry w-full px-2 py-1.5 border border-gray-300 rounded text-xs"></div>
+        <div class="col-span-1 flex items-center"><button type="button" onclick="this.closest('[data-line]').remove(); recalcTotal();" class="text-red-500 hover:text-red-700"><i class="fas fa-trash"></i></button></div>`;
+    document.getElementById('lines').appendChild(div);
+}
+
+function onItemChange(sel, idx) {
+    const line = sel.closest('[data-line]');
+    const controlsLot = sel.selectedOptions[0]?.dataset.controlsLot === 'true';
+    line.querySelector('.line-lot-area').classList.toggle('hidden', !controlsLot);
+    line.querySelector('.line-expiry-area').classList.toggle('hidden', !controlsLot);
+    line.querySelectorAll('.line-lot, .line-expiry').forEach(el => el.required = controlsLot);
+}
+
+function recalcTotal() {
+    let total = 0;
+    document.querySelectorAll('[data-line]').forEach(line => {
+        const qty = parseFloat(line.querySelector('.line-qty').value) || 0;
+        const cost = parseFloat(line.querySelector('.line-cost').value) || 0;
+        total += qty * cost;
+    });
+    document.getElementById('grandTotal').textContent = total.toFixed(2);
+}
+
+document.getElementById('entryForm').addEventListener('submit', async e => {
+    e.preventDefault();
+    const f = e.target;
+    const lines = [];
+    for (const lineDiv of document.querySelectorAll('[data-line]')) {
+        const item_id = lineDiv.querySelector('.line-item').value;
+        if (!item_id) continue;
+        lines.push({
+            item_id,
+            location_id: lineDiv.querySelector('.line-location').value,
+            purchase_qty: parseFloat(lineDiv.querySelector('.line-qty').value),
+            conversion_factor: parseFloat(lineDiv.querySelector('.line-factor').value) || 1,
+            unit_cost: parseFloat(lineDiv.querySelector('.line-cost').value),
+            lot_number: lineDiv.querySelector('.line-lot')?.value || null,
+            expiry_date: lineDiv.querySelector('.line-expiry')?.value || null
+        });
+    }
+    if (lines.length === 0) return toast('Adicione pelo menos uma linha', 'error');
+
+    const payload = {
+        document_type: f.document_type.value,
+        document_number: f.document_number.value,
+        document_date: f.document_date.value,
+        supplier_id: f.supplier_id.value,
+        notes: f.notes.value || null,
+        lines
+    };
+    try {
+        await apiCall('/api/inventory/entries', { method: 'POST', body: JSON.stringify(payload) });
+        toast('Entrada registada com sucesso');
+        closeEntryModal();
+        load();
+    } catch (err) { toast(err.message, 'error'); }
+});
+
+function escapeHtml(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+(async () => { await bootstrap(); await load(); })();
+</script>
+</body>
+</html>

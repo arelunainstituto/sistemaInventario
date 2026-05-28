@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Inventário · Ler QR Code</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/styles.css">
+    <script src="https://unpkg.com/html5-qrcode@2.3.10/html5-qrcode.min.js"></script>
+    <script>if (!localStorage.getItem('access_token')) window.location.href = '/login.html';</script>
+</head>
+<body class="bg-gray-50" style="font-family: 'Inter', sans-serif;">
+<div id="layoutRoot"></div>
+<script src="_layout.js"></script>
+<script>
+renderInventoryLayout({ activePage: 'scan', title: 'Ler QR Code', subtitle: 'Aponte a câmera do telemóvel/computador para a etiqueta' });
+
+document.getElementById('pageContent').innerHTML = `
+    <div class="max-w-2xl mx-auto">
+        <div class="bg-white rounded-lg shadow p-6">
+            <div id="reader" class="rounded-lg overflow-hidden bg-black" style="min-height: 360px;"></div>
+            <div class="mt-4 flex flex-col gap-2 items-center">
+                <p id="status" class="text-sm text-gray-500">Iniciando câmera…</p>
+                <a id="fallback" href="#" class="hidden text-xs text-blue-600 underline">Inserir código manualmente</a>
+            </div>
+        </div>
+
+        <div id="result" class="hidden mt-6 bg-white rounded-lg shadow p-6"></div>
+    </div>
+`;
+
+// Permite também ler via querystring (?code=<uuid>) — útil quando a etiqueta é
+// fotografada e o telemóvel abre o link diretamente.
+const urlCode = new URLSearchParams(location.search).get('code');
+if (urlCode) {
+    resolveCode(urlCode);
+}
+
+// Inicia câmera
+const reader = new Html5Qrcode('reader');
+const status = document.getElementById('status');
+
+Html5Qrcode.getCameras().then(cams => {
+    if (!cams.length) { status.textContent = 'Nenhuma câmera detetada.'; return; }
+    reader.start(
+        { facingMode: 'environment' },
+        { fps: 10, qrbox: { width: 250, height: 250 } },
+        onScan, () => {}
+    ).then(() => { status.textContent = 'A escanear… aponte para o QR Code.'; })
+     .catch(err => { status.textContent = 'Erro ao iniciar câmera: ' + err; });
+}).catch(err => { status.textContent = 'Sem permissão de câmera. ' + err; });
+
+let resolved = false;
+async function onScan(decoded) {
+    if (resolved) return;
+    resolved = true;
+    try { await reader.stop(); } catch {}
+
+    // O QR contém URL como /inventory/scan.html?code=<uuid> — extrair UUID
+    const m = decoded.match(/code=([0-9a-f-]{36})/i) || decoded.match(/^([0-9a-f-]{36})$/i);
+    const code = m ? m[1] : decoded;
+    resolveCode(code);
+}
+
+async function resolveCode(code) {
+    status.textContent = 'Consultando item…';
+    try {
+        const r = await apiCall(`/api/inventory/scan/${code}`);
+        const it = r.data;
+        document.getElementById('result').classList.remove('hidden');
+        document.getElementById('result').innerHTML = `
+            <div class="flex items-start gap-4">
+                ${it.image_url ? `<img src="${it.image_url}" class="w-24 h-24 rounded-lg object-cover">` : ''}
+                <div class="flex-1">
+                    <p class="text-xs text-gray-500">${it.macro_category === 'patrimonial' ? 'Patrimonial' : 'Consumo'}</p>
+                    <h3 class="text-lg font-bold text-gray-800">${escapeHtml(it.name)}</h3>
+                    <p class="text-sm text-gray-600">Código: <span class="font-mono">${escapeHtml(it.internal_code)}</span></p>
+                    <p class="text-sm text-gray-600">CMP: € ${(parseFloat(it.cmp) || 0).toFixed(2)}</p>
+                    <div class="mt-3 flex gap-2">
+                        <a href="item-form.html?id=${it.id}" class="px-3 py-1.5 bg-blue-600 text-white rounded text-xs">Ver / Editar</a>
+                        <a href="item-label.html?id=${it.id}" class="px-3 py-1.5 bg-gray-200 rounded text-xs">Etiqueta</a>
+                    </div>
+                </div>
+            </div>`;
+        status.textContent = 'Item encontrado.';
+    } catch (err) {
+        document.getElementById('result').classList.remove('hidden');
+        document.getElementById('result').innerHTML = `<p class="text-red-600">${err.message}</p>`;
+        status.textContent = 'Falha ao resolver QR.';
+    }
+}
+
+function escapeHtml(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+</script>
+</body>
+</html>

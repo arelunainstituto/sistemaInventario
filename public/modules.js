@@ -16,11 +16,16 @@ class ModuleManager {
                 name: 'Inventário',
                 icon: 'fas fa-warehouse',
                 emoji: '📦',
-                url: 'index.html',
+                url: 'inventory/index.html',
                 tabs: [
-                    { id: 'dashboard', name: 'Dashboard', icon: 'fas fa-chart-pie', permission: 'read' },
-                    { id: 'add-item', name: 'Adicionar', icon: 'fas fa-plus-circle', permission: 'create' },
-                    { id: 'inventory', name: 'Inventário', icon: 'fas fa-warehouse', permission: 'read' }
+                    { id: 'dashboard',  name: 'Dashboard',     icon: 'fas fa-chart-pie',           permission: 'read' },
+                    { id: 'items',      name: 'Itens',         icon: 'fas fa-boxes-stacked',       permission: 'read' },
+                    { id: 'entries',    name: 'Entradas',      icon: 'fas fa-arrow-right-to-bracket', permission: 'entry' },
+                    { id: 'scan',       name: 'Ler QR Code',   icon: 'fas fa-qrcode',              permission: 'read' },
+                    { id: 'locations',  name: 'Localizações',  icon: 'fas fa-map-marker-alt',      permission: 'read' },
+                    { id: 'categories', name: 'Subcategorias', icon: 'fas fa-tags',                permission: 'read' },
+                    { id: 'suppliers',  name: 'Fornecedores',  icon: 'fas fa-truck',               permission: 'read' },
+                    { id: 'uoms',       name: 'Un. medida',    icon: 'fas fa-ruler',               permission: 'read' }
                 ]
             },
             {

@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Inventário · Itens</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/styles.css">
+    <script>if (!localStorage.getItem('access_token')) window.location.href = '/login.html';</script>
+</head>
+<body class="bg-gray-50" style="font-family: 'Inter', sans-serif;">
+
+<div id="layoutRoot"></div>
+
+<script src="_layout.js"></script>
+<script>
+renderInventoryLayout({ activePage: 'items', title: 'Itens', subtitle: 'Catálogo de itens do inventário' });
+
+document.getElementById('pageContent').innerHTML = `
+    <div class="flex flex-wrap gap-3 items-end mb-6">
+        <div>
+            <label class="block text-xs text-gray-500 mb-1">Pesquisar</label>
+            <input id="filterSearch" type="text" placeholder="Nome, código, ref, código de barras"
+                   class="px-3 py-2 border border-gray-300 rounded-lg text-sm w-72 focus:ring-2 focus:ring-blue-500 focus:outline-none">
+        </div>
+        <div>
+            <label class="block text-xs text-gray-500 mb-1">Categoria macro</label>
+            <select id="filterMacro" class="px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                <option value="">Todas</option>
+                <option value="consumo">Consumo</option>
+                <option value="patrimonial">Patrimonial</option>
+            </select>
+        </div>
+        <div>
+            <label class="block text-xs text-gray-500 mb-1">Subcategoria</label>
+            <select id="filterSubcategory" class="px-3 py-2 border border-gray-300 rounded-lg text-sm w-48">
+                <option value="">Todas</option>
+            </select>
+        </div>
+        <button id="btnFilter" class="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700">
+            <i class="fas fa-search"></i> Filtrar
+        </button>
+        <div class="ml-auto">
+            <a href="item-form.html" class="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700">
+                <i class="fas fa-plus"></i> Novo item
+            </a>
+        </div>
+    </div>
+
+    <div class="bg-white rounded-lg shadow overflow-hidden">
+        <table class="w-full text-sm">
+            <thead class="bg-gray-50 text-gray-600 text-xs uppercase">
+                <tr>
+                    <th class="px-4 py-3 text-left">Código</th>
+                    <th class="px-4 py-3 text-left">Nome</th>
+                    <th class="px-4 py-3 text-left">Macro</th>
+                    <th class="px-4 py-3 text-left">Subcategoria</th>
+                    <th class="px-4 py-3 text-right">CMP</th>
+                    <th class="px-4 py-3 text-right">Min</th>
+                    <th class="px-4 py-3 text-center">Estado</th>
+                    <th class="px-4 py-3 text-center w-32">Ações</th>
+                </tr>
+            </thead>
+            <tbody id="itemsTbody" class="divide-y divide-gray-100">
+                <tr><td colspan="8" class="px-4 py-8 text-center text-gray-400">Carregando…</td></tr>
+            </tbody>
+        </table>
+    </div>
+`;
+
+const filterSearch = document.getElementById('filterSearch');
+const filterMacro = document.getElementById('filterMacro');
+const filterSubcategory = document.getElementById('filterSubcategory');
+
+// Carregar categorias no filtro
+(async () => {
+    try {
+        const cats = await apiCall('/api/inventory/categories');
+        filterSubcategory.innerHTML = '<option value="">Todas</option>' +
+            cats.data.map(c => `<option value="${c.id}">[${c.parent_macro}] ${escapeHtml(c.name)}</option>`).join('');
+    } catch (e) { /* silent */ }
+})();
+
+document.getElementById('btnFilter').addEventListener('click', loadItems);
+filterSearch.addEventListener('keypress', e => { if (e.key === 'Enter') loadItems(); });
+filterMacro.addEventListener('change', loadItems);
+filterSubcategory.addEventListener('change', loadItems);
+
+async function loadItems() {
+    const params = new URLSearchParams();
+    if (filterSearch.value)       params.set('search', filterSearch.value);
+    if (filterMacro.value)        params.set('macro_category', filterMacro.value);
+    if (filterSubcategory.value)  params.set('subcategory_id', filterSubcategory.value);
+    params.set('limit', '200');
+
+    const tbody = document.getElementById('itemsTbody');
+    tbody.innerHTML = '<tr><td colspan="8" class="px-4 py-8 text-center text-gray-400">Carregando…</td></tr>';
+    try {
+        const res = await apiCall(`/api/inventory/items?${params}`);
+        if (!res.data.length) {
+            tbody.innerHTML = '<tr><td colspan="8" class="px-4 py-8 text-center text-gray-400">Nenhum item encontrado.</td></tr>';
+            return;
+        }
+        tbody.innerHTML = res.data.map(it => `
+            <tr class="hover:bg-gray-50">
+                <td class="px-4 py-3 font-mono text-xs text-gray-600">${escapeHtml(it.internal_code)}</td>
+                <td class="px-4 py-3 font-medium text-gray-800">${escapeHtml(it.name)}</td>
+                <td class="px-4 py-3">
+                    <span class="text-xs px-2 py-0.5 rounded ${it.macro_category === 'consumo' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}">
+                        ${it.macro_category}
+                    </span>
+                </td>
+                <td class="px-4 py-3 text-gray-600">${escapeHtml(it.subcategory?.name || '—')}</td>
+                <td class="px-4 py-3 text-right text-gray-700">€ ${(parseFloat(it.cmp) || 0).toFixed(2)}</td>
+                <td class="px-4 py-3 text-right text-gray-700">${parseFloat(it.min_stock) || 0}</td>
+                <td class="px-4 py-3 text-center">
+                    ${it.is_active ? '<span class="text-xs text-green-600">● Ativo</span>' : '<span class="text-xs text-gray-400">● Inativo</span>'}
+                </td>
+                <td class="px-4 py-3 text-center">
+                    <a href="item-form.html?id=${it.id}" class="text-blue-600 hover:text-blue-800 mx-1" title="Editar">
+                        <i class="fas fa-edit"></i>
+                    </a>
+                    <a href="item-label.html?id=${it.id}" class="text-gray-600 hover:text-gray-800 mx-1" title="Etiqueta QR">
+                        <i class="fas fa-qrcode"></i>
+                    </a>
+                </td>
+            </tr>`).join('');
+    } catch (err) {
+        tbody.innerHTML = `<tr><td colspan="8" class="px-4 py-8 text-center text-red-500">${err.message}</td></tr>`;
+    }
+}
+
+loadItems();
+
+function escapeHtml(s) {
+    return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+</script>
+</body>
+</html>

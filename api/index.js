@@ -248,6 +248,9 @@ app.use('/api/rh', rhRoutes);
 // Rotas do Módulo de Marketing
 app.use('/api/marketing', require('./marketing'));
 
+// Rotas do Módulo de Inventário (refatorado)
+app.use('/api/inventory', require('./inventory'));
+
 
 
 // Rotas da API
