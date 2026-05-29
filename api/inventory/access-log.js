@@ -188,7 +188,7 @@ router.get('/', requireRole(ADMIN_ROLES), async (req, res) => {
     }
 });
 
-// POST /purge — força a purga manual (utilitário)
+// POST /purge — força a purga manual conforme retenção (utilitário)
 router.post('/purge', requireRole(ADMIN_ROLES), async (req, res) => {
     try {
         const { data, error } = await supabaseAdmin.rpc('fn_inv_purge_access_log');
@@ -196,6 +196,25 @@ router.post('/purge', requireRole(ADMIN_ROLES), async (req, res) => {
         res.json({ success: true, data: { deleted: data } });
     } catch (err) {
         console.error('POST access-log/purge error:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// DELETE / — apaga TUDO (utilizado para descartar ruído acumulado quando
+// o filtro de captação muda). Requer body { confirm: 'APAGAR TUDO' }.
+router.delete('/', requireRole(ADMIN_ROLES), async (req, res) => {
+    try {
+        if (req.body?.confirm !== 'APAGAR TUDO') {
+            return res.status(400).json({ error: 'Envie body { "confirm": "APAGAR TUDO" } para confirmar' });
+        }
+        const { count, error } = await supabaseAdmin
+            .from('inv_access_log')
+            .delete({ count: 'exact' })
+            .neq('id', '00000000-0000-0000-0000-000000000000');  // pega tudo
+        if (error) throw error;
+        res.json({ success: true, data: { deleted: count } });
+    } catch (err) {
+        console.error('DELETE access-log error:', err);
         res.status(500).json({ error: err.message });
     }
 });

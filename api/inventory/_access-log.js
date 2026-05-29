@@ -13,8 +13,13 @@
 
 const { supabaseAdmin } = require('./_stock');
 
+// GETs que valem auditoria (impactam decisão/têm valor contábil).
+// Excluímos /stats/* (badge global e dashboard são alto volume automático),
+// /search (ruído por keystroke), /access-log (admin navegando o próprio log)
+// e /scan (alto volume de leitura por câmera sem valor de auditoria).
 const SENSITIVE_GET_PATHS = [
-    '/reports', '/stats', '/search', '/access-log', '/depreciation'
+    '/reports',
+    '/depreciation/runs'
 ];
 
 function shouldLog(req) {

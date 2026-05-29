@@ -30,7 +30,10 @@ document.getElementById('pageContent').innerHTML = `
                     <button type="submit" class="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs"><i class="fas fa-save"></i></button>
                 </div>
                 <p class="text-[10px] text-gray-500">Cron mensal purga registos mais antigos. Atual: <span id="currentRetention">—</span> meses.</p>
-                <button type="button" onclick="purgeNow()" class="text-xs text-red-600 hover:underline mt-2"><i class="fas fa-trash"></i> Purgar agora</button>
+                <div class="flex gap-3 mt-2">
+                    <button type="button" onclick="purgeNow()" class="text-xs text-orange-600 hover:underline"><i class="fas fa-broom"></i> Aplicar retenção agora</button>
+                    <button type="button" onclick="clearAll()" class="text-xs text-red-600 hover:underline"><i class="fas fa-trash-can"></i> Apagar tudo</button>
+                </div>
             </form>
         </div>
         <div class="bg-white rounded-lg shadow p-4 lg:col-span-2">
@@ -168,10 +171,23 @@ document.getElementById('retentionForm').addEventListener('submit', async e => {
 });
 
 async function purgeNow() {
-    if (!confirm('Purgar agora os registos que excedem a retenção atual? (Operação imediata)')) return;
+    if (!confirm('Aplicar a retenção atual agora? Registos mais antigos do que o limite definido serão apagados.')) return;
     try {
         const r = await apiCall('/api/inventory/access-log/purge', { method: 'POST' });
-        toast(`${r.data.deleted} registos purgados`);
+        toast(`${r.data.deleted} registos apagados`);
+        load(1);
+    } catch (err) { toast(err.message, 'error'); }
+}
+
+async function clearAll() {
+    const phrase = prompt('Apagar TODOS os registos de log? Esta ação é irreversível.\n\nDigite "APAGAR TUDO" (maiúsculas) para confirmar:');
+    if (phrase !== 'APAGAR TUDO') return;
+    try {
+        const r = await apiCall('/api/inventory/access-log', {
+            method: 'DELETE',
+            body: JSON.stringify({ confirm: 'APAGAR TUDO' })
+        });
+        toast(`${r.data.deleted} registos apagados`);
         load(1);
     } catch (err) { toast(err.message, 'error'); }
 }
