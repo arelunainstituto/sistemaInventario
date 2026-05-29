@@ -12,6 +12,7 @@ const INVENTORY_NAV = [
     { id: 'depreciation', label: 'Depreciação',       icon: 'fa-arrow-trend-down', href: 'depreciation.html' },
     { id: 'reports',     label: 'Relatórios',        icon: 'fa-chart-line',  href: 'reports.html' },
     { id: 'kardex',      label: 'Kardex',            icon: 'fa-clipboard-list', href: 'kardex.html' },
+    { id: 'movements',   label: 'Histórico',         icon: 'fa-history',     href: 'movements.html' },
     { id: 'scan',        label: 'Ler QR Code',       icon: 'fa-qrcode',      href: 'scan.html' },
 ];
 
@@ -71,11 +72,26 @@ function renderInventoryLayout({ activePage = 'dashboard', title = 'Inventário'
 
     const header = `
         <header class="bg-white border-b border-gray-200 px-8 py-4 flex justify-between items-center sticky top-0 z-10">
-            <div>
+            <div class="flex-shrink-0">
                 <h2 class="text-xl font-bold text-gray-800">${title}</h2>
                 <p class="text-sm text-gray-500">${subtitle}</p>
             </div>
-            <div class="flex items-center gap-4">
+
+            <!-- Busca global (§16) -->
+            <div class="relative flex-1 max-w-md mx-8">
+                <div class="relative">
+                    <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs"></i>
+                    <input id="globalSearch" type="text"
+                           placeholder="Buscar item, lote, fornecedor…"
+                           autocomplete="off"
+                           class="w-full pl-8 pr-3 py-2 border border-gray-200 bg-gray-50 rounded-lg text-sm focus:bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                </div>
+                <div id="searchDropdown" class="hidden absolute left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-[480px] overflow-y-auto z-30">
+                    <div id="searchResults" class="p-2 text-sm"></div>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-4 flex-shrink-0">
                 <!-- Badge global de alertas (§16) -->
                 <div class="relative">
                     <button id="alertsBell" onclick="toggleAlertsPanel()"
@@ -249,4 +265,173 @@ document.addEventListener('click', (e) => {
 setTimeout(() => {
     loadAlerts();
     setInterval(loadAlerts, 60000);
+    setupGlobalSearch();
+    injectActionPanel();
 }, 500);
+
+// =====================================================
+// Busca global (§16) — debounced cross-entity
+// =====================================================
+
+function setupGlobalSearch() {
+    const input = document.getElementById('globalSearch');
+    if (!input) return;
+
+    let timer = null;
+    input.addEventListener('input', () => {
+        clearTimeout(timer);
+        const q = input.value.trim();
+        if (q.length < 2) {
+            document.getElementById('searchDropdown').classList.add('hidden');
+            return;
+        }
+        timer = setTimeout(() => runGlobalSearch(q), 250);
+    });
+    input.addEventListener('focus', () => {
+        if (input.value.trim().length >= 2) runGlobalSearch(input.value.trim());
+    });
+
+    // Atalho Ctrl/Cmd+K
+    document.addEventListener('keydown', e => {
+        if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+            e.preventDefault();
+            input.focus();
+            input.select();
+        }
+        if (e.key === 'Escape') {
+            document.getElementById('searchDropdown').classList.add('hidden');
+        }
+    });
+
+    // Fecha ao clicar fora
+    document.addEventListener('click', e => {
+        const dd = document.getElementById('searchDropdown');
+        if (!dd) return;
+        if (dd.contains(e.target) || input.contains(e.target)) return;
+        dd.classList.add('hidden');
+    });
+}
+
+async function runGlobalSearch(q) {
+    const resultsEl = document.getElementById('searchResults');
+    const dd = document.getElementById('searchDropdown');
+    dd.classList.remove('hidden');
+    resultsEl.innerHTML = '<p class="text-xs text-gray-400 p-2">Buscando…</p>';
+
+    try {
+        const r = await apiCall(`/api/inventory/search?q=${encodeURIComponent(q)}`);
+        const { items, lots, suppliers } = r.data;
+        const total = items.length + lots.length + suppliers.length;
+
+        if (total === 0) {
+            resultsEl.innerHTML = '<p class="text-xs text-gray-400 p-3 text-center">Nenhum resultado.</p>';
+            return;
+        }
+
+        let html = '';
+        if (items.length) {
+            html += '<p class="text-[10px] uppercase font-bold text-gray-400 px-2 mt-1 mb-1">Itens</p>';
+            html += items.map(i => `
+                <button onclick='openActionPanel(${JSON.stringify({kind:"item", ...i}).replace(/'/g,"&#39;")})'
+                        class="w-full text-left flex items-center gap-2 px-2 py-1.5 hover:bg-blue-50 rounded text-xs">
+                    <i class="fas fa-box ${i.macro_category === "patrimonial" ? "text-purple-500" : "text-blue-500"}"></i>
+                    <span class="font-mono text-gray-500">${escapeAlerts(i.internal_code)}</span>
+                    <span class="text-gray-800 truncate">${escapeAlerts(i.name)}</span>
+                    ${!i.is_active ? '<span class="text-[10px] text-gray-400">(inativo)</span>' : ''}
+                </button>`).join('');
+        }
+        if (lots.length) {
+            html += '<p class="text-[10px] uppercase font-bold text-gray-400 px-2 mt-2 mb-1">Lotes</p>';
+            html += lots.map(l => `
+                <button onclick='openActionPanel(${JSON.stringify({kind:"lot", id:l.id, lot_number:l.lot_number, expiry_date:l.expiry_date, item:l.item}).replace(/'/g,"&#39;")})'
+                        class="w-full text-left flex items-center gap-2 px-2 py-1.5 hover:bg-yellow-50 rounded text-xs">
+                    <i class="fas fa-flask text-yellow-600"></i>
+                    <span class="font-mono">${escapeAlerts(l.lot_number)}</span>
+                    <span class="text-gray-600 truncate">${escapeAlerts(l.item?.name || '')}</span>
+                    ${l.expiry_date ? `<span class="text-[10px] text-gray-400 ml-auto">val ${l.expiry_date}</span>` : ''}
+                </button>`).join('');
+        }
+        if (suppliers.length) {
+            html += '<p class="text-[10px] uppercase font-bold text-gray-400 px-2 mt-2 mb-1">Fornecedores</p>';
+            html += suppliers.map(s => `
+                <button onclick='openActionPanel(${JSON.stringify({kind:"supplier", ...s}).replace(/'/g,"&#39;")})'
+                        class="w-full text-left flex items-center gap-2 px-2 py-1.5 hover:bg-green-50 rounded text-xs">
+                    <i class="fas fa-truck text-green-600"></i>
+                    <span class="text-gray-800 truncate">${escapeAlerts(s.name)}</span>
+                    ${s.tax_id ? `<span class="text-[10px] text-gray-400">${escapeAlerts(s.tax_id)}</span>` : ''}
+                </button>`).join('');
+        }
+        resultsEl.innerHTML = html;
+    } catch (err) {
+        resultsEl.innerHTML = `<p class="text-xs text-red-500 p-2">${escapeAlerts(err.message)}</p>`;
+    }
+}
+
+// =====================================================
+// Painel lateral de ações (resultado da busca clicado)
+// =====================================================
+
+function injectActionPanel() {
+    if (document.getElementById('actionPanel')) return;
+    const panel = document.createElement('div');
+    panel.id = 'actionPanel';
+    panel.className = 'hidden fixed inset-0 z-40';
+    panel.innerHTML = `
+        <div class="absolute inset-0 bg-black/30" onclick="closeActionPanel()"></div>
+        <div class="absolute right-0 top-0 bottom-0 w-96 bg-white shadow-xl overflow-y-auto">
+            <div class="p-4 border-b flex justify-between items-center">
+                <h3 id="actionPanelTitle" class="font-bold text-gray-800">—</h3>
+                <button onclick="closeActionPanel()" class="text-gray-400 hover:text-gray-600"><i class="fas fa-times"></i></button>
+            </div>
+            <div id="actionPanelBody" class="p-4 space-y-3"></div>
+        </div>`;
+    document.body.appendChild(panel);
+}
+
+function openActionPanel(entity) {
+    document.getElementById('searchDropdown').classList.add('hidden');
+    document.getElementById('globalSearch').value = '';
+
+    const panel = document.getElementById('actionPanel');
+    const title = document.getElementById('actionPanelTitle');
+    const body  = document.getElementById('actionPanelBody');
+    panel.classList.remove('hidden');
+
+    if (entity.kind === 'item') {
+        title.innerHTML = `<span class="text-xs text-gray-400 font-mono">${escapeAlerts(entity.internal_code)}</span> · ${escapeAlerts(entity.name)}`;
+        body.innerHTML = `
+            <p class="text-xs text-gray-500">Categoria: <span class="font-medium">${escapeAlerts(entity.macro_category)}</span></p>
+            ${entity.image_url ? `<img src="${entity.image_url}" class="w-full h-32 object-cover rounded">` : ''}
+            <div class="grid grid-cols-2 gap-2 pt-2">
+                <a href="/inventory/item-form.html?id=${entity.id}" class="px-3 py-2 bg-blue-100 hover:bg-blue-200 text-blue-800 rounded text-xs text-center"><i class="fas fa-edit"></i> Editar</a>
+                <a href="/inventory/kardex.html?item=${entity.id}" class="px-3 py-2 bg-teal-100 hover:bg-teal-200 text-teal-800 rounded text-xs text-center"><i class="fas fa-clipboard-list"></i> Kardex</a>
+                <a href="/inventory/item-label.html?id=${entity.id}" class="px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-800 rounded text-xs text-center"><i class="fas fa-qrcode"></i> Etiqueta</a>
+                <a href="/inventory/movements.html?item_id=${entity.id}" class="px-3 py-2 bg-purple-100 hover:bg-purple-200 text-purple-800 rounded text-xs text-center"><i class="fas fa-list"></i> Histórico</a>
+                <a href="/inventory/entries.html" class="px-3 py-2 bg-green-100 hover:bg-green-200 text-green-800 rounded text-xs text-center"><i class="fas fa-arrow-right-to-bracket"></i> Nova entrada</a>
+                <a href="/inventory/exits.html" class="px-3 py-2 bg-red-100 hover:bg-red-200 text-red-800 rounded text-xs text-center"><i class="fas fa-arrow-right-from-bracket"></i> Nova saída</a>
+            </div>`;
+    } else if (entity.kind === 'lot') {
+        title.innerHTML = `Lote <span class="font-mono">${escapeAlerts(entity.lot_number)}</span>`;
+        body.innerHTML = `
+            <p class="text-xs text-gray-500">Item: <span class="font-medium">${escapeAlerts(entity.item?.internal_code || '')} · ${escapeAlerts(entity.item?.name || '')}</span></p>
+            ${entity.expiry_date ? `<p class="text-xs text-gray-500">Validade: <span class="font-medium">${entity.expiry_date}</span></p>` : ''}
+            <div class="pt-2 space-y-2">
+                <a href="/inventory/kardex.html?item=${entity.item?.id}" class="block px-3 py-2 bg-teal-100 hover:bg-teal-200 text-teal-800 rounded text-xs text-center"><i class="fas fa-clipboard-list"></i> Kardex do item</a>
+                <a href="/inventory/item-form.html?id=${entity.item?.id}" class="block px-3 py-2 bg-blue-100 hover:bg-blue-200 text-blue-800 rounded text-xs text-center"><i class="fas fa-edit"></i> Editar item</a>
+            </div>`;
+    } else if (entity.kind === 'supplier') {
+        title.innerHTML = escapeAlerts(entity.name);
+        body.innerHTML = `
+            ${entity.tax_id ? `<p class="text-xs text-gray-500">NIF: <span class="font-medium">${escapeAlerts(entity.tax_id)}</span></p>` : ''}
+            ${entity.email  ? `<p class="text-xs text-gray-500">Email: ${escapeAlerts(entity.email)}</p>` : ''}
+            <div class="pt-2 space-y-2">
+                <a href="/inventory/suppliers.html" class="block px-3 py-2 bg-green-100 hover:bg-green-200 text-green-800 rounded text-xs text-center"><i class="fas fa-list"></i> Ver lista de fornecedores</a>
+                <a href="/inventory/entries.html" class="block px-3 py-2 bg-blue-100 hover:bg-blue-200 text-blue-800 rounded text-xs text-center"><i class="fas fa-arrow-right-to-bracket"></i> Nova entrada</a>
+            </div>`;
+    }
+}
+
+function closeActionPanel() {
+    const p = document.getElementById('actionPanel');
+    if (p) p.classList.add('hidden');
+}

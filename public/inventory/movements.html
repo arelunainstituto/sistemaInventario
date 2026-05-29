@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Inventário · Histórico de Movimentos</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/styles.css">
+    <script>if (!localStorage.getItem('access_token')) window.location.href = '/login.html';</script>
+</head>
+<body class="bg-gray-50" style="font-family: 'Inter', sans-serif;">
+<div id="layoutRoot"></div>
+<script src="_layout.js"></script>
+<script>
+const TYPES = [
+    ['entrada', 'Entrada'],
+    ['saida', 'Saída'],
+    ['transferencia_saida', 'Transferência (saída)'],
+    ['transferencia_entrada', 'Transferência (entrada)'],
+    ['ajuste', 'Ajuste'],
+    ['inventario', 'Inventário'],
+    ['depreciacao', 'Depreciação']
+];
+
+renderInventoryLayout({
+    activePage: 'movements',
+    title: 'Histórico de Movimentos',
+    subtitle: 'RF09 — consulta unificada com filtros combinados'
+});
+
+document.getElementById('pageContent').innerHTML = `
+    <div class="bg-white rounded-lg shadow p-4 mb-4">
+        <form id="filtersForm" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 items-end">
+            <div class="lg:col-span-2">
+                <label class="text-xs text-gray-500">Item</label>
+                <select name="item_id" id="itemSelect" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                    <option value="">Todos</option>
+                </select>
+            </div>
+            <div>
+                <label class="text-xs text-gray-500">Localização</label>
+                <select name="location_id" id="locationSelect" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                    <option value="">Todas</option>
+                </select>
+            </div>
+            <div>
+                <label class="text-xs text-gray-500">Utilizador</label>
+                <select name="user_id" id="userSelect" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                    <option value="">Todos</option>
+                </select>
+            </div>
+            <div>
+                <label class="text-xs text-gray-500">Tipo</label>
+                <select name="type" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                    <option value="">Todos</option>
+                    ${TYPES.map(([v,l]) => `<option value="${v}">${l}</option>`).join('')}
+                </select>
+            </div>
+            <div>
+                <label class="text-xs text-gray-500">Subtipo</label>
+                <input name="subtype" type="text" placeholder="ex: consumo, avaria…" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+            </div>
+            <div>
+                <label class="text-xs text-gray-500">De</label>
+                <input name="from_date" type="date" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+            </div>
+            <div>
+                <label class="text-xs text-gray-500">Até</label>
+                <input name="to_date" type="date" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+            </div>
+            <div class="flex gap-2 lg:col-span-4 justify-between">
+                <div class="flex gap-2">
+                    <button type="submit" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm"><i class="fas fa-filter"></i> Filtrar</button>
+                    <button type="button" onclick="resetFilters()" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm">Limpar</button>
+                </div>
+                <div class="flex gap-2">
+                    <button type="button" onclick="downloadCurrent('csv')" class="px-3 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-xs"><i class="fas fa-file-csv"></i> CSV</button>
+                    <button type="button" onclick="downloadCurrent('xlsx')" class="px-3 py-2 bg-green-100 hover:bg-green-200 text-green-800 rounded-lg text-xs"><i class="fas fa-file-excel"></i> Excel</button>
+                    <button type="button" onclick="downloadCurrent('pdf')" class="px-3 py-2 bg-red-100 hover:bg-red-200 text-red-800 rounded-lg text-xs"><i class="fas fa-file-pdf"></i> PDF</button>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    <div class="bg-white rounded-lg shadow overflow-hidden">
+        <div class="overflow-x-auto max-h-[700px] overflow-y-auto">
+            <table class="w-full text-xs">
+                <thead class="bg-gray-50 uppercase text-gray-600 sticky top-0">
+                    <tr>
+                        <th class="text-left p-2">Data/hora</th>
+                        <th class="text-left p-2">Tipo</th>
+                        <th class="text-left p-2">Subtipo</th>
+                        <th class="text-left p-2">Item</th>
+                        <th class="text-right p-2">Qtd</th>
+                        <th class="text-left p-2">Origem</th>
+                        <th class="text-left p-2">Destino</th>
+                        <th class="text-left p-2">Lote</th>
+                        <th class="text-right p-2">CMP €</th>
+                        <th class="text-left p-2">Justificação</th>
+                    </tr>
+                </thead>
+                <tbody id="tbody" class="divide-y divide-gray-100"></tbody>
+            </table>
+        </div>
+        <div id="pagination" class="p-3 border-t border-gray-100 flex justify-between items-center text-xs text-gray-500"></div>
+    </div>
+`;
+
+let currentPage = 1;
+const LIMIT = 100;
+
+function badgeClass(type) {
+    const map = {
+        entrada: 'bg-green-100 text-green-700',
+        saida: 'bg-red-100 text-red-700',
+        transferencia_saida: 'bg-indigo-100 text-indigo-700',
+        transferencia_entrada: 'bg-indigo-100 text-indigo-700',
+        ajuste: 'bg-amber-100 text-amber-700',
+        inventario: 'bg-purple-100 text-purple-700',
+        depreciacao: 'bg-gray-200 text-gray-700'
+    };
+    return map[type] || 'bg-gray-100 text-gray-700';
+}
+
+async function bootstrap() {
+    try {
+        const [it, lo] = await Promise.all([
+            apiCall('/api/inventory/items?limit=1000'),
+            apiCall('/api/inventory/locations')
+        ]);
+        document.getElementById('itemSelect').innerHTML = '<option value="">Todos</option>' +
+            it.data.map(i => `<option value="${i.id}">${escapeHtml(i.internal_code)} · ${escapeHtml(i.name)}</option>`).join('');
+        document.getElementById('locationSelect').innerHTML = '<option value="">Todas</option>' +
+            lo.data.map(l => `<option value="${l.id}">${escapeHtml(l.unit?.name || '')} · ${escapeHtml(l.name)}</option>`).join('');
+        // userSelect: deixar vazio por enquanto (lista de utilizadores não está acessível via API neste módulo)
+        document.getElementById('userSelect').disabled = true;
+        document.getElementById('userSelect').title = 'Filtro por utilizador será habilitado em iteração futura';
+
+        // Aplica filtros vindos da querystring (ex: ?item_id=...)
+        const params = new URLSearchParams(location.search);
+        if (params.get('item_id'))     document.getElementById('itemSelect').value = params.get('item_id');
+        if (params.get('location_id')) document.getElementById('locationSelect').value = params.get('location_id');
+
+        load();
+    } catch (err) { toast(err.message, 'error'); }
+}
+
+function buildQueryString(extra = {}) {
+    const f = document.getElementById('filtersForm');
+    const params = new URLSearchParams();
+    for (const el of f.elements) {
+        if (!el.name) continue;
+        if (el.value) params.set(el.name, el.value);
+    }
+    for (const [k, v] of Object.entries(extra)) params.set(k, v);
+    return params.toString();
+}
+
+async function load(page = 1) {
+    currentPage = page;
+    const tbody = document.getElementById('tbody');
+    tbody.innerHTML = '<tr><td colspan="10" class="p-6 text-center text-gray-400">Carregando…</td></tr>';
+    try {
+        const qs = buildQueryString({ page, limit: LIMIT });
+        const r = await apiCall(`/api/inventory/movements?${qs}`);
+        const rows = r.data || [];
+        if (!rows.length) {
+            tbody.innerHTML = '<tr><td colspan="10" class="p-6 text-center text-gray-400">Nenhum movimento para os filtros aplicados.</td></tr>';
+        } else {
+            tbody.innerHTML = rows.map(m => `
+                <tr class="hover:bg-gray-50">
+                    <td class="p-2 whitespace-nowrap">${new Date(m.occurred_at).toLocaleString('pt-PT')}</td>
+                    <td class="p-2"><span class="text-[10px] px-1.5 py-0.5 rounded ${badgeClass(m.type)}">${m.type}</span></td>
+                    <td class="p-2">${escapeHtml(m.subtype || '—')}</td>
+                    <td class="p-2">${escapeHtml(m.item?.name || '')}<br><span class="text-[10px] font-mono text-gray-400">${escapeHtml(m.item?.internal_code || '')}</span></td>
+                    <td class="p-2 text-right">${parseFloat(m.quantity).toFixed(2)}</td>
+                    <td class="p-2">${m.from_location ? escapeHtml(`${m.from_location.unit?.name || ''} · ${m.from_location.name}`) : '—'}</td>
+                    <td class="p-2">${m.to_location   ? escapeHtml(`${m.to_location.unit?.name   || ''} · ${m.to_location.name}`)   : '—'}</td>
+                    <td class="p-2">${m.lot ? escapeHtml(m.lot.lot_number) : '—'}</td>
+                    <td class="p-2 text-right">€ ${parseFloat(m.cmp_at_moment || 0).toFixed(2)}</td>
+                    <td class="p-2 max-w-[300px] truncate" title="${escapeHtml(m.justification || '')}">${escapeHtml(m.justification || '—')}</td>
+                </tr>`).join('');
+        }
+        renderPagination(r.pagination);
+    } catch (err) {
+        tbody.innerHTML = `<tr><td colspan="10" class="p-6 text-center text-red-500">${escapeHtml(err.message)}</td></tr>`;
+    }
+}
+
+function renderPagination(p) {
+    if (!p) { document.getElementById('pagination').innerHTML = ''; return; }
+    const el = document.getElementById('pagination');
+    el.innerHTML = `
+        <span>${p.total} registos · página ${p.page} de ${p.totalPages || 1}</span>
+        <div class="flex gap-1">
+            <button onclick="load(${Math.max(1, p.page - 1)})" ${p.page <= 1 ? 'disabled' : ''}
+                    class="px-2 py-1 ${p.page <= 1 ? 'text-gray-300' : 'text-blue-600 hover:bg-blue-50'} rounded">
+                <i class="fas fa-chevron-left"></i> Anterior
+            </button>
+            <button onclick="load(${Math.min(p.totalPages || 1, p.page + 1)})" ${p.page >= p.totalPages ? 'disabled' : ''}
+                    class="px-2 py-1 ${p.page >= p.totalPages ? 'text-gray-300' : 'text-blue-600 hover:bg-blue-50'} rounded">
+                Próxima <i class="fas fa-chevron-right"></i>
+            </button>
+        </div>`;
+}
+
+function resetFilters() {
+    document.getElementById('filtersForm').reset();
+    load(1);
+}
+
+document.getElementById('filtersForm').addEventListener('submit', e => {
+    e.preventDefault();
+    load(1);
+});
+
+async function downloadCurrent(format) {
+    const token = localStorage.getItem('access_token');
+    const qs = buildQueryString({ format });
+    try {
+        const res = await fetch(`/api/inventory/movements?${qs}`, { headers: { Authorization: 'Bearer ' + token } });
+        if (!res.ok) throw new Error('Erro ao gerar arquivo');
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = `historico.${format}`; a.click();
+        URL.revokeObjectURL(url);
+    } catch (err) { toast(err.message, 'error'); }
+}
+
+function escapeHtml(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+bootstrap();
+</script>
+</body>
+</html>

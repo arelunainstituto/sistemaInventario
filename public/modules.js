@@ -28,6 +28,7 @@ class ModuleManager {
                     { id: 'depreciation',      name: 'Depreciação',       icon: 'fas fa-arrow-trend-down',         permission: 'financial' },
                     { id: 'reports',           name: 'Relatórios',        icon: 'fas fa-chart-line',               permission: 'reports' },
                     { id: 'kardex',            name: 'Kardex',            icon: 'fas fa-clipboard-list',           permission: 'reports' },
+                    { id: 'movements',         name: 'Histórico',         icon: 'fas fa-history',                  permission: 'read' },
                     { id: 'scan',              name: 'Ler QR Code',       icon: 'fas fa-qrcode',                   permission: 'read' },
                     { id: 'locations',         name: 'Localizações',      icon: 'fas fa-map-marker-alt',           permission: 'read' },
                     { id: 'categories',        name: 'Subcategorias',     icon: 'fas fa-tags',                     permission: 'read' },
