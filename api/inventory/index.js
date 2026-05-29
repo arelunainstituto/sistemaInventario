@@ -15,6 +15,13 @@ router.use('/items',      require('./items'));
 router.use('/entries',    require('./entries'));
 router.use('/scan',       require('./scan'));
 
+// Fase 2 — Saídas + Movimentações + Ajustes
+router.use('/exits',              require('./exits'));
+router.use('/transfers',          require('./transfers'));
+router.use('/adjustments',        require('./adjustments'));
+router.use('/adjustment-reasons', require('./adjustment-reasons'));
+router.use('/stats',              require('./stats'));
+
 // Healthcheck do módulo (útil para verificar montagem do router)
 router.get('/_health', (_req, res) => {
     res.json({ ok: true, module: 'inventory', stage: 'fase-0' });

@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Inventário · Transferências</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/styles.css">
+    <script>if (!localStorage.getItem('access_token')) window.location.href = '/login.html';</script>
+</head>
+<body class="bg-gray-50" style="font-family: 'Inter', sans-serif;">
+<div id="layoutRoot"></div>
+<script src="_layout.js"></script>
+<script>
+renderInventoryLayout({ activePage: 'transfers', title: 'Transferências Internas', subtitle: 'Movimentação entre localizações (gera 2 movimentos)' });
+
+document.getElementById('pageContent').innerHTML = `
+    <div class="flex justify-between items-center mb-4">
+        <h3 class="text-lg font-bold text-gray-800">Histórico de transferências</h3>
+        <button onclick="openModal()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm"><i class="fas fa-right-left"></i> Nova transferência</button>
+    </div>
+    <div class="bg-white rounded-lg shadow overflow-hidden">
+        <table class="w-full text-sm">
+            <thead class="bg-gray-50 text-xs uppercase text-gray-600">
+                <tr><th class="text-left p-3">Data/hora</th><th class="text-left p-3">Item</th><th class="text-right p-3">Qtd</th><th class="text-left p-3">De</th><th class="text-left p-3">Para</th><th class="text-left p-3">Lote</th><th class="text-left p-3">Justificação</th></tr>
+            </thead>
+            <tbody id="tbody" class="divide-y divide-gray-100"></tbody>
+        </table>
+    </div>
+
+    <div id="modal" class="hidden fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <div class="flex justify-between items-center p-4 border-b">
+                <h3 class="font-bold text-gray-800">Nova transferência</h3>
+                <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600"><i class="fas fa-times"></i></button>
+            </div>
+            <form id="form" class="p-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="md:col-span-3">
+                    <label class="text-xs text-gray-500">Item *</label>
+                    <select name="item_id" required onchange="onItemChange()" id="itemSelect" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                        <option value="">— selecione —</option>
+                    </select>
+                    <p id="patrimonialNotice" class="hidden mt-2 text-xs text-purple-700"><i class="fas fa-info-circle"></i> Item patrimonial — a localização do bem será atualizada para a localização de destino.</p>
+                </div>
+
+                <div id="stockPanel" class="md:col-span-3 hidden border border-indigo-200 bg-indigo-50 rounded-lg p-3 text-xs">
+                    <p class="font-bold text-indigo-700 mb-2"><i class="fas fa-info-circle"></i> Stock disponível:</p>
+                    <div id="stockList"></div>
+                </div>
+
+                <div>
+                    <label class="text-xs text-gray-500">Origem *</label>
+                    <select name="from_location_id" id="fromSelect" required onchange="onFromChange()" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                        <option value="">—</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="text-xs text-gray-500">Destino *</label>
+                    <select name="to_location_id" id="toSelect" required class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                        <option value="">—</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="text-xs text-gray-500">Quantidade *</label>
+                    <input name="quantity" type="number" step="0.0001" required class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                    <p id="maxAvailable" class="text-[10px] text-gray-500 mt-1"></p>
+                </div>
+
+                <div class="md:col-span-2">
+                    <label class="text-xs text-gray-500">Lote</label>
+                    <select name="lot_id" id="lotSelect" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                        <option value="">— Sugestão FEFO automática —</option>
+                    </select>
+                </div>
+                <div class="md:col-span-3">
+                    <label class="text-xs text-gray-500">Justificação (recomendada)</label>
+                    <textarea name="justification" rows="2" placeholder="Motivo da transferência…" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"></textarea>
+                </div>
+
+                <div class="md:col-span-3 flex justify-end gap-2 border-t pt-4">
+                    <button type="button" onclick="closeModal()" class="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">Cancelar</button>
+                    <button type="submit" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium"><i class="fas fa-save"></i> Executar transferência</button>
+                </div>
+            </form>
+        </div>
+    </div>
+`;
+
+let items = [], allLocations = [], currentStock = [];
+
+async function bootstrap() {
+    try {
+        const [it, lo] = await Promise.all([
+            apiCall('/api/inventory/items?limit=1000'),
+            apiCall('/api/inventory/locations')
+        ]);
+        items = it.data || [];
+        allLocations = lo.data || [];
+        document.getElementById('itemSelect').innerHTML = '<option value="">— selecione —</option>' +
+            items.map(i => `<option value="${i.id}" data-controls-lot="${i.controls_lot}" data-macro="${i.macro_category}">${escapeHtml(i.internal_code)} · ${escapeHtml(i.name)}</option>`).join('');
+    } catch (err) { toast(err.message, 'error'); }
+}
+
+async function load() {
+    try {
+        const r = await apiCall('/api/inventory/transfers?limit=100');
+        document.getElementById('tbody').innerHTML = r.data.map(m => `
+            <tr class="hover:bg-gray-50">
+                <td class="p-3 text-xs">${new Date(m.occurred_at).toLocaleString('pt-PT')}</td>
+                <td class="p-3 font-medium">${escapeHtml(m.item?.name || '')}<br><span class="text-[10px] text-gray-400 font-mono">${escapeHtml(m.item?.internal_code || '')}</span></td>
+                <td class="p-3 text-right">${parseFloat(m.quantity).toFixed(2)}</td>
+                <td class="p-3 text-xs text-gray-600">${escapeHtml(m.from_location?.unit?.name || '')} · ${escapeHtml(m.from_location?.name || '')}</td>
+                <td class="p-3 text-xs text-gray-600">${escapeHtml(m.to_location?.unit?.name || '')} · ${escapeHtml(m.to_location?.name || '')}</td>
+                <td class="p-3 text-xs">${m.lot ? escapeHtml(m.lot.lot_number) : '—'}</td>
+                <td class="p-3 text-xs text-gray-600">${escapeHtml(m.justification || '—')}</td>
+            </tr>`).join('') || '<tr><td colspan="7" class="p-6 text-center text-gray-400">Nenhuma transferência registada.</td></tr>';
+    } catch (err) { toast(err.message, 'error'); }
+}
+
+function openModal() {
+    document.getElementById('form').reset();
+    document.getElementById('stockPanel').classList.add('hidden');
+    document.getElementById('patrimonialNotice').classList.add('hidden');
+    document.getElementById('fromSelect').innerHTML = '<option value="">—</option>';
+    document.getElementById('toSelect').innerHTML = '<option value="">—</option>';
+    document.getElementById('lotSelect').innerHTML = '<option value="">— Sugestão FEFO automática —</option>';
+    document.getElementById('maxAvailable').textContent = '';
+    document.getElementById('modal').classList.remove('hidden');
+}
+
+function closeModal() { document.getElementById('modal').classList.add('hidden'); }
+
+async function onItemChange() {
+    const itemId = document.getElementById('itemSelect').value;
+    if (!itemId) return;
+    const itemOpt = document.getElementById('itemSelect').selectedOptions[0];
+    document.getElementById('patrimonialNotice').classList.toggle('hidden', itemOpt.dataset.macro !== 'patrimonial');
+
+    try {
+        const r = await apiCall(`/api/inventory/exits/stock-by-item/${itemId}`);
+        currentStock = r.data || [];
+        if (!currentStock.length) {
+            document.getElementById('stockPanel').classList.remove('hidden');
+            document.getElementById('stockList').innerHTML = '<p class="text-red-600">Sem stock disponível.</p>';
+            return;
+        }
+        document.getElementById('stockPanel').classList.remove('hidden');
+        document.getElementById('stockList').innerHTML = currentStock.map(s => `
+            <div class="flex justify-between py-1 border-b border-indigo-100 last:border-0">
+                <span>${escapeHtml(s.location?.unit?.name || '')} · ${escapeHtml(s.location?.name || '')} ${s.lot ? `· lote ${escapeHtml(s.lot.lot_number)}` : ''}</span>
+                <span class="font-bold">${parseFloat(s.quantity).toFixed(2)}</span>
+            </div>`).join('');
+
+        const fromMap = new Map();
+        for (const s of currentStock) {
+            if (s.location?.can_send !== false) fromMap.set(s.location_id, s.location);
+        }
+        document.getElementById('fromSelect').innerHTML = '<option value="">—</option>' +
+            Array.from(fromMap.values()).map(l => `<option value="${l.id}">${escapeHtml(l.unit?.name || '')} · ${escapeHtml(l.name)}</option>`).join('');
+
+        // Destino: TODAS as localizações can_receive (item pode ir para uma localização sem stock prévio)
+        document.getElementById('toSelect').innerHTML = '<option value="">—</option>' +
+            allLocations.filter(l => l.can_receive !== false)
+                .map(l => `<option value="${l.id}">${escapeHtml(l.unit?.name || '')} · ${escapeHtml(l.name)}</option>`).join('');
+    } catch (err) { toast(err.message, 'error'); }
+}
+
+function onFromChange() {
+    const fromId = document.getElementById('fromSelect').value;
+    const itemOpt = document.getElementById('itemSelect').selectedOptions[0];
+    const controlsLot = itemOpt?.dataset?.controlsLot === 'true';
+
+    const lotsHere = currentStock.filter(s => s.location_id === fromId);
+    const total = lotsHere.reduce((a, s) => a + parseFloat(s.quantity), 0);
+    document.getElementById('maxAvailable').textContent = `Disponível na origem: ${total.toFixed(2)}`;
+
+    // Filtra destino para excluir a origem
+    const toSelect = document.getElementById('toSelect');
+    for (const opt of toSelect.options) {
+        opt.hidden = opt.value === fromId;
+    }
+    if (toSelect.value === fromId) toSelect.value = '';
+
+    if (controlsLot) {
+        const sorted = [...lotsHere].filter(s => s.lot).sort((a, b) =>
+            (a.lot.expiry_date || '9999').localeCompare(b.lot.expiry_date || '9999'));
+        document.getElementById('lotSelect').innerHTML = '<option value="">— Sugestão FEFO automática —</option>' +
+            sorted.map((s, idx) => `<option value="${s.lot.id}">${escapeHtml(s.lot.lot_number)} · qty ${parseFloat(s.quantity).toFixed(2)} · val ${s.lot.expiry_date || 'sem'}${idx === 0 ? ' 🟢 FEFO' : ''}</option>`).join('');
+    } else {
+        document.getElementById('lotSelect').innerHTML = '<option value="">— item não controla lote —</option>';
+    }
+}
+
+document.getElementById('form').addEventListener('submit', async e => {
+    e.preventDefault();
+    const f = e.target;
+    if (f.from_location_id.value === f.to_location_id.value) {
+        toast('Origem e destino não podem ser iguais', 'error');
+        return;
+    }
+    const payload = {
+        item_id: f.item_id.value,
+        from_location_id: f.from_location_id.value,
+        to_location_id: f.to_location_id.value,
+        quantity: parseFloat(f.quantity.value),
+        lot_id: f.lot_id.value || null,
+        justification: f.justification.value || null
+    };
+    try {
+        await apiCall('/api/inventory/transfers', { method: 'POST', body: JSON.stringify(payload) });
+        toast('Transferência executada');
+        closeModal();
+        load();
+    } catch (err) { toast(err.message, 'error'); }
+});
+
+function escapeHtml(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+(async () => { await bootstrap(); await load(); })();
+</script>
+</body>
+</html>
