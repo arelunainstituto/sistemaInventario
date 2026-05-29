@@ -8,8 +8,9 @@ const INVENTORY_NAV = [
     { id: 'exits',       label: 'Saídas',            icon: 'fa-arrow-right-from-bracket', href: 'exits.html' },
     { id: 'transfers',   label: 'Transferências',    icon: 'fa-right-left',  href: 'transfers.html' },
     { id: 'adjustments', label: 'Ajustes',           icon: 'fa-sliders',     href: 'adjustments.html' },
-    { id: 'inventory-session', label: 'Inventário Físico', icon: 'fa-list-check', href: 'inventory-session.html', disabled: true, badge: 'F3' },
-    { id: 'reports',     label: 'Relatórios',        icon: 'fa-chart-line',  href: 'reports.html',   disabled: true, badge: 'F3' },
+    { id: 'inventory-session', label: 'Inventário Físico', icon: 'fa-list-check', href: 'inventory-session.html' },
+    { id: 'reports',     label: 'Relatórios',        icon: 'fa-chart-line',  href: 'reports.html' },
+    { id: 'kardex',      label: 'Kardex',            icon: 'fa-clipboard-list', href: 'kardex.html' },
     { id: 'scan',        label: 'Ler QR Code',       icon: 'fa-qrcode',      href: 'scan.html' },
 ];
 

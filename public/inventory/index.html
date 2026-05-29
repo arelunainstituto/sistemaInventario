@@ -25,11 +25,13 @@
     });
 
     document.getElementById('pageContent').innerHTML = `
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
             ${card('Total de itens', 'total_items', 'fa-boxes-stacked', 'blue')}
-            ${card('Itens ativos', 'active_items', 'fa-check-circle', 'green')}
+            ${card('Ativos', 'active_items', 'fa-check-circle', 'green')}
             ${card('Abaixo do mínimo', 'below_min', 'fa-triangle-exclamation', 'yellow')}
-            ${card('Valor total (CMP × qtd)', 'total_value', 'fa-euro-sign', 'purple', '€ ')}
+            ${card('Valor total', 'total_value', 'fa-euro-sign', 'purple', '€ ')}
+            ${card('Cobertura média (dias)', 'avg_coverage', 'fa-clock', 'cyan')}
+            ${card('Lotes vencendo (30d)', 'expiring_count', 'fa-hourglass-half', 'orange')}
         </div>
 
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -83,15 +85,17 @@
                 apiCall('/api/inventory/transfers?limit=5')
             ]);
 
-            setCard('total_items',  stats.data.total_items);
-            setCard('active_items', stats.data.active_items);
-            setCard('below_min',    stats.data.below_min);
-            setCard('total_value',  stats.data.total_value.toFixed(2));
+            setCard('total_items',    stats.data.total_items);
+            setCard('active_items',   stats.data.active_items);
+            setCard('below_min',      stats.data.below_min);
+            setCard('total_value',    stats.data.total_value.toFixed(2));
+            setCard('avg_coverage',   stats.data.avg_coverage !== null ? stats.data.avg_coverage : '—');
+            setCard('expiring_count', stats.data.expiring_count);
 
             document.getElementById('criticalItems').innerHTML = stats.data.critical_items.length
                 ? stats.data.critical_items.map(i => `
                     <div class="flex justify-between py-2 border-b border-gray-100 last:border-0">
-                        <span class="text-gray-800">${escapeHtml(i.name)}</span>
+                        <span class="text-gray-800">${escapeHtml(i.internal_code)} · ${escapeHtml(i.name)}</span>
                         <span class="text-xs ${i.stock === 0 ? 'text-red-600 font-bold' : 'text-yellow-600'}">${i.stock.toFixed(2)} / mín ${i.min_stock.toFixed(2)}</span>
                     </div>`).join('')
                 : '<p class="text-green-600"><i class="fas fa-check"></i> Nenhum item abaixo do mínimo.</p>';

@@ -22,6 +22,11 @@ router.use('/adjustments',        require('./adjustments'));
 router.use('/adjustment-reasons', require('./adjustment-reasons'));
 router.use('/stats',              require('./stats'));
 
+// Fase 3 — Inventário Físico + Relatórios + Depreciação
+router.use('/inventory-sessions', require('./inventory-sessions'));
+router.use('/reports',            require('./reports'));
+router.use('/depreciation',       require('./depreciation'));
+
 // Healthcheck do módulo (útil para verificar montagem do router)
 router.get('/_health', (_req, res) => {
     res.json({ ok: true, module: 'inventory', stage: 'fase-0' });

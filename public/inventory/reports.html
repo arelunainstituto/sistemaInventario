@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Inventário · Relatórios</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/styles.css">
+    <script>if (!localStorage.getItem('access_token')) window.location.href = '/login.html';</script>
+</head>
+<body class="bg-gray-50" style="font-family: 'Inter', sans-serif;">
+<div id="layoutRoot"></div>
+<script src="_layout.js"></script>
+<script>
+renderInventoryLayout({ activePage: 'reports', title: 'Relatórios', subtitle: 'Indicadores e exportações (§12)' });
+
+const REPORTS = [
+    { key: 'reorder',            label: 'Ponto de Reposição',         icon: 'fa-rotate',          color: 'red',     section: '§12.1', endpoint: '/reports/reorder' },
+    { key: 'stock-min-max',      label: 'Abaixo do Mínimo / Acima do Máximo', icon: 'fa-triangle-exclamation', color: 'orange', section: '§12.2', endpoint: '/reports/stock-min-max' },
+    { key: 'coverage',           label: 'Cobertura de Stock',         icon: 'fa-clock',           color: 'blue',    section: '§12.3', endpoint: '/reports/coverage' },
+    { key: 'valuation',          label: 'Valorização de Stock',       icon: 'fa-euro-sign',       color: 'purple',  section: '§12.4', endpoint: '/reports/valuation' },
+    { key: 'inventory-sessions', label: 'Inventário (Contagem)',      icon: 'fa-list-check',      color: 'indigo',  section: '§12.5', endpoint: '/reports/inventory-sessions' },
+    { key: 'consumption-trend',  label: 'Tendência de Consumo',       icon: 'fa-chart-line',      color: 'green',   section: '§12.7', endpoint: '/reports/consumption-trend' },
+    { key: 'user-activity',      label: 'Movimentos por Utilizador',  icon: 'fa-user-clock',      color: 'gray',    section: '§12.8', endpoint: '/reports/user-activity' }
+];
+
+document.getElementById('pageContent').innerHTML = `
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+        ${REPORTS.map(r => `
+            <button onclick="openReport('${r.key}')" class="bg-white rounded-lg shadow p-5 text-left hover:shadow-md transition">
+                <div class="flex items-start gap-3">
+                    <div class="w-10 h-10 rounded-lg bg-${r.color}-100 flex items-center justify-center text-${r.color}-600 flex-shrink-0">
+                        <i class="fas ${r.icon}"></i>
+                    </div>
+                    <div>
+                        <p class="font-bold text-gray-800">${r.label}</p>
+                        <p class="text-xs text-gray-500 mt-1">${r.section}</p>
+                    </div>
+                </div>
+            </button>
+        `).join('')}
+        <a href="kardex.html" class="bg-white rounded-lg shadow p-5 text-left hover:shadow-md transition block">
+            <div class="flex items-start gap-3">
+                <div class="w-10 h-10 rounded-lg bg-teal-100 flex items-center justify-center text-teal-600 flex-shrink-0">
+                    <i class="fas fa-clipboard-list"></i>
+                </div>
+                <div>
+                    <p class="font-bold text-gray-800">Ficha Kardex</p>
+                    <p class="text-xs text-gray-500 mt-1">§12.6 — abrir tela dedicada</p>
+                </div>
+            </div>
+        </a>
+    </div>
+
+    <div id="reportPanel" class="bg-white rounded-lg shadow p-6 hidden">
+        <div class="flex justify-between items-start mb-4">
+            <div>
+                <h3 id="reportTitle" class="text-lg font-bold text-gray-800">—</h3>
+                <p id="reportSubtitle" class="text-sm text-gray-500"></p>
+            </div>
+            <div class="flex gap-2">
+                <button onclick="downloadCurrent('csv')" class="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 rounded-lg text-xs"><i class="fas fa-file-csv"></i> CSV</button>
+                <button onclick="downloadCurrent('xlsx')" class="px-3 py-1.5 bg-green-100 hover:bg-green-200 text-green-800 rounded-lg text-xs"><i class="fas fa-file-excel"></i> Excel</button>
+                <button onclick="downloadCurrent('pdf')" class="px-3 py-1.5 bg-red-100 hover:bg-red-200 text-red-800 rounded-lg text-xs"><i class="fas fa-file-pdf"></i> PDF</button>
+            </div>
+        </div>
+        <div id="reportTable" class="overflow-x-auto max-h-[600px] overflow-y-auto"></div>
+    </div>
+`;
+
+let currentReport = null;
+
+async function openReport(key) {
+    const r = REPORTS.find(x => x.key === key);
+    if (!r) return;
+    currentReport = r;
+    document.getElementById('reportPanel').classList.remove('hidden');
+    document.getElementById('reportTitle').textContent = r.label;
+    document.getElementById('reportSubtitle').textContent = r.section;
+    document.getElementById('reportTable').innerHTML = '<p class="text-sm text-gray-400 p-4">Carregando…</p>';
+    try {
+        const res = await apiCall(`/api/inventory${r.endpoint}`);
+        const rows = res.data || [];
+        const columns = res.columns || [];
+        if (!rows.length) {
+            document.getElementById('reportTable').innerHTML = '<p class="text-sm text-gray-400 p-6 text-center">Sem dados para este relatório.</p>';
+            return;
+        }
+        const html = `
+            <table class="w-full text-xs">
+                <thead class="bg-gray-50 text-xs uppercase text-gray-600 sticky top-0">
+                    <tr>${columns.map(c => `<th class="text-left p-2">${escapeHtml(c.label || c.key)}</th>`).join('')}</tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100">
+                    ${rows.map(row => `<tr class="hover:bg-gray-50">${columns.map(c => {
+                        const v = row[c.key];
+                        return `<td class="p-2">${v === null || v === undefined ? '—' : escapeHtml(String(v))}</td>`;
+                    }).join('')}</tr>`).join('')}
+                </tbody>
+            </table>`;
+        document.getElementById('reportTable').innerHTML = html;
+        document.getElementById('reportSubtitle').textContent = `${r.section} · ${rows.length} registos`;
+    } catch (err) {
+        document.getElementById('reportTable').innerHTML = `<p class="text-sm text-red-500 p-4">${escapeHtml(err.message)}</p>`;
+    }
+}
+
+async function downloadCurrent(format) {
+    if (!currentReport) return;
+    const token = localStorage.getItem('access_token');
+    try {
+        const res = await fetch(`/api/inventory${currentReport.endpoint}?format=${format}`, {
+            headers: { Authorization: 'Bearer ' + token }
+        });
+        if (!res.ok) throw new Error('Erro ao gerar arquivo');
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${currentReport.key}.${format}`;
+        a.click();
+        URL.revokeObjectURL(url);
+    } catch (err) { toast(err.message, 'error'); }
+}
+
+function escapeHtml(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+</script>
+</body>
+</html>

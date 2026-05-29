@@ -18,17 +18,20 @@ class ModuleManager {
                 emoji: '📦',
                 url: 'inventory/index.html',
                 tabs: [
-                    { id: 'dashboard',   name: 'Dashboard',       icon: 'fas fa-chart-pie',              permission: 'read' },
-                    { id: 'items',       name: 'Itens',           icon: 'fas fa-boxes-stacked',          permission: 'read' },
-                    { id: 'entries',     name: 'Entradas',        icon: 'fas fa-arrow-right-to-bracket', permission: 'entry' },
-                    { id: 'exits',       name: 'Saídas',          icon: 'fas fa-arrow-right-from-bracket', permission: 'exit' },
-                    { id: 'transfers',   name: 'Transferências',  icon: 'fas fa-right-left',             permission: 'transfer' },
-                    { id: 'adjustments', name: 'Ajustes',         icon: 'fas fa-sliders',                permission: 'adjust' },
-                    { id: 'scan',        name: 'Ler QR Code',     icon: 'fas fa-qrcode',                 permission: 'read' },
-                    { id: 'locations',   name: 'Localizações',    icon: 'fas fa-map-marker-alt',         permission: 'read' },
-                    { id: 'categories',  name: 'Subcategorias',   icon: 'fas fa-tags',                   permission: 'read' },
-                    { id: 'suppliers',   name: 'Fornecedores',    icon: 'fas fa-truck',                  permission: 'read' },
-                    { id: 'uoms',        name: 'Un. medida',      icon: 'fas fa-ruler',                  permission: 'read' }
+                    { id: 'dashboard',         name: 'Dashboard',         icon: 'fas fa-chart-pie',                permission: 'read' },
+                    { id: 'items',             name: 'Itens',             icon: 'fas fa-boxes-stacked',            permission: 'read' },
+                    { id: 'entries',           name: 'Entradas',          icon: 'fas fa-arrow-right-to-bracket',   permission: 'entry' },
+                    { id: 'exits',             name: 'Saídas',            icon: 'fas fa-arrow-right-from-bracket', permission: 'exit' },
+                    { id: 'transfers',         name: 'Transferências',    icon: 'fas fa-right-left',               permission: 'transfer' },
+                    { id: 'adjustments',       name: 'Ajustes',           icon: 'fas fa-sliders',                  permission: 'adjust' },
+                    { id: 'inventory-session', name: 'Inventário Físico', icon: 'fas fa-list-check',               permission: 'inventory_session' },
+                    { id: 'reports',           name: 'Relatórios',        icon: 'fas fa-chart-line',               permission: 'reports' },
+                    { id: 'kardex',            name: 'Kardex',            icon: 'fas fa-clipboard-list',           permission: 'reports' },
+                    { id: 'scan',              name: 'Ler QR Code',       icon: 'fas fa-qrcode',                   permission: 'read' },
+                    { id: 'locations',         name: 'Localizações',      icon: 'fas fa-map-marker-alt',           permission: 'read' },
+                    { id: 'categories',        name: 'Subcategorias',     icon: 'fas fa-tags',                     permission: 'read' },
+                    { id: 'suppliers',         name: 'Fornecedores',      icon: 'fas fa-truck',                    permission: 'read' },
+                    { id: 'uoms',              name: 'Un. medida',        icon: 'fas fa-ruler',                    permission: 'read' }
                 ]
             },
             {
