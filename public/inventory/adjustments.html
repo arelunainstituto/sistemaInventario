@@ -126,7 +126,9 @@ async function load() {
     try {
         const r = await apiCall('/api/inventory/adjustments?limit=100');
         document.getElementById('tbody').innerHTML = r.data.map(m => {
-            const sign = m.from_location_id ? -1 : 1;
+            // Convenção: from_location preenchido = ajuste negativo; to_location preenchido = positivo.
+            // (Conferimos pelo objeto aninhado porque o SELECT não traz os _id crus.)
+            const sign = m.from_location ? -1 : 1;
             const loc = m.from_location || m.to_location;
             return `<tr class="hover:bg-gray-50">
                 <td class="p-3 text-xs">${new Date(m.occurred_at).toLocaleString('pt-PT')}</td>
@@ -175,7 +177,7 @@ function onLocationChange() {
 
     const lotsHere = currentStockList.filter(s => s.location_id === locId && s.lot);
     if (controlsLot) {
-        document.getElementById('lotSelect').innerHTML = '<option value="">— sem lote —</option>' +
+        document.getElementById('lotSelect').innerHTML = '<option value="">— selecione um lote —</option>' +
             lotsHere.map(s => `<option value="${s.lot.id}">${escapeHtml(s.lot.lot_number)} · qty ${parseFloat(s.quantity).toFixed(2)} · val ${s.lot.expiry_date || 'sem'}</option>`).join('');
     } else {
         document.getElementById('lotSelect').innerHTML = '<option value="">— item não controla lote —</option>';
@@ -186,13 +188,33 @@ function onLocationChange() {
 function recalcStockDisplay() {
     const locId = document.getElementById('locationSelect').value;
     const lotId = document.getElementById('lotSelect').value;
-    if (!locId) { document.getElementById('currentStock').textContent = '—'; return; }
+    const itemOpt = document.getElementById('itemSelect').selectedOptions[0];
+    const controlsLot = itemOpt?.dataset?.controlsLot === 'true';
+    const stockEl = document.getElementById('currentStock');
 
-    const match = currentStockList.find(s =>
-        s.location_id === locId && (lotId ? s.lot?.id === lotId : !s.lot)
-    );
-    const current = match ? parseFloat(match.quantity) : 0;
-    document.getElementById('currentStock').textContent = current.toFixed(2);
+    if (!locId) { stockEl.textContent = '—'; stockEl.title = ''; recalcDelta(); return; }
+
+    let current = 0;
+    let label = '';
+    if (lotId) {
+        // Triplo completo (item, localização, lote específico)
+        const match = currentStockList.find(s => s.location_id === locId && s.lot?.id === lotId);
+        current = match ? parseFloat(match.quantity) : 0;
+    } else if (controlsLot) {
+        // Item controla lote mas nenhum selecionado: mostra soma total da localização
+        // para o utilizador ter contexto (mas precisa escolher lote antes de ajustar)
+        current = currentStockList
+            .filter(s => s.location_id === locId)
+            .reduce((acc, s) => acc + parseFloat(s.quantity || 0), 0);
+        label = '⚠️ Selecione um lote para ajustar';
+    } else {
+        // Item NÃO controla lote: triplo é (item, localização, sem lote)
+        const match = currentStockList.find(s => s.location_id === locId && !s.lot);
+        current = match ? parseFloat(match.quantity) : 0;
+    }
+    stockEl.textContent = current.toFixed(2);
+    stockEl.title = label;
+    document.getElementById('pctIndicator').textContent = label;
     recalcDelta();
 }
 
@@ -218,6 +240,12 @@ document.getElementById('form').addEventListener('submit', async e => {
     const f = e.target;
     const sign = parseInt(f.sign.value);
     const qty = parseFloat(f.qty.value);
+    const itemOpt = document.getElementById('itemSelect').selectedOptions[0];
+    const controlsLot = itemOpt?.dataset?.controlsLot === 'true';
+    if (controlsLot && !f.lot_id.value) {
+        toast('Item controla lote — selecione um lote específico antes de ajustar (RN03)', 'error');
+        return;
+    }
     const payload = {
         item_id: f.item_id.value,
         location_id: f.location_id.value,
