@@ -62,6 +62,64 @@ async function attachUserProfiles(rows) {
     return rows.map(r => ({ ...r, user: r.user_id ? (byId.get(r.user_id) || null) : null }));
 }
 
+// Resolve entity_id (UUID nu) para uma label amigável por tipo de entidade.
+// Faz lookup em batch agrupando por entity_type — N queries para N tipos
+// distintos, não N queries por linha.
+const ENTITY_RESOLVERS = {
+    items:        { table: 'inv_items',              select: 'id, internal_code, name',  label: r => `${r.internal_code} · ${r.name}` },
+    suppliers:    { table: 'inv_suppliers',          select: 'id, name',                  label: r => r.name },
+    locations:    { table: 'inv_locations',          select: 'id, name',                  label: r => r.name },
+    categories:   { table: 'inv_categories',         select: 'id, name, parent_macro',    label: r => `${r.parent_macro} · ${r.name}` },
+    uoms:         { table: 'inv_units_of_measure',   select: 'id, code, name',            label: r => `${r.code} · ${r.name}` },
+    units:        { table: 'inv_units',              select: 'id, code, name',            label: r => r.name },
+    entries:      { table: 'inv_entries',            select: 'id, document_type, document_number', label: r => `${r.document_type} ${r.document_number}` },
+    'inventory-sessions':  { table: 'inv_inventory_sessions', select: 'id', label: r => `sessão ${r.id.slice(0,8)}` },
+    'adjustment-reasons':  { table: 'inv_adjustment_reasons', select: 'id, label', label: r => r.label }
+};
+
+// Sub-paths que não são UUIDs, são "actions" do endpoint (ex.: /stats/summary).
+// Mostrar de forma legível em vez de tratar como entity_id.
+function isActionSubpath(entity_id) {
+    return /^[a-z][a-z_-]+$/i.test(entity_id || '');
+}
+
+async function attachEntityLabels(rows) {
+    // Agrupa entity_ids reais (UUIDs) por entity_type
+    const byType = {};
+    for (const r of rows) {
+        if (!r.entity_id || !r.entity_type) continue;
+        if (!ENTITY_RESOLVERS[r.entity_type]) continue;
+        if (isActionSubpath(r.entity_id)) continue;   // é "summary", "runs", etc.
+        (byType[r.entity_type] = byType[r.entity_type] || new Set()).add(r.entity_id);
+    }
+
+    const labelsByTypeId = {};
+    for (const [type, ids] of Object.entries(byType)) {
+        const resolver = ENTITY_RESOLVERS[type];
+        const { data } = await supabaseAdmin
+            .from(resolver.table)
+            .select(resolver.select)
+            .in('id', [...ids]);
+        labelsByTypeId[type] = new Map((data || []).map(d => [d.id, resolver.label(d)]));
+    }
+
+    return rows.map(r => {
+        let entity_label = null;
+        if (r.entity_id) {
+            if (isActionSubpath(r.entity_id)) {
+                entity_label = r.entity_id;  // já é legível ("summary", "runs"...)
+            } else if (labelsByTypeId[r.entity_type]?.has(r.entity_id)) {
+                entity_label = labelsByTypeId[r.entity_type].get(r.entity_id);
+            } else if (r.entity_id.length === 36) {
+                entity_label = r.entity_id.slice(0, 8) + '…';  // UUID não resolvido (item apagado?)
+            } else {
+                entity_label = r.entity_id;
+            }
+        }
+        return { ...r, entity_label };
+    });
+}
+
 // GET / — lista paginada com filtros
 router.get('/', requireRole(ADMIN_ROLES), async (req, res) => {
     try {
@@ -84,30 +142,32 @@ router.get('/', requireRole(ADMIN_ROLES), async (req, res) => {
         if (format && format !== 'json') {
             const { data, error } = await q.limit(10000);
             if (error) throw error;
-            const enriched = await attachUserProfiles(data || []);
+            const withUsers = await attachUserProfiles(data || []);
+            const enriched  = await attachEntityLabels(withUsers);
             const rows = enriched.map(r => ({
-                created_at:  new Date(r.created_at).toLocaleString('pt-PT'),
-                user:        r.user?.display_name || r.user?.email || (r.user_id ? r.user_id.slice(0, 8) : '—'),
-                ip:          r.ip || '—',
-                method:      r.method,
-                path:        r.path,
-                entity_type: r.entity_type || '—',
-                entity_id:   r.entity_id || '—',
-                status:      r.status_code,
-                duration_ms: r.duration_ms
+                created_at:   new Date(r.created_at).toLocaleString('pt-PT'),
+                user:         r.user?.display_name || r.user?.email || (r.user_id ? r.user_id.slice(0, 8) : '—'),
+                ip:           r.ip || '—',
+                method:       r.method,
+                path:         r.path,
+                entity_type:  r.entity_type || '—',
+                entity_label: r.entity_label || '—',
+                status:       r.status_code,
+                duration_ms:  r.duration_ms
             }));
             return sendReport(res, format, {
                 title: 'Log de Acesso (§17)',
                 subtitle: 'Auditoria de chamadas à API do inventário',
                 columns: [
-                    { key: 'created_at',  label: 'Data/hora',  width: 110 },
-                    { key: 'user',        label: 'Utilizador', width: 110 },
-                    { key: 'ip',          label: 'IP',         width: 80  },
-                    { key: 'method',      label: 'Método',     width: 50  },
-                    { key: 'path',        label: 'Path',       width: 180 },
-                    { key: 'entity_type', label: 'Entidade',   width: 70  },
-                    { key: 'status',      label: 'Status',     width: 45  },
-                    { key: 'duration_ms', label: 'ms',         width: 45  }
+                    { key: 'created_at',   label: 'Data/hora',  width: 110 },
+                    { key: 'user',         label: 'Utilizador', width: 100 },
+                    { key: 'ip',           label: 'IP',         width: 80  },
+                    { key: 'method',       label: 'Método',     width: 50  },
+                    { key: 'path',         label: 'Path',       width: 150 },
+                    { key: 'entity_type',  label: 'Tipo',       width: 60  },
+                    { key: 'entity_label', label: 'Alvo',       width: 130 },
+                    { key: 'status',       label: 'Status',     width: 45  },
+                    { key: 'duration_ms',  label: 'ms',         width: 45  }
                 ],
                 rows
             });

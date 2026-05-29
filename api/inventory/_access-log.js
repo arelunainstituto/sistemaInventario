@@ -51,30 +51,38 @@ function getClientIp(req) {
 function accessLog(req, res, next) {
     if (!shouldLog(req)) return next();
 
+    // Capturamos AGORA, antes dos sub-routers reescreverem req.url/req.path.
+    // (Express muta req.url ao entrar num sub-router, fazendo req.path ficar
+    // relativo. Sem capturar aqui, terminaríamos com "/summary" em vez de
+    // "/stats/summary" no log.)
+    const capturedPath   = req.path;
+    const capturedMethod = req.method.toUpperCase();
+    const capturedIp     = getClientIp(req);
+    const capturedUA     = (req.headers['user-agent'] || '').slice(0, 500);
+    const capturedUser   = req.user?.id || null;
+    const { entity_type, entity_id } = parsePath(capturedPath);
+
     const start = Date.now();
     const originalEnd = res.end;
 
     res.end = function (...args) {
-        const duration = Date.now() - start;
-        const { entity_type, entity_id } = parsePath(req.path);
+        const duration   = Date.now() - start;
         const statusCode = res.statusCode;
 
-        // Inserção async (não bloqueia a resposta)
         setImmediate(async () => {
             try {
                 await supabaseAdmin.from('inv_access_log').insert({
-                    user_id:     req.user?.id || null,
-                    ip:          getClientIp(req),
-                    user_agent:  (req.headers['user-agent'] || '').slice(0, 500),
-                    method:      req.method.toUpperCase(),
-                    path:        req.path.slice(0, 300),
+                    user_id:     capturedUser,
+                    ip:          capturedIp,
+                    user_agent:  capturedUA,
+                    method:      capturedMethod,
+                    path:        capturedPath.slice(0, 300),
                     entity_type,
                     entity_id,
                     status_code: statusCode,
                     duration_ms: duration
                 });
             } catch (err) {
-                // Falha silenciosa para não impactar requisição do utilizador
                 console.error('[access-log] insert failed:', err.message);
             }
         });

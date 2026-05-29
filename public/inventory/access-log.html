@@ -89,10 +89,9 @@ document.getElementById('pageContent').innerHTML = `
                     <tr>
                         <th class="text-left p-2">Data/hora</th>
                         <th class="text-left p-2">Utilizador</th>
-                        <th class="text-left p-2">IP</th>
                         <th class="text-left p-2">Método</th>
-                        <th class="text-left p-2">Path</th>
-                        <th class="text-left p-2">Entidade</th>
+                        <th class="text-left p-2">Ação</th>
+                        <th class="text-left p-2">Alvo</th>
                         <th class="text-center p-2">Status</th>
                         <th class="text-right p-2">ms</th>
                     </tr>
@@ -106,6 +105,37 @@ document.getElementById('pageContent').innerHTML = `
 
 let currentPage = 1;
 const LIMIT = 100;
+
+// Traduz (método, entity_type, path) numa descrição legível
+const ACTION_VERBS = {
+    POST:   'Criou',
+    PUT:    'Atualizou',
+    PATCH:  'Atualizou',
+    DELETE: 'Removeu',
+    GET:    'Consultou'
+};
+const ENTITY_LABELS = {
+    items: 'item', suppliers: 'fornecedor', locations: 'localização',
+    categories: 'subcategoria', uoms: 'unidade de medida', units: 'unidade',
+    entries: 'entrada', exits: 'saída', transfers: 'transferência',
+    adjustments: 'ajuste', 'inventory-sessions': 'sessão de inventário',
+    'adjustment-reasons': 'motivo de ajuste', depreciation: 'depreciação',
+    reports: 'relatório', stats: 'estatística', search: 'busca',
+    'access-log': 'log de acesso', scan: 'leitura QR', movements: 'movimento'
+};
+function describeAction(l) {
+    const verb = ACTION_VERBS[l.method] || l.method;
+    const entity = ENTITY_LABELS[l.entity_type] || l.entity_type || '';
+    if (!entity) return verb;
+    // Casos especiais: ações típicas
+    if (l.path.endsWith('/validate'))  return 'Validou sessão de inventário';
+    if (l.path.endsWith('/cancel'))    return 'Cancelou sessão de inventário';
+    if (l.path.endsWith('/purge'))     return 'Purgou log de acesso';
+    if (l.path.endsWith('/run'))       return 'Executou depreciação anual';
+    if (l.path.endsWith('/settings'))  return `${verb} configurações`;
+    if (l.path.endsWith('/summary'))   return 'Carregou painel';
+    return `${verb} ${entity}`;
+}
 
 function methodBadge(m) {
     const map = { GET: 'bg-blue-100 text-blue-700', POST: 'bg-green-100 text-green-700', PUT: 'bg-amber-100 text-amber-700', PATCH: 'bg-amber-100 text-amber-700', DELETE: 'bg-red-100 text-red-700' };
@@ -168,17 +198,25 @@ async function load(page = 1) {
         if (!rows.length) {
             tbody.innerHTML = '<tr><td colspan="8" class="p-6 text-center text-gray-400">Nenhum registo encontrado.</td></tr>';
         } else {
-            tbody.innerHTML = rows.map(l => `
+            tbody.innerHTML = rows.map(l => {
+                const action = describeAction(l);
+                return `
                 <tr class="hover:bg-gray-50">
                     <td class="p-2 whitespace-nowrap">${new Date(l.created_at).toLocaleString('pt-PT')}</td>
-                    <td class="p-2">${escapeHtml(l.user?.display_name || l.user?.email || (l.user_id ? l.user_id.slice(0,8) : '—'))}</td>
-                    <td class="p-2 font-mono text-[10px]">${escapeHtml(l.ip || '—')}</td>
+                    <td class="p-2">
+                        ${escapeHtml(l.user?.display_name || l.user?.email || (l.user_id ? l.user_id.slice(0,8) : '—'))}
+                        <span class="text-[10px] text-gray-400 font-mono ml-1">${escapeHtml(l.ip || '')}</span>
+                    </td>
                     <td class="p-2"><span class="text-[10px] px-1.5 py-0.5 rounded ${methodBadge(l.method)}">${l.method}</span></td>
-                    <td class="p-2 font-mono text-[10px] max-w-[260px] truncate" title="${escapeHtml(l.path)}">${escapeHtml(l.path)}</td>
-                    <td class="p-2">${escapeHtml(l.entity_type || '—')}</td>
+                    <td class="p-2">
+                        <span class="text-gray-800">${escapeHtml(action)}</span>
+                        <span class="text-[10px] text-gray-400 font-mono ml-1" title="${escapeHtml(l.path)}">${escapeHtml(l.path)}</span>
+                    </td>
+                    <td class="p-2">${escapeHtml(l.entity_label || '—')}</td>
                     <td class="p-2 text-center ${statusColor(l.status_code)}">${l.status_code}</td>
                     <td class="p-2 text-right text-gray-500">${l.duration_ms}</td>
-                </tr>`).join('');
+                </tr>`;
+            }).join('');
         }
         renderPagination(r.pagination);
     } catch (err) {
