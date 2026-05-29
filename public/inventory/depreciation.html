@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Inventário · Depreciação Anual</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/styles.css">
+    <script>if (!localStorage.getItem('access_token')) window.location.href = '/login.html';</script>
+</head>
+<body class="bg-gray-50" style="font-family: 'Inter', sans-serif;">
+<div id="layoutRoot"></div>
+<script src="_layout.js"></script>
+<script>
+renderInventoryLayout({
+    activePage: 'depreciation',
+    title: 'Depreciação Anual',
+    subtitle: 'RN09 — baixa contábil anual dos bens patrimoniais'
+});
+
+document.getElementById('pageContent').innerHTML = `
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div class="bg-white rounded-lg shadow p-6 lg:col-span-1">
+            <h3 class="font-bold text-gray-800 mb-2 flex items-center gap-2">
+                <i class="fas fa-play-circle text-purple-600"></i> Executar depreciação
+            </h3>
+            <p class="text-xs text-gray-500 mb-4">
+                Aplica a taxa de depreciação anual em cada bem patrimonial <strong>em uso</strong>.
+                Cada ano só pode ser executado <strong>uma vez</strong> (RN09).
+                Há também execução automática em 1 de janeiro às 04h00 via cron.
+            </p>
+            <form id="runForm" class="space-y-3">
+                <div>
+                    <label class="text-xs text-gray-500">Ano a executar *</label>
+                    <input name="year" type="number" required min="2024" max="2100"
+                           value="${new Date().getFullYear()}"
+                           class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                </div>
+                <button type="submit"
+                        class="w-full bg-purple-600 hover:bg-purple-700 text-white py-2 rounded-lg text-sm font-medium">
+                    <i class="fas fa-play"></i> Executar depreciação
+                </button>
+            </form>
+            <p class="text-[10px] text-gray-400 mt-3">
+                <i class="fas fa-shield"></i> Apenas Inventory_Admin ou Admin.
+            </p>
+        </div>
+
+        <div class="bg-white rounded-lg shadow p-6 lg:col-span-2">
+            <h3 class="font-bold text-gray-800 mb-4 flex items-center gap-2">
+                <i class="fas fa-history text-gray-600"></i> Histórico de execuções
+            </h3>
+            <table class="w-full text-sm">
+                <thead class="bg-gray-50 text-xs uppercase text-gray-600">
+                    <tr>
+                        <th class="text-left p-2">Ano</th>
+                        <th class="text-left p-2">Executado em</th>
+                        <th class="text-left p-2">Origem</th>
+                        <th class="text-right p-2">Processados</th>
+                        <th class="text-right p-2">Baixados</th>
+                        <th class="text-right p-2">Valor depreciado</th>
+                        <th class="text-center p-2">Estado</th>
+                    </tr>
+                </thead>
+                <tbody id="runsTbody" class="divide-y divide-gray-100">
+                    <tr><td colspan="7" class="p-6 text-center text-gray-400">Carregando…</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+`;
+
+async function loadRuns() {
+    try {
+        const r = await apiCall('/api/inventory/depreciation/runs');
+        const rows = r.data || [];
+        document.getElementById('runsTbody').innerHTML = rows.length
+            ? rows.map(run => `
+                <tr class="hover:bg-gray-50">
+                    <td class="p-2 font-bold">${run.year}</td>
+                    <td class="p-2 text-xs">${new Date(run.run_at).toLocaleString('pt-PT')}</td>
+                    <td class="p-2"><span class="text-xs px-2 py-0.5 rounded ${run.triggered_by === 'cron' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}">${run.triggered_by}</span></td>
+                    <td class="p-2 text-right">${run.items_processed}</td>
+                    <td class="p-2 text-right text-red-600">${run.items_written_off}</td>
+                    <td class="p-2 text-right">€ ${parseFloat(run.total_value || 0).toFixed(2)}</td>
+                    <td class="p-2 text-center">
+                        <span class="text-xs px-2 py-0.5 rounded ${run.status === 'concluido' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}">${run.status}</span>
+                    </td>
+                </tr>`).join('')
+            : '<tr><td colspan="7" class="p-6 text-center text-gray-400">Nenhuma execução registada.</td></tr>';
+    } catch (err) {
+        document.getElementById('runsTbody').innerHTML = `<tr><td colspan="7" class="p-6 text-center text-red-500">${escapeHtml(err.message)}</td></tr>`;
+    }
+}
+
+document.getElementById('runForm').addEventListener('submit', async e => {
+    e.preventDefault();
+    const year = parseInt(new FormData(e.target).get('year'));
+    const msg = `Executar depreciação anual para ${year}?\n\nA operação:\n• Aplica taxa em cada bem patrimonial em uso\n• Atualiza CMP e baixa quem zerou\n• Não pode ser desfeita (RN07)\n• Não pode ser repetida no mesmo ano (RN09)`;
+    if (!confirm(msg)) return;
+
+    try {
+        const r = await apiCall('/api/inventory/depreciation/run', {
+            method: 'POST', body: JSON.stringify({ year })
+        });
+        toast(`Depreciação ${year} executada (run ${r.data.run_id.slice(0,8)})`);
+        loadRuns();
+    } catch (err) {
+        toast(err.message, 'error');
+    }
+});
+
+function escapeHtml(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+loadRuns();
+</script>
+</body>
+</html>

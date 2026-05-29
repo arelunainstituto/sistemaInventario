@@ -9,6 +9,7 @@ const INVENTORY_NAV = [
     { id: 'transfers',   label: 'Transferências',    icon: 'fa-right-left',  href: 'transfers.html' },
     { id: 'adjustments', label: 'Ajustes',           icon: 'fa-sliders',     href: 'adjustments.html' },
     { id: 'inventory-session', label: 'Inventário Físico', icon: 'fa-list-check', href: 'inventory-session.html' },
+    { id: 'depreciation', label: 'Depreciação',       icon: 'fa-arrow-trend-down', href: 'depreciation.html' },
     { id: 'reports',     label: 'Relatórios',        icon: 'fa-chart-line',  href: 'reports.html' },
     { id: 'kardex',      label: 'Kardex',            icon: 'fa-clipboard-list', href: 'kardex.html' },
     { id: 'scan',        label: 'Ler QR Code',       icon: 'fa-qrcode',      href: 'scan.html' },
@@ -75,6 +76,24 @@ function renderInventoryLayout({ activePage = 'dashboard', title = 'Inventário'
                 <p class="text-sm text-gray-500">${subtitle}</p>
             </div>
             <div class="flex items-center gap-4">
+                <!-- Badge global de alertas (§16) -->
+                <div class="relative">
+                    <button id="alertsBell" onclick="toggleAlertsPanel()"
+                            class="relative w-10 h-10 rounded-lg bg-gray-50 hover:bg-gray-100 border border-gray-200 flex items-center justify-center text-gray-600">
+                        <i class="fas fa-bell"></i>
+                        <span id="alertsBadge" class="hidden absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1
+                              rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center">0</span>
+                    </button>
+                    <div id="alertsPanel" class="hidden absolute right-0 mt-2 w-80 bg-white border border-gray-200
+                         rounded-lg shadow-lg z-20 max-h-[480px] overflow-y-auto">
+                        <div class="p-3 border-b border-gray-100 flex justify-between items-center">
+                            <p class="font-bold text-gray-800 text-sm">Alertas</p>
+                            <button onclick="toggleAlertsPanel()" class="text-gray-400 hover:text-gray-600 text-xs"><i class="fas fa-times"></i></button>
+                        </div>
+                        <div id="alertsContent" class="p-3 text-sm text-gray-500">Carregando…</div>
+                    </div>
+                </div>
+
                 <div id="userAvatarBox" class="flex items-center gap-3 px-4 py-2 bg-gray-50 rounded-lg border border-gray-200">
                     <div class="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold" id="userAvatar">U</div>
                     <span class="text-sm text-gray-700" id="userName">Utilizador</span>
@@ -136,3 +155,98 @@ function toast(message, type = 'success') {
     document.body.appendChild(el);
     setTimeout(() => { el.classList.add('opacity-0'); setTimeout(() => el.remove(), 300); }, 3000);
 }
+
+// =====================================================
+// Badge global de alertas (§16)
+// =====================================================
+// Atualiza a cada 60 segundos. Lê do endpoint /stats/summary
+// que já agrupa itens abaixo do mínimo e lotes vencendo em 30 dias.
+
+let alertsCache = null;
+
+function toggleAlertsPanel() {
+    const panel = document.getElementById('alertsPanel');
+    if (!panel) return;
+    if (panel.classList.contains('hidden')) {
+        panel.classList.remove('hidden');
+        renderAlertsContent();
+    } else {
+        panel.classList.add('hidden');
+    }
+}
+
+async function loadAlerts() {
+    try {
+        const r = await apiCall('/api/inventory/stats/summary');
+        alertsCache = r.data;
+        const total = (r.data.below_min || 0) + (r.data.expiring_count || 0);
+        const badge = document.getElementById('alertsBadge');
+        if (!badge) return;
+        if (total > 0) {
+            badge.textContent = total > 99 ? '99+' : String(total);
+            badge.classList.remove('hidden');
+        } else {
+            badge.classList.add('hidden');
+        }
+    } catch (err) {
+        // Silencioso: badge fica em estado anterior
+    }
+}
+
+function renderAlertsContent() {
+    const el = document.getElementById('alertsContent');
+    if (!el || !alertsCache) return;
+
+    const critical = alertsCache.critical_items || [];
+    const expiring = alertsCache.expiring_lots  || [];
+
+    let html = '';
+
+    if (critical.length === 0 && expiring.length === 0) {
+        html = '<p class="text-green-600 py-4 text-center"><i class="fas fa-check-circle"></i> Tudo em ordem.</p>';
+    } else {
+        if (critical.length > 0) {
+            html += `<div class="mb-3">
+                <p class="text-[10px] uppercase font-bold text-red-600 mb-1">Stock abaixo do mínimo</p>
+                ${critical.slice(0, 5).map(i => `
+                    <div class="flex justify-between py-1 border-b border-gray-50 last:border-0 text-xs">
+                        <span class="text-gray-800 truncate">${escapeAlerts(i.internal_code)} · ${escapeAlerts(i.name)}</span>
+                        <span class="${i.stock === 0 ? 'text-red-600 font-bold' : 'text-yellow-600'} ml-2 flex-shrink-0">${parseFloat(i.stock).toFixed(0)} / ${parseFloat(i.min_stock).toFixed(0)}</span>
+                    </div>`).join('')}
+                ${critical.length > 5 ? `<a href="/inventory/reports.html" class="text-xs text-blue-600 hover:underline mt-1 inline-block">+ ${critical.length - 5} → ver relatório completo</a>` : ''}
+            </div>`;
+        }
+        if (expiring.length > 0) {
+            html += `<div>
+                <p class="text-[10px] uppercase font-bold text-orange-600 mb-1">Lotes vencendo (30 dias)</p>
+                ${expiring.slice(0, 5).map(l => `
+                    <div class="flex justify-between py-1 border-b border-gray-50 last:border-0 text-xs">
+                        <span class="text-gray-800 truncate">${escapeAlerts(l.item?.name || '')} · <span class="font-mono">${escapeAlerts(l.lot_number)}</span></span>
+                        <span class="text-orange-600 ml-2 flex-shrink-0">${l.expiry_date}</span>
+                    </div>`).join('')}
+                ${expiring.length > 5 ? `<a href="/inventory/index.html" class="text-xs text-blue-600 hover:underline mt-1 inline-block">+ ${expiring.length - 5} → ver dashboard</a>` : ''}
+            </div>`;
+        }
+    }
+    el.innerHTML = html;
+}
+
+function escapeAlerts(s) {
+    return String(s ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+}
+
+// Fecha o painel ao clicar fora dele
+document.addEventListener('click', (e) => {
+    const panel = document.getElementById('alertsPanel');
+    const bell  = document.getElementById('alertsBell');
+    if (!panel || !bell) return;
+    if (panel.classList.contains('hidden')) return;
+    if (panel.contains(e.target) || bell.contains(e.target)) return;
+    panel.classList.add('hidden');
+});
+
+// Inicia carregamento + refresh a cada 60s (defer para garantir que apiCall existe)
+setTimeout(() => {
+    loadAlerts();
+    setInterval(loadAlerts, 60000);
+}, 500);

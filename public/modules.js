@@ -25,6 +25,7 @@ class ModuleManager {
                     { id: 'transfers',         name: 'Transferências',    icon: 'fas fa-right-left',               permission: 'transfer' },
                     { id: 'adjustments',       name: 'Ajustes',           icon: 'fas fa-sliders',                  permission: 'adjust' },
                     { id: 'inventory-session', name: 'Inventário Físico', icon: 'fas fa-list-check',               permission: 'inventory_session' },
+                    { id: 'depreciation',      name: 'Depreciação',       icon: 'fas fa-arrow-trend-down',         permission: 'financial' },
                     { id: 'reports',           name: 'Relatórios',        icon: 'fas fa-chart-line',               permission: 'reports' },
                     { id: 'kardex',            name: 'Kardex',            icon: 'fas fa-clipboard-list',           permission: 'reports' },
                     { id: 'scan',              name: 'Ler QR Code',       icon: 'fas fa-qrcode',                   permission: 'read' },
