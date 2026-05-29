@@ -158,9 +158,20 @@ router.put('/:id', requirePermission('inventory', 'update_item'), async (req, re
 
         // Campos imutáveis após criação
         const immutable = ['internal_code','qr_code','macro_category','controls_lot','uses_serial','patrimony_number'];
+        // Campos editáveis apenas por Inventory_Admin/Admin (gerenciados normalmente
+        // por operações: cmp via entradas, asset_status via depreciação ou saída tipo depreciacao)
+        const adminOnly = ['cmp','asset_status'];
+        const userRoles = Array.isArray(req.user?.roles) ? req.user.roles : [];
+        const isAdmin = userRoles.some(r => ['Inventory_Admin','Admin','admin'].includes(r));
+
         const patch = { updated_by: req.user?.id || null };
         for (const [k, v] of Object.entries(req.body)) {
             if (immutable.includes(k)) continue;
+            if (adminOnly.includes(k) && !isAdmin) {
+                return res.status(403).json({
+                    error: `Campo '${k}' só pode ser alterado por Inventory_Admin. Use operações (entradas/depreciação) para alterar via fluxo normal.`
+                });
+            }
             patch[k] = v;
         }
 
