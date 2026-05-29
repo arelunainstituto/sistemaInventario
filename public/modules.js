@@ -29,6 +29,7 @@ class ModuleManager {
                     { id: 'reports',           name: 'Relatórios',        icon: 'fas fa-chart-line',               permission: 'reports' },
                     { id: 'kardex',            name: 'Kardex',            icon: 'fas fa-clipboard-list',           permission: 'reports' },
                     { id: 'movements',         name: 'Histórico',         icon: 'fas fa-history',                  permission: 'read' },
+                    { id: 'access-log',        name: 'Log de Acesso',     icon: 'fas fa-shield-halved',            permission: 'financial' },
                     { id: 'scan',              name: 'Ler QR Code',       icon: 'fas fa-qrcode',                   permission: 'read' },
                     { id: 'locations',         name: 'Localizações',      icon: 'fas fa-map-marker-alt',           permission: 'read' },
                     { id: 'categories',        name: 'Subcategorias',     icon: 'fas fa-tags',                     permission: 'read' },

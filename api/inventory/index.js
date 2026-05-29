@@ -1,9 +1,13 @@
 const express = require('express');
 const router = express.Router();
 const { authenticateToken } = require('../middleware/auth');
+const { accessLog } = require('./_access-log');
 
 // Authentication required on all inventory routes
 router.use(authenticateToken);
+
+// Auditoria §17: regista mutações + leituras sensíveis em inv_access_log
+router.use(accessLog);
 
 // Fase 1 — Cadastros + Entradas
 router.use('/units',      require('./units'));
@@ -30,6 +34,9 @@ router.use('/depreciation',       require('./depreciation'));
 // Sprint 4B — Busca global + histórico unificado
 router.use('/search',             require('./search'));
 router.use('/movements',          require('./movements'));
+
+// Sprint 4C — Log de acesso (§17)
+router.use('/access-log',         require('./access-log'));
 
 // Healthcheck do módulo (útil para verificar montagem do router)
 router.get('/_health', (_req, res) => {

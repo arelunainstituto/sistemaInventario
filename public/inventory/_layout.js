@@ -13,6 +13,7 @@ const INVENTORY_NAV = [
     { id: 'reports',     label: 'Relatórios',        icon: 'fa-chart-line',  href: 'reports.html' },
     { id: 'kardex',      label: 'Kardex',            icon: 'fa-clipboard-list', href: 'kardex.html' },
     { id: 'movements',   label: 'Histórico',         icon: 'fa-history',     href: 'movements.html' },
+    { id: 'access-log',  label: 'Log de Acesso',     icon: 'fa-shield-halved', href: 'access-log.html' },
     { id: 'scan',        label: 'Ler QR Code',       icon: 'fa-qrcode',      href: 'scan.html' },
 ];
 

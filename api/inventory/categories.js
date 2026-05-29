@@ -9,6 +9,7 @@ const supabaseAdmin = createClient(
 );
 
 const VALID_MACROS = ['consumo','patrimonial'];
+const VALID_WINDOWS = [30, 60, 90, 180, 365];
 
 router.get('/', requirePermission('inventory', 'read'), async (req, res) => {
     try {
@@ -33,13 +34,15 @@ router.get('/', requirePermission('inventory', 'read'), async (req, res) => {
 
 router.post('/', requirePermission('inventory', 'create_item'), async (req, res) => {
     try {
-        const { parent_macro, name, is_active = true } = req.body;
+        const { parent_macro, name, is_active = true, consumption_window_days = 30 } = req.body;
         if (!parent_macro || !name) return res.status(400).json({ error: 'parent_macro e name são obrigatórios' });
         if (!VALID_MACROS.includes(parent_macro)) return res.status(400).json({ error: 'parent_macro inválido' });
+        if (!VALID_WINDOWS.includes(parseInt(consumption_window_days)))
+            return res.status(400).json({ error: `consumption_window_days deve ser um de: ${VALID_WINDOWS.join(', ')}` });
 
         const { data, error } = await supabaseAdmin
             .from('inv_categories')
-            .insert({ parent_macro, name: name.trim(), is_active })
+            .insert({ parent_macro, name: name.trim(), is_active, consumption_window_days: parseInt(consumption_window_days) })
             .select()
             .single();
         if (error) throw error;
@@ -54,10 +57,15 @@ router.post('/', requirePermission('inventory', 'create_item'), async (req, res)
 router.put('/:id', requirePermission('inventory', 'update_item'), async (req, res) => {
     try {
         const { id } = req.params;
-        const { name, is_active } = req.body;
+        const { name, is_active, consumption_window_days } = req.body;
         const patch = {};
         if (name !== undefined) patch.name = name.trim();
         if (is_active !== undefined) patch.is_active = !!is_active;
+        if (consumption_window_days !== undefined) {
+            if (!VALID_WINDOWS.includes(parseInt(consumption_window_days)))
+                return res.status(400).json({ error: `consumption_window_days deve ser um de: ${VALID_WINDOWS.join(', ')}` });
+            patch.consumption_window_days = parseInt(consumption_window_days);
+        }
         const { data, error } = await supabaseAdmin
             .from('inv_categories')
             .update(patch)
