@@ -12,6 +12,7 @@
 <body class="bg-gray-50" style="font-family: 'Inter', sans-serif;">
 <div id="layoutRoot"></div>
 <script src="_layout.js"></script>
+<script src="_searchable-select.js"></script>
 <script>
 renderInventoryLayout({ activePage: 'entries', title: 'Entradas', subtitle: 'Recepção de materiais com documento fiscal' });
 
@@ -23,7 +24,7 @@ document.getElementById('pageContent').innerHTML = `
     <div class="bg-white rounded-lg shadow overflow-hidden">
         <table class="w-full text-sm">
             <thead class="bg-gray-50 text-xs uppercase text-gray-600">
-                <tr><th class="text-left p-3">Data</th><th class="text-left p-3">Documento</th><th class="text-left p-3">Fornecedor</th><th class="text-right p-3">Linhas</th><th class="text-right p-3">Valor total</th><th class="p-3"></th></tr>
+                <tr><th class="text-left p-3">Data</th><th class="text-left p-3">Documento</th><th class="text-left p-3">Fornecedor</th><th class="text-right p-3">Linhas</th><th class="text-right p-3">Valor total</th><th class="text-center p-3">Ações</th></tr>
             </thead>
             <tbody id="tbody" class="divide-y divide-gray-100"></tbody>
         </table>
@@ -94,22 +95,26 @@ async function load() {
         document.getElementById('tbody').innerHTML = r.data.map(e => `
             <tr class="hover:bg-gray-50">
                 <td class="p-3">${e.document_date}</td>
-                <td class="p-3"><span class="text-xs px-1.5 py-0.5 bg-gray-100 rounded">${e.document_type}</span> ${escapeHtml(e.document_number)}</td>
+                <td class="p-3 font-mono text-xs" title="${escapeHtml(e.document_type)}">${escapeHtml(e.document_number)}</td>
                 <td class="p-3 font-medium">${escapeHtml(e.supplier?.name || '—')}</td>
                 <td class="p-3 text-right">${e.lines?.length || 0}</td>
                 <td class="p-3 text-right">€ ${parseFloat(e.total_value || 0).toFixed(2)}</td>
-                <td class="p-3 text-right"><span class="text-xs text-gray-400">${e.lines?.length ? 'processada' : '—'}</span></td>
+                <td class="p-3 text-center">
+                    <button onclick='viewEntry(${JSON.stringify(e).replace(/'/g, "&#39;")})' class="text-gray-600 hover:text-blue-600" title="Visualizar"><i class="fas fa-eye"></i></button>
+                </td>
             </tr>`).join('') || '<tr><td colspan="6" class="p-6 text-center text-gray-400">Nenhuma entrada.</td></tr>';
     } catch (err) { toast(err.message, 'error'); }
 }
 
 function openNewEntryForm() {
     document.getElementById('supplierSelect').innerHTML = '<option value="">—</option>' +
-        suppliers.map(s => `<option value="${s.id}">${escapeHtml(s.name)}</option>`).join('');
+        suppliers.map(s => `<option value="${s.id}">${escapeHtml(s.name)}${s.tax_id ? ' · ' + escapeHtml(s.tax_id) : ''}</option>`).join('');
     document.getElementById('lines').innerHTML = '';
     addLine();
     document.getElementById('entryForm').reset();
     document.getElementById('entryModal').classList.remove('hidden');
+    // Combobox no fornecedor (depois do innerHTML)
+    makeSearchable('supplierSelect', { placeholder: 'Buscar fornecedor por nome ou NIF…' });
 }
 
 function closeEntryModal() { document.getElementById('entryModal').classList.add('hidden'); }
@@ -122,13 +127,13 @@ function addLine() {
     div.dataset.line = idx;
     div.innerHTML = `
         <div class="col-span-3"><label class="text-xs text-gray-500">Item</label>
-            <select required onchange="onItemChange(this, ${idx})" class="line-item w-full px-2 py-1.5 border border-gray-300 rounded text-xs">
+            <select required onchange="onItemChange(this, ${idx})" class="line-item w-full px-2 py-1.5 border border-gray-300 rounded text-xs" id="lineItem-${idx}">
                 <option value="">—</option>
-                ${items.map(i => `<option value="${i.id}" data-controls-lot="${i.controls_lot}">${escapeHtml(i.internal_code)} · ${escapeHtml(i.name)}</option>`).join('')}
+                ${items.map(i => `<option value="${i.id}" data-controls-lot="${i.controls_lot}">${escapeHtml(i.internal_code)} · ${escapeHtml(i.name)}${i.subcategory?.name ? ' · ' + escapeHtml(i.subcategory.name) : ''}</option>`).join('')}
             </select>
         </div>
         <div class="col-span-2"><label class="text-xs text-gray-500">Localização</label>
-            <select required class="line-location w-full px-2 py-1.5 border border-gray-300 rounded text-xs">
+            <select required class="line-location w-full px-2 py-1.5 border border-gray-300 rounded text-xs" id="lineLocation-${idx}">
                 <option value="">—</option>
                 ${locations.map(l => `<option value="${l.id}">${escapeHtml(l.unit?.name)} · ${escapeHtml(l.name)}</option>`).join('')}
             </select>
@@ -140,6 +145,9 @@ function addLine() {
         <div class="col-span-1 line-expiry-area hidden"><label class="text-xs text-gray-500">Validade</label><input type="date" class="line-expiry w-full px-2 py-1.5 border border-gray-300 rounded text-xs"></div>
         <div class="col-span-1 flex items-center"><button type="button" onclick="this.closest('[data-line]').remove(); recalcTotal();" class="text-red-500 hover:text-red-700"><i class="fas fa-trash"></i></button></div>`;
     document.getElementById('lines').appendChild(div);
+    // Combobox nas seleções da linha
+    makeSearchable(`lineItem-${idx}`,     { placeholder: 'Buscar item por nome, SKU ou categoria…' });
+    makeSearchable(`lineLocation-${idx}`, { placeholder: 'Buscar localização…' });
 }
 
 function onItemChange(sel, idx) {
@@ -196,6 +204,32 @@ document.getElementById('entryForm').addEventListener('submit', async e => {
 });
 
 function escapeHtml(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+function viewEntry(e) {
+    const sections = [
+        { title: 'Documento', rows: [
+            ['Tipo', e.document_type],
+            ['Número', e.document_number, { mono: true }],
+            ['Data', e.document_date],
+            ['Fornecedor', e.supplier?.name],
+            ['NIF/Tax ID', e.supplier?.tax_id, { mono: true }],
+            ['Valor total', `€ ${parseFloat(e.total_value || 0).toFixed(2)}`, { bold: true }],
+            ['Notas', e.notes]
+        ]},
+        { title: 'Linhas', rows: (e.lines || []).flatMap((l, idx) => [
+            [`Linha ${idx + 1} — Item`, `${l.item?.internal_code || ''} · ${l.item?.name || ''}`],
+            [`Linha ${idx + 1} — Localização`, l.location?.name],
+            [`Linha ${idx + 1} — Quantidade compra`, l.purchase_qty],
+            [`Linha ${idx + 1} — Fator conversão`, l.conversion_factor],
+            [`Linha ${idx + 1} — Quantidade consumo`, l.consumption_qty],
+            [`Linha ${idx + 1} — Custo unitário`, `€ ${parseFloat(l.unit_cost || 0).toFixed(4)}`],
+            [`Linha ${idx + 1} — Custo total`, `€ ${parseFloat(l.total_cost || 0).toFixed(2)}`, { bold: true }],
+            [`Linha ${idx + 1} — Lote`, l.lot_number, { mono: true }],
+            [`Linha ${idx + 1} — Validade`, l.expiry_date]
+        ])}
+    ];
+    showViewModal({ title: `Entrada · ${e.document_number}`, sections });
+}
 
 (async () => { await bootstrap(); await load(); })();
 </script>

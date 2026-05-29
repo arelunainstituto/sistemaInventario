@@ -240,6 +240,13 @@ async function loadForEdit() {
     } catch (err) { toast(err.message, 'error'); }
 }
 
+// Em modo edição: esconde o seletor de tipo imediatamente para evitar
+// o flash do passo 1 antes do passo 2 montar.
+if (editingId) {
+    step1.classList.add('hidden');
+    step2.classList.remove('hidden');
+}
+
 document.getElementById('itemForm').addEventListener('submit', async (e) => {
     e.preventDefault();
     const f = e.target;

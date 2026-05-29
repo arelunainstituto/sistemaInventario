@@ -118,7 +118,10 @@ async function loadItems() {
                 <td class="px-4 py-3 text-center">
                     ${it.is_active ? '<span class="text-xs text-green-600">● Ativo</span>' : '<span class="text-xs text-gray-400">● Inativo</span>'}
                 </td>
-                <td class="px-4 py-3 text-center">
+                <td class="px-4 py-3 text-center whitespace-nowrap">
+                    <a href="item-view.html?id=${it.id}" class="text-gray-600 hover:text-blue-600 mx-1" title="Visualizar">
+                        <i class="fas fa-eye"></i>
+                    </a>
                     <a href="item-form.html?id=${it.id}" class="text-blue-600 hover:text-blue-800 mx-1" title="Editar">
                         <i class="fas fa-edit"></i>
                     </a>

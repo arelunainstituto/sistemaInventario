@@ -12,6 +12,7 @@
 <body class="bg-gray-50" style="font-family: 'Inter', sans-serif;">
 <div id="layoutRoot"></div>
 <script src="_layout.js"></script>
+<script src="_searchable-select.js"></script>
 <script>
 renderInventoryLayout({ activePage: 'reports', title: 'Ficha Kardex', subtitle: '§12.6 — movimentos cronológicos com saldo acumulado' });
 
@@ -46,6 +47,7 @@ async function bootstrap() {
         const r = await apiCall('/api/inventory/items?limit=1000');
         document.getElementById('itemSelect').innerHTML = '<option value="">— selecione —</option>' +
             r.data.map(i => `<option value="${i.id}">${escapeHtml(i.internal_code)} · ${escapeHtml(i.name)}</option>`).join('');
+        makeSearchable('itemSelect', { placeholder: 'Buscar item por nome ou SKU…' });
     } catch (err) { toast(err.message, 'error'); }
 }
 

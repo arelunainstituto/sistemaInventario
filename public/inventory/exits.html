@@ -12,6 +12,7 @@
 <body class="bg-gray-50" style="font-family: 'Inter', sans-serif;">
 <div id="layoutRoot"></div>
 <script src="_layout.js"></script>
+<script src="_searchable-select.js"></script>
 <script>
 const SUBTYPES = [
     ['consumo',     'Consumo',     false],
@@ -32,7 +33,7 @@ document.getElementById('pageContent').innerHTML = `
     <div class="bg-white rounded-lg shadow overflow-hidden">
         <table class="w-full text-sm">
             <thead class="bg-gray-50 text-xs uppercase text-gray-600">
-                <tr><th class="text-left p-3">Data/hora</th><th class="text-left p-3">Tipo</th><th class="text-left p-3">Item</th><th class="text-right p-3">Qtd</th><th class="text-left p-3">Localização</th><th class="text-left p-3">Lote</th><th class="text-right p-3">€ unit</th><th class="text-left p-3">Justificação</th></tr>
+                <tr><th class="text-left p-3">Data/hora</th><th class="text-left p-3">Tipo</th><th class="text-left p-3">Item</th><th class="text-right p-3">Qtd</th><th class="text-left p-3">Localização</th><th class="text-left p-3">Lote</th><th class="text-right p-3">€ unit</th><th class="text-left p-3">Justificação</th><th class="text-center p-3">Ações</th></tr>
             </thead>
             <tbody id="tbody" class="divide-y divide-gray-100"></tbody>
         </table>
@@ -103,7 +104,9 @@ async function bootstrap() {
         const r = await apiCall('/api/inventory/items?limit=1000');
         items = r.data || [];
         document.getElementById('itemSelect').innerHTML = '<option value="">— selecione —</option>' +
-            items.map(i => `<option value="${i.id}" data-controls-lot="${i.controls_lot}" data-min="${i.min_stock || 0}" data-macro="${i.macro_category}">${escapeHtml(i.internal_code)} · ${escapeHtml(i.name)}</option>`).join('');
+            items.map(i => `<option value="${i.id}" data-controls-lot="${i.controls_lot}" data-min="${i.min_stock || 0}" data-macro="${i.macro_category}">${escapeHtml(i.internal_code)} · ${escapeHtml(i.name)}${i.subcategory?.name ? ' · ' + escapeHtml(i.subcategory.name) : ''}</option>`).join('');
+        // Combobox no item (location e lot mudam dinamicamente — re-aplicamos depois)
+        makeSearchable('itemSelect', { placeholder: 'Buscar item por nome, SKU ou categoria…' });
     } catch (err) { toast(err.message, 'error'); }
 }
 
@@ -119,8 +122,11 @@ async function load() {
                 <td class="p-3 text-xs text-gray-600">${escapeHtml(m.from_location?.unit?.name || '')} · ${escapeHtml(m.from_location?.name || '')}</td>
                 <td class="p-3 text-xs">${m.lot ? escapeHtml(m.lot.lot_number) : '—'}</td>
                 <td class="p-3 text-right text-gray-600">€ ${parseFloat(m.cmp_at_moment || 0).toFixed(2)}</td>
-                <td class="p-3 text-xs text-gray-600">${escapeHtml(m.justification || '—')}</td>
-            </tr>`).join('') || '<tr><td colspan="8" class="p-6 text-center text-gray-400">Nenhuma saída registada.</td></tr>';
+                <td class="p-3 text-xs text-gray-600 max-w-[200px] truncate" title="${escapeHtml(m.justification || '')}">${escapeHtml(m.justification || '—')}</td>
+                <td class="p-3 text-center">
+                    <button onclick='viewMovement(${JSON.stringify(m).replace(/'/g, "&#39;")}, "saída")' class="text-gray-600 hover:text-blue-600" title="Visualizar"><i class="fas fa-eye"></i></button>
+                </td>
+            </tr>`).join('') || '<tr><td colspan="9" class="p-6 text-center text-gray-400">Nenhuma saída registada.</td></tr>';
     } catch (err) { toast(err.message, 'error'); }
 }
 
@@ -177,6 +183,7 @@ async function onItemChange() {
         }
         document.getElementById('locationSelect').innerHTML = '<option value="">—</option>' +
             Array.from(locMap.values()).map(l => `<option value="${l.id}">${escapeHtml(l.unit?.name || '')} · ${escapeHtml(l.name)}</option>`).join('');
+        makeSearchable('locationSelect', { placeholder: 'Buscar localização…' });
     } catch (err) { toast(err.message, 'error'); }
 }
 
@@ -242,6 +249,38 @@ document.getElementById('form').addEventListener('submit', async e => {
 });
 
 function escapeHtml(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+function viewMovement(m, kind) {
+    const fromLoc = m.from_location ? `${m.from_location.unit?.name || ''} · ${m.from_location.name}` : null;
+    const toLoc   = m.to_location   ? `${m.to_location.unit?.name   || ''} · ${m.to_location.name}`   : null;
+    showViewModal({
+        title: `Movimento · ${kind}`,
+        sections: [
+            { title: 'Dados gerais', rows: [
+                ['Data/hora', new Date(m.occurred_at).toLocaleString('pt-PT')],
+                ['Tipo', m.type],
+                ['Subtipo', m.subtype],
+                ['Quantidade', parseFloat(m.quantity).toFixed(4)],
+                ['Custo unitário (CMP)', `€ ${parseFloat(m.cmp_at_moment || 0).toFixed(4)}`],
+                ['Custo total', `€ ${parseFloat(m.total_cost || 0).toFixed(2)}`, { bold: true }]
+            ]},
+            { title: 'Item', rows: [
+                ['Código', m.item?.internal_code, { mono: true }],
+                ['Nome', m.item?.name],
+                ['Categoria macro', m.item?.macro_category]
+            ]},
+            { title: 'Localização e lote', rows: [
+                ['Origem', fromLoc],
+                ['Destino', toLoc],
+                ['Lote', m.lot?.lot_number, { mono: true }],
+                ['Validade do lote', m.lot?.expiry_date]
+            ]},
+            { title: 'Justificação', rows: [
+                ['Texto', m.justification]
+            ]}
+        ]
+    });
+}
 
 (async () => { await bootstrap(); await load(); })();
 </script>

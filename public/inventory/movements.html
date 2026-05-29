@@ -12,6 +12,7 @@
 <body class="bg-gray-50" style="font-family: 'Inter', sans-serif;">
 <div id="layoutRoot"></div>
 <script src="_layout.js"></script>
+<script src="_searchable-select.js"></script>
 <script>
 const TYPES = [
     ['entrada', 'Entrada'],
@@ -133,6 +134,8 @@ async function bootstrap() {
             it.data.map(i => `<option value="${i.id}">${escapeHtml(i.internal_code)} · ${escapeHtml(i.name)}</option>`).join('');
         document.getElementById('locationSelect').innerHTML = '<option value="">Todas</option>' +
             lo.data.map(l => `<option value="${l.id}">${escapeHtml(l.unit?.name || '')} · ${escapeHtml(l.name)}</option>`).join('');
+        makeSearchable('itemSelect',     { placeholder: 'Buscar item…' });
+        makeSearchable('locationSelect', { placeholder: 'Buscar localização…' });
         // userSelect: deixar vazio por enquanto (lista de utilizadores não está acessível via API neste módulo)
         document.getElementById('userSelect').disabled = true;
         document.getElementById('userSelect').title = 'Filtro por utilizador será habilitado em iteração futura';

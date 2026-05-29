@@ -436,3 +436,44 @@ function closeActionPanel() {
     const p = document.getElementById('actionPanel');
     if (p) p.classList.add('hidden');
 }
+
+// =====================================================
+// Modal de visualização genérico (read-only)
+// =====================================================
+// Uso: showViewModal({ title, sections: [{ title, rows: [[label, value], …] }, …] })
+
+function showViewModal({ title, sections = [] }) {
+    let modal = document.getElementById('genericViewModal');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'genericViewModal';
+        modal.className = 'hidden fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4';
+        modal.innerHTML = `
+            <div class="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+                <div class="flex justify-between items-center p-4 border-b">
+                    <h3 id="genericViewTitle" class="font-bold text-gray-800">—</h3>
+                    <button onclick="closeViewModal()" class="text-gray-400 hover:text-gray-600"><i class="fas fa-times"></i></button>
+                </div>
+                <div id="genericViewBody" class="p-6"></div>
+            </div>`;
+        document.body.appendChild(modal);
+    }
+    document.getElementById('genericViewTitle').textContent = title;
+    document.getElementById('genericViewBody').innerHTML = sections.map(sec => `
+        <div class="mb-5 last:mb-0">
+            ${sec.title ? `<h4 class="text-xs uppercase font-bold text-gray-400 mb-2">${escapeAlerts(sec.title)}</h4>` : ''}
+            <div class="border border-gray-100 rounded-lg divide-y divide-gray-100">
+                ${sec.rows.map(([label, value, opts = {}]) => `
+                    <div class="flex justify-between items-center px-3 py-2">
+                        <span class="text-xs text-gray-500">${escapeAlerts(label)}</span>
+                        <span class="text-sm ${opts.mono ? 'font-mono' : ''} ${opts.bold ? 'font-bold' : ''} text-gray-800 text-right max-w-[60%]">${value === null || value === undefined || value === '' ? '<span class="text-gray-300">—</span>' : escapeAlerts(String(value))}</span>
+                    </div>`).join('')}
+            </div>
+        </div>`).join('');
+    modal.classList.remove('hidden');
+}
+
+function closeViewModal() {
+    const m = document.getElementById('genericViewModal');
+    if (m) m.classList.add('hidden');
+}
