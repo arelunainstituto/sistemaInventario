@@ -156,7 +156,7 @@ router.get('/', requireRole(ADMIN_ROLES), async (req, res) => {
                 duration_ms:  r.duration_ms
             }));
             return sendReport(res, format, {
-                title: 'Log de Acesso (§17)',
+                title: 'Log de Acesso',
                 subtitle: 'Auditoria de chamadas à API do inventário',
                 columns: [
                     { key: 'created_at',   label: 'Data/hora',  width: 110 },

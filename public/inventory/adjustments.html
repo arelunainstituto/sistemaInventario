@@ -82,10 +82,10 @@ document.getElementById('pageContent').innerHTML = `
                 </div>
 
                 <div id="warnAdmin" class="hidden border border-yellow-300 bg-yellow-50 rounded-lg p-3 text-xs text-yellow-800">
-                    ⚠️ Ajuste superior a 5% do stock atual — requer perfil <strong>Inventory_Admin</strong> (RF06).
+                    ⚠️ Ajuste superior a 5% do stock atual — requer perfil <strong>Inventory_Admin</strong>.
                 </div>
                 <div id="warnNegative" class="hidden border border-red-300 bg-red-50 rounded-lg p-3 text-xs text-red-800">
-                    🔴 Stock final ficará <strong>negativo</strong>. Apenas <strong>Inventory_Admin</strong> com confirmação dupla pode autorizar (RN05).
+                    🔴 Stock final ficará <strong>negativo</strong>. Apenas <strong>Inventory_Admin</strong> com confirmação dupla pode autorizar.
                 </div>
 
                 <div>
@@ -249,7 +249,7 @@ document.getElementById('form').addEventListener('submit', async e => {
     const itemOpt = document.getElementById('itemSelect').selectedOptions[0];
     const controlsLot = itemOpt?.dataset?.controlsLot === 'true';
     if (controlsLot && !f.lot_id.value) {
-        toast('Item controla lote — selecione um lote específico antes de ajustar (RN03)', 'error');
+        toast('Item controla lote — selecione um lote específico antes de ajustar', 'error');
         return;
     }
     const payload = {

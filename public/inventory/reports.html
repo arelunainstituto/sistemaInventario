@@ -13,16 +13,16 @@
 <div id="layoutRoot"></div>
 <script src="_layout.js"></script>
 <script>
-renderInventoryLayout({ activePage: 'reports', title: 'Relatórios', subtitle: 'Indicadores e exportações (§12)' });
+renderInventoryLayout({ activePage: 'reports', title: 'Relatórios', subtitle: 'Indicadores e exportações' });
 
 const REPORTS = [
-    { key: 'reorder',            label: 'Ponto de Reposição',         icon: 'fa-rotate',          color: 'red',     section: '§12.1', endpoint: '/reports/reorder' },
-    { key: 'stock-min-max',      label: 'Abaixo do Mínimo / Acima do Máximo', icon: 'fa-triangle-exclamation', color: 'orange', section: '§12.2', endpoint: '/reports/stock-min-max' },
-    { key: 'coverage',           label: 'Cobertura de Stock',         icon: 'fa-clock',           color: 'blue',    section: '§12.3', endpoint: '/reports/coverage' },
-    { key: 'valuation',          label: 'Valorização de Stock',       icon: 'fa-euro-sign',       color: 'purple',  section: '§12.4', endpoint: '/reports/valuation' },
-    { key: 'inventory-sessions', label: 'Inventário (Contagem)',      icon: 'fa-list-check',      color: 'indigo',  section: '§12.5', endpoint: '/reports/inventory-sessions' },
-    { key: 'consumption-trend',  label: 'Tendência de Consumo',       icon: 'fa-chart-line',      color: 'green',   section: '§12.7', endpoint: '/reports/consumption-trend' },
-    { key: 'user-activity',      label: 'Movimentos por Utilizador',  icon: 'fa-user-clock',      color: 'gray',    section: '§12.8', endpoint: '/reports/user-activity' }
+    { key: 'reorder',            label: 'Ponto de Reposição',                  icon: 'fa-rotate',                color: 'red',     hint: 'Itens abaixo do ponto de reposição',      endpoint: '/reports/reorder' },
+    { key: 'stock-min-max',      label: 'Abaixo do Mínimo / Acima do Máximo',  icon: 'fa-triangle-exclamation',  color: 'orange',  hint: 'Identifica ruturas e excessos',           endpoint: '/reports/stock-min-max' },
+    { key: 'coverage',           label: 'Cobertura de Stock',                  icon: 'fa-clock',                 color: 'blue',    hint: 'Dias de cobertura por item',              endpoint: '/reports/coverage' },
+    { key: 'valuation',          label: 'Valorização de Stock',                icon: 'fa-euro-sign',             color: 'purple',  hint: 'Stock × CMP por item, categoria e local', endpoint: '/reports/valuation' },
+    { key: 'inventory-sessions', label: 'Inventário (Contagem)',               icon: 'fa-list-check',            color: 'indigo',  hint: 'Diferenças apuradas em sessões',          endpoint: '/reports/inventory-sessions' },
+    { key: 'consumption-trend',  label: 'Tendência de Consumo',                icon: 'fa-chart-line',            color: 'green',   hint: 'Mensal com comparativo anual',            endpoint: '/reports/consumption-trend' },
+    { key: 'user-activity',      label: 'Movimentos por Utilizador',           icon: 'fa-user-clock',            color: 'gray',    hint: 'Auditoria de operações por utilizador',   endpoint: '/reports/user-activity' }
 ];
 
 document.getElementById('pageContent').innerHTML = `
@@ -35,7 +35,7 @@ document.getElementById('pageContent').innerHTML = `
                     </div>
                     <div>
                         <p class="font-bold text-gray-800">${r.label}</p>
-                        <p class="text-xs text-gray-500 mt-1">${r.section}</p>
+                        <p class="text-xs text-gray-500 mt-1">${r.hint}</p>
                     </div>
                 </div>
             </button>
@@ -47,7 +47,7 @@ document.getElementById('pageContent').innerHTML = `
                 </div>
                 <div>
                     <p class="font-bold text-gray-800">Ficha Kardex</p>
-                    <p class="text-xs text-gray-500 mt-1">§12.6 — abrir tela dedicada</p>
+                    <p class="text-xs text-gray-500 mt-1">Movimentos cronológicos por item</p>
                 </div>
             </div>
         </a>
@@ -77,7 +77,7 @@ async function openReport(key) {
     currentReport = r;
     document.getElementById('reportPanel').classList.remove('hidden');
     document.getElementById('reportTitle').textContent = r.label;
-    document.getElementById('reportSubtitle').textContent = r.section;
+    document.getElementById('reportSubtitle').textContent = r.hint;
     document.getElementById('reportTable').innerHTML = '<p class="text-sm text-gray-400 p-4">Carregando…</p>';
     try {
         const res = await apiCall(`/api/inventory${r.endpoint}`);
@@ -100,7 +100,7 @@ async function openReport(key) {
                 </tbody>
             </table>`;
         document.getElementById('reportTable').innerHTML = html;
-        document.getElementById('reportSubtitle').textContent = `${r.section} · ${rows.length} registos`;
+        document.getElementById('reportSubtitle').textContent = `${r.hint} · ${rows.length} registos`;
     } catch (err) {
         document.getElementById('reportTable').innerHTML = `<p class="text-sm text-red-500 p-4">${escapeHtml(err.message)}</p>`;
     }

@@ -68,7 +68,7 @@ router.get('/', requirePermission('inventory', 'read'), async (req, res) => {
                 justification:   m.justification || ''
             }));
             return sendReport(res, format, {
-                title: 'Histórico de Movimentos (RF09)',
+                title: 'Histórico de Movimentos',
                 subtitle: 'Listagem completa com filtros aplicados',
                 columns: [
                     { key: 'occurred_at',   label: 'Data/hora',     width: 110 },

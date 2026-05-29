@@ -32,7 +32,7 @@ router.post('/run', requireRole(['Inventory_Admin', 'Admin', 'admin']), async (r
         });
         if (error) {
             if (error.code === '23505')
-                return res.status(409).json({ error: `Depreciação para ${year} já foi executada (RN09 — uma vez por ano)` });
+                return res.status(409).json({ error: `Depreciação para ${year} já foi executada (apenas uma vez por ano)` });
             throw error;
         }
         res.json({ success: true, data: { run_id: data } });

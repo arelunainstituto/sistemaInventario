@@ -22,7 +22,7 @@ router.get('/reorder', requirePermission('inventory', 'reports'), async (req, re
             .filter(r => ['rutura','abaixo_minimo','abaixo_reposicao'].includes(r.status));
         sendReport(res, req.query.format, {
             title: 'Relatório de Ponto de Reposição',
-            subtitle: 'Itens abaixo do mínimo ou do ponto de reposição (§12.1)',
+            subtitle: 'Itens abaixo do mínimo ou do ponto de reposição',
             columns: [
                 { key: 'internal_code',           label: 'Código',         width: 60 },
                 { key: 'name',                    label: 'Item',           width: 170 },
@@ -45,7 +45,7 @@ router.get('/stock-min-max', requirePermission('inventory', 'reports'), async (r
             .filter(r => ['rutura','abaixo_minimo','acima_maximo'].includes(r.status));
         sendReport(res, req.query.format, {
             title: 'Itens abaixo do mínimo ou acima do máximo',
-            subtitle: '§12.2',
+            subtitle: 'Identifica ruturas e excessos',
             columns: [
                 { key: 'internal_code', label: 'Código',      width: 60 },
                 { key: 'name',          label: 'Item',        width: 200 },
@@ -66,7 +66,7 @@ router.get('/coverage', requirePermission('inventory', 'reports'), async (req, r
             .sort((a, b) => (a.days_coverage ?? 99999) - (b.days_coverage ?? 99999));
         sendReport(res, req.query.format, {
             title: 'Cobertura de Stock (dias)',
-            subtitle: '§12.3 — ordenado do menor para o maior',
+            subtitle: 'Ordenado do menor para o maior',
             columns: [
                 { key: 'internal_code',         label: 'Código',           width: 60 },
                 { key: 'name',                  label: 'Item',             width: 210 },
@@ -86,7 +86,7 @@ router.get('/valuation', requirePermission('inventory', 'financial'), async (req
         const totalValue = rows.reduce((acc, r) => acc + parseFloat(r.line_value || 0), 0);
         sendReport(res, req.query.format, {
             title: 'Valorização de Stock',
-            subtitle: `§12.4 — Total: € ${totalValue.toFixed(2)}`,
+            subtitle: `Total: € ${totalValue.toFixed(2)}`,
             columns: [
                 { key: 'internal_code',  label: 'Código',         width: 60 },
                 { key: 'name',           label: 'Item',           width: 180 },
@@ -134,7 +134,7 @@ router.get('/inventory-sessions', requirePermission('inventory', 'reports'), asy
 
         sendReport(res, req.query.format, {
             title: 'Relatório de Inventário (Contagem)',
-            subtitle: '§12.5',
+            subtitle: 'Diferenças apuradas em sessões de contagem',
             columns: [
                 { key: 'session_id',   label: 'Sessão',       width: 50 },
                 { key: 'opened_at',    label: 'Data',         width: 70 },
@@ -175,7 +175,7 @@ router.get('/kardex/:itemId', requirePermission('inventory', 'reports'), async (
 
         sendReport(res, req.query.format, {
             title: `Kardex — ${data?.[0]?.internal_code || 'item'}`,
-            subtitle: '§12.6 — movimentos cronológicos com saldo acumulado',
+            subtitle: 'Movimentos cronológicos com saldo acumulado',
             columns: [
                 { key: 'occurred_at',     label: 'Data/hora',  width: 110 },
                 { key: 'type',            label: 'Tipo',        width: 90 },
@@ -209,7 +209,7 @@ router.get('/consumption-trend', requirePermission('inventory', 'reports'), asyn
 
         sendReport(res, req.query.format, {
             title: 'Tendência de Consumo Mensal',
-            subtitle: '§12.7 — últimos 16 meses (4 correntes + 12 base para YoY)',
+            subtitle: 'Últimos 16 meses (4 correntes + 12 base para comparativo anual)',
             columns: [
                 { key: 'internal_code', label: 'Código', width: 60 },
                 { key: 'name',          label: 'Item',   width: 200 },
@@ -242,7 +242,7 @@ router.get('/user-activity', requirePermission('inventory', 'reports'), async (r
 
         sendReport(res, req.query.format, {
             title: 'Movimentos por Utilizador',
-            subtitle: '§12.8 — últimos 12 meses (refresh diário)',
+            subtitle: 'Últimos 12 meses (atualizado diariamente)',
             columns: [
                 { key: 'user',           label: 'Utilizador',  width: 110 },
                 { key: 'day',            label: 'Dia',         width: 70 },

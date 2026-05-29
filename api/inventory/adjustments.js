@@ -47,7 +47,7 @@ router.post('/', requirePermission('inventory', 'adjust'), async (req, res) => {
             return res.status(400).json({ error: 'delta deve ser positivo ou negativo (não zero)' });
         if (!reason_code) return res.status(400).json({ error: 'reason_code é obrigatório' });
         if (!justification || !justification.trim())
-            return res.status(400).json({ error: 'justification é obrigatório (§10.2)' });
+            return res.status(400).json({ error: 'justification é obrigatório' });
 
         // req.user.roles vem do middleware authenticateToken como string[]
         const userRoles = Array.isArray(req.user?.roles) ? req.user.roles : [];

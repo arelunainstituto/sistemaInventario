@@ -16,7 +16,7 @@
 renderInventoryLayout({
     activePage: 'depreciation',
     title: 'Depreciação Anual',
-    subtitle: 'RN09 — baixa contábil anual dos bens patrimoniais'
+    subtitle: 'Baixa contábil anual dos bens patrimoniais'
 });
 
 document.getElementById('pageContent').innerHTML = `
@@ -27,8 +27,8 @@ document.getElementById('pageContent').innerHTML = `
             </h3>
             <p class="text-xs text-gray-500 mb-4">
                 Aplica a taxa de depreciação anual em cada bem patrimonial <strong>em uso</strong>.
-                Cada ano só pode ser executado <strong>uma vez</strong> (RN09).
-                Há também execução automática em 1 de janeiro às 04h00 via cron.
+                Cada ano só pode ser executado <strong>uma vez</strong>.
+                Há também execução automática em 1 de janeiro às 04h00.
             </p>
             <form id="runForm" class="space-y-3">
                 <div>
@@ -97,7 +97,7 @@ async function loadRuns() {
 document.getElementById('runForm').addEventListener('submit', async e => {
     e.preventDefault();
     const year = parseInt(new FormData(e.target).get('year'));
-    const msg = `Executar depreciação anual para ${year}?\n\nA operação:\n• Aplica taxa em cada bem patrimonial em uso\n• Atualiza CMP e baixa quem zerou\n• Não pode ser desfeita (RN07)\n• Não pode ser repetida no mesmo ano (RN09)`;
+    const msg = `Executar depreciação anual para ${year}?\n\nA operação:\n• Aplica taxa em cada bem patrimonial em uso\n• Atualiza CMP e baixa quem zerou\n• Não pode ser desfeita\n• Não pode ser repetida no mesmo ano`;
     if (!confirm(msg)) return;
 
     try {

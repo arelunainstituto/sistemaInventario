@@ -101,7 +101,7 @@ router.post('/', requirePermission('inventory', 'entry'), async (req, res) => {
             .single();
 
         if (entryErr) {
-            if (entryErr.code === '23505') return res.status(409).json({ error: 'Documento já registado para este fornecedor (RN02)' });
+            if (entryErr.code === '23505') return res.status(409).json({ error: 'Documento já registado para este fornecedor' });
             throw entryErr;
         }
 

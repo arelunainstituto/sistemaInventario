@@ -48,7 +48,7 @@ router.post('/', requirePermission('inventory', 'transfer'), async (req, res) =>
         if (!to_location_id)   return res.status(400).json({ error: 'to_location_id é obrigatório' });
         if (!(quantity > 0))   return res.status(400).json({ error: 'quantity deve ser > 0' });
         if (from_location_id === to_location_id)
-            return res.status(400).json({ error: 'Localizações origem e destino não podem ser iguais (§9.2)' });
+            return res.status(400).json({ error: 'Localizações origem e destino não podem ser iguais' });
 
         const { data, error } = await supabaseAdmin.rpc('fn_inv_transfer', {
             p_item: item_id,
