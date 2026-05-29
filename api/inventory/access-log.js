@@ -48,6 +48,20 @@ router.put('/settings', requireRole(ADMIN_ROLES), async (req, res) => {
     }
 });
 
+// Helper: enriquece registos de log com display_name/email do user_profiles.
+// Faz isso em 2 etapas porque inv_access_log.user_id aponta para auth.users,
+// não diretamente para user_profiles (PostgREST não detecta a relação).
+async function attachUserProfiles(rows) {
+    const userIds = [...new Set(rows.map(r => r.user_id).filter(Boolean))];
+    if (!userIds.length) return rows;
+    const { data: profiles } = await supabaseAdmin
+        .from('user_profiles')
+        .select('id, display_name, email')
+        .in('id', userIds);
+    const byId = new Map((profiles || []).map(p => [p.id, p]));
+    return rows.map(r => ({ ...r, user: r.user_id ? (byId.get(r.user_id) || null) : null }));
+}
+
 // GET / — lista paginada com filtros
 router.get('/', requireRole(ADMIN_ROLES), async (req, res) => {
     try {
@@ -56,7 +70,7 @@ router.get('/', requireRole(ADMIN_ROLES), async (req, res) => {
 
         let q = supabaseAdmin
             .from('inv_access_log')
-            .select('*, user:user_profiles!user_id(id, display_name, email)', { count: 'exact' })
+            .select('*', { count: 'exact' })
             .order('created_at', { ascending: false });
 
         if (user_id)     q = q.eq('user_id', user_id);
@@ -70,7 +84,8 @@ router.get('/', requireRole(ADMIN_ROLES), async (req, res) => {
         if (format && format !== 'json') {
             const { data, error } = await q.limit(10000);
             if (error) throw error;
-            const rows = (data || []).map(r => ({
+            const enriched = await attachUserProfiles(data || []);
+            const rows = enriched.map(r => ({
                 created_at:  new Date(r.created_at).toLocaleString('pt-PT'),
                 user:        r.user?.display_name || r.user?.email || (r.user_id ? r.user_id.slice(0, 8) : '—'),
                 ip:          r.ip || '—',
@@ -101,9 +116,10 @@ router.get('/', requireRole(ADMIN_ROLES), async (req, res) => {
         const offset = (parseInt(page) - 1) * parseInt(limit);
         const { data, error, count } = await q.range(offset, offset + parseInt(limit) - 1);
         if (error) throw error;
+        const enriched = await attachUserProfiles(data || []);
         res.json({
             success: true,
-            data,
+            data: enriched,
             pagination: { page: parseInt(page), limit: parseInt(limit), total: count, totalPages: Math.ceil((count || 0) / parseInt(limit)) }
         });
     } catch (err) {
