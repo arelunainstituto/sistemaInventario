@@ -16,7 +16,7 @@
     },
     {
       "name": "Status is colour",
-      "rule": "Use the colour palette to carry meaning consistently. Green = success/in-stock, Blue = informational/in-progress, Amber = warning/pending, Red = critical/blocked, Purple = patrimonial/asset, Teal = brand primary. Never repurpose a status colour for decoration."
+      "rule": "Use the colour palette to carry meaning consistently. Sky = brand + success/in-stock (mesma família, como em dashboards clínicos modernos), Blue = informational/in-progress, Amber = warning/pending, Red = critical/blocked, Purple = patrimonial/asset, Rose = série antagonista em gráficos. Never repurpose a status colour for decoration."
     },
     {
       "name": "One pill, one verb",
@@ -53,13 +53,13 @@
   "colorTokens": {
     "description": "Sistema de cores. Sempre que possível usar variáveis/utility classes — não hardcodar hex em components, mas se precisar para email/PDF, a referência está aqui.",
     "brand": {
-      "primary":      { "hex": "#10b981", "tailwind": "emerald-500", "use": "Botões primários, links principais, ícones de marca, accent em gráficos." },
-      "primaryDark":  { "hex": "#059669", "tailwind": "emerald-600", "use": "Hover de botões primários." },
-      "primaryLight": { "hex": "#d1fae5", "tailwind": "emerald-100", "use": "Fundo de badges de sucesso, hover sutil de itens." },
-      "primarySoft":  { "hex": "#ecfdf5", "tailwind": "emerald-50",  "use": "Tinta de fundo de seções de marca, gradientes de ambiente." }
+      "primary":      { "hex": "#0ea5e9", "tailwind": "sky-500", "use": "Botões primários, links principais, ícones de marca, accent em gráficos." },
+      "primaryDark":  { "hex": "#0284c7", "tailwind": "sky-600", "use": "Hover de botões primários." },
+      "primaryLight": { "hex": "#e0f2fe", "tailwind": "sky-100", "use": "Fundo de badges de sucesso, hover sutil de itens." },
+      "primarySoft":  { "hex": "#f0f9ff", "tailwind": "sky-50",  "use": "Tinta de fundo de seções de marca, gradientes de ambiente." }
     },
     "surface": {
-      "appBackground":  { "hex": "#f0fdfa", "tailwind": "teal-50",   "use": "Fundo da viewport — sutil verde-mint para puxar a marca sem competir." },
+      "appBackground":  { "hex": "#f0f9ff", "tailwind": "sky-50",   "use": "Fundo da viewport — sutil azul-céu para puxar a marca sem competir." },
       "cardBackground": { "hex": "#ffffff", "tailwind": "white",     "use": "Cards, modais, sidebar, header. Sempre branco puro." },
       "subtle":         { "hex": "#f9fafb", "tailwind": "gray-50",   "use": "Cabeçalhos de tabela, fundos de form não-críticos." },
       "muted":          { "hex": "#f3f4f6", "tailwind": "gray-100",  "use": "Inputs desativados, separadores grossos." }
@@ -75,13 +75,13 @@
     "border": {
       "default": { "hex": "#e5e7eb", "tailwind": "gray-200", "use": "Borda de cards, inputs em estado normal, divisores de tabelas." },
       "subtle":  { "hex": "#f3f4f6", "tailwind": "gray-100", "use": "Divider interno (row separator em listas)." },
-      "focus":   { "hex": "#10b981", "tailwind": "emerald-500", "use": "Borda + ring de inputs em foco." },
+      "focus":   { "hex": "#0ea5e9", "tailwind": "sky-500", "use": "Borda + ring de inputs em foco." },
       "error":   { "hex": "#ef4444", "tailwind": "red-500",  "use": "Borda de inputs com erro." }
     },
     "status": {
       "description": "Cada estado tem um par (fundo claro + texto escuro). Aplicar como '<bg> <fg>' em badges. NUNCA usar essas cores como pano de fundo de página.",
-      "success":  { "label": "Sucesso / Ativo / Pago",            "bg": "bg-emerald-100", "fg": "text-emerald-800", "dot": "bg-emerald-500" },
-      "info":     { "label": "Em curso / Informativo",            "bg": "bg-blue-100",    "fg": "text-blue-800",    "dot": "bg-blue-500"    },
+      "success":  { "label": "Sucesso / Ativo / Pago",            "bg": "bg-sky-100",   "fg": "text-sky-800",   "dot": "bg-sky-500"   },
+      "info":     { "label": "Em curso / Informativo",            "bg": "bg-blue-100",  "fg": "text-blue-800",  "dot": "bg-blue-500"  },
       "warning":  { "label": "Atenção / Pendente / Baixo",        "bg": "bg-amber-100",   "fg": "text-amber-800",   "dot": "bg-amber-500"   },
       "danger":   { "label": "Crítico / Rutura / Bloqueado",      "bg": "bg-red-100",     "fg": "text-red-700",     "dot": "bg-red-500"     },
       "neutral":  { "label": "Inativo / Cancelado",               "bg": "bg-gray-100",    "fg": "text-gray-600",    "dot": "bg-gray-400"    },
@@ -89,20 +89,20 @@
       "consumo":  { "label": "Consumo / Material descartável",    "bg": "bg-blue-100",    "fg": "text-blue-700",    "dot": "bg-blue-500"    }
     },
     "chart": {
-      "primary":   { "hex": "#10b981", "use": "Série principal (receita, entradas, consumo positivo)" },
-      "secondary": { "hex": "#f43f5e", "use": "Série antagonista (despesa, saídas, perda)" },
-      "tertiary":  { "hex": "#3b82f6", "use": "Terceira série (transferências)" },
-      "quaternary":{ "hex": "#a855f7", "use": "Patrimoniais / categoria 4" },
+      "primary":   { "hex": "#0ea5e9", "use": "Série principal (receita, entradas, consumo positivo) — sky" },
+      "secondary": { "hex": "#f43f5e", "use": "Série antagonista (despesa, saídas, perda) — rose" },
+      "tertiary":  { "hex": "#6366f1", "use": "Terceira série (transferências) — indigo" },
+      "quaternary":{ "hex": "#a855f7", "use": "Patrimoniais / categoria 4 — purple" },
       "gridLine":  { "hex": "#f3f4f6", "use": "Linhas de grade de gráficos" },
       "axisLabel": { "hex": "#9ca3af", "use": "Labels de eixos" }
     },
     "gradients": {
       "appAmbient": {
-        "css": "linear-gradient(180deg, #ecfdf5 0%, #f0fdfa 40%, #f0fdfa 100%)",
-        "use": "Background da viewport quando se quer reforçar a marca. Aplicar no <body>. Tailwind: 'bg-gradient-to-b from-emerald-50 via-teal-50 to-teal-50'."
+        "css": "linear-gradient(180deg, #f0f9ff 0%, #eff6ff 40%, #eff6ff 100%)",
+        "use": "Background da viewport quando se quer reforçar a marca. Aplicar no <body>. Tailwind: 'bg-gradient-to-b from-sky-50 via-blue-50 to-blue-50'."
       },
       "cardHero": {
-        "css": "linear-gradient(135deg, rgba(16,185,129,0.06), rgba(16,185,129,0))",
+        "css": "linear-gradient(135deg, rgba(14,165,233,0.06), rgba(14,165,233,0))",
         "use": "Card hero do dashboard (opcional, sutil)"
       }
     }
@@ -199,9 +199,9 @@
   "borders": {
     "default": "1px solid #e5e7eb (gray-200)",
     "subtle":  "1px solid #f3f4f6 (gray-100) — divisores internos",
-    "focus":   "ring-2 ring-emerald-500 + border-emerald-500",
+    "focus":   "ring-2 ring-sky-500 + border-sky-500",
     "error":   "ring-2 ring-red-500 + border-red-500",
-    "rule":    "Inputs e cards têm borda hairline sempre. Em hover de elementos clicáveis (rows de tabela, items de sidebar), trocar fundo (bg-gray-50 ou bg-emerald-50) em vez de mexer na borda."
+    "rule":    "Inputs e cards têm borda hairline sempre. Em hover de elementos clicáveis (rows de tabela, items de sidebar), trocar fundo (bg-gray-50 ou bg-sky-50) em vez de mexer na borda."
   },
 
   "iconography": {
@@ -253,7 +253,7 @@
     },
     "iconBubble": {
       "anatomy": "Ícone num círculo/quadrado pintado com a versão -100 da cor + ícone na versão -600 da cor",
-      "example": "<div class='w-10 h-10 rounded-lg bg-emerald-100 flex items-center justify-center text-emerald-600'><i class='fas fa-warehouse text-xl'></i></div>",
+      "example": "<div class='w-10 h-10 rounded-lg bg-sky-100 flex items-center justify-center text-sky-600'><i class='fas fa-warehouse text-xl'></i></div>",
       "use": "Brand mark em sidebar, ícones de KPI cards, ícones de tipo de relatório"
     }
   },
@@ -282,7 +282,7 @@
       "structure": "div.flex.h-screen.overflow-hidden { aside.sidebar (w-64) + main.flex-1.overflow-y-auto { header.sticky + div#pageContent.p-8 } }",
       "sidebarWidth": "256px (w-64)",
       "headerHeight": "auto (px-8 py-4) — tipicamente 72px",
-      "canvas": "Background gray-50 (teal-50 quando se quer ambiente de marca); padding 32px (p-8)"
+      "canvas": "Background gray-50 (sky-50 quando se quer ambiente de marca); padding 32px (p-8)"
     },
     "pageGrid": {
       "kpiRow":      "grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8",
@@ -307,7 +307,7 @@
       "rightBorder": "1px solid gray-200",
       "logoBlock": {
         "padding": "p-6, border-b gray-100",
-        "iconBubble": "w-10 h-10 rounded-lg bg-emerald-100 text-emerald-600 (ver iconBubble em iconography)",
+        "iconBubble": "w-10 h-10 rounded-lg bg-sky-100 text-sky-600 (ver iconBubble em iconography)",
         "title": "text-lg font-bold gray-800",
         "subtitle": "text-xs gray-500"
       },
@@ -318,7 +318,7 @@
       "navItem": {
         "baseClass": "w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium rounded-lg transition-colors",
         "default": "text-gray-600 hover:bg-gray-50",
-        "active": "text-emerald-600 bg-emerald-50",
+        "active": "text-sky-600 bg-sky-50",
         "disabled": "text-gray-400 cursor-not-allowed",
         "iconSize": "w-5 (icon class)",
         "badgeOnRight": "ml-auto text-[10px] font-bold px-1.5 py-0.5 rounded bg-gray-200 text-gray-600"
@@ -337,7 +337,7 @@
       },
       "globalSearch": {
         "container": "relative flex-1 max-w-md mx-8",
-        "input": "w-full pl-8 pr-3 py-2 border border-gray-200 bg-gray-50 rounded-lg text-sm focus:bg-white focus:ring-2 focus:ring-emerald-500 focus:outline-none",
+        "input": "w-full pl-8 pr-3 py-2 border border-gray-200 bg-gray-50 rounded-lg text-sm focus:bg-white focus:ring-2 focus:ring-sky-500 focus:outline-none",
         "leadingIcon": "fa-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs",
         "behavior": "Debounce 250ms, Ctrl/Cmd+K para focar, Esc fecha"
       },
@@ -347,7 +347,7 @@
       },
       "userChip": {
         "container": "flex items-center gap-3 px-4 py-2 bg-gray-50 rounded-lg border border-gray-200",
-        "avatar": "w-8 h-8 rounded-full bg-emerald-100 text-emerald-600 font-bold flex items-center justify-center",
+        "avatar": "w-8 h-8 rounded-full bg-sky-100 text-sky-600 font-bold flex items-center justify-center",
         "label": "text-sm gray-700"
       }
     },
@@ -366,19 +366,19 @@
     "kpiCard": {
       "purpose": "Mostrar um número (total, valor, contador) com contexto e tendência.",
       "anatomy": "label small + valor large + delta (opcional) + icon bubble (right)",
-      "template": "<div class='bg-white rounded-lg shadow p-5'><div class='flex items-center justify-between'><div><p class='text-xs uppercase text-gray-500 font-medium'>{label}</p><p class='text-2xl font-bold text-gray-800 mt-1'>{prefix}{value}</p>{delta? <p class='text-xs text-emerald-600 mt-1'><i class='fas fa-arrow-up'></i> +12% vs período anterior</p>}</div><div class='w-10 h-10 rounded-lg bg-{color}-100 flex items-center justify-center text-{color}-600'><i class='fas fa-{icon}'></i></div></div></div>",
+      "template": "<div class='bg-white rounded-lg shadow p-5'><div class='flex items-center justify-between'><div><p class='text-xs uppercase text-gray-500 font-medium'>{label}</p><p class='text-2xl font-bold text-gray-800 mt-1'>{prefix}{value}</p>{delta? <p class='text-xs text-sky-600 mt-1'><i class='fas fa-arrow-up'></i> +12% vs período anterior</p>}</div><div class='w-10 h-10 rounded-lg bg-{color}-100 flex items-center justify-center text-{color}-600'><i class='fas fa-{icon}'></i></div></div></div>",
       "colorMappingByMetric": {
         "Total / Quantidade": "blue",
-        "Ativos / OK / Verde": "emerald",
+        "Ativos / OK / Sucesso": "sky",
         "Atenção / Pendente": "amber",
         "Crítico / Rutura": "red",
         "Patrimonial / Asset": "purple",
-        "Valor financeiro": "emerald (prefix € ) ou purple",
+        "Valor financeiro": "sky (prefix € ) ou purple",
         "Cobertura / Tempo": "cyan",
         "Vencendo": "orange"
       },
       "delta": {
-        "up":   "text-emerald-600 — fa-arrow-up (bom para Total, Ativos; ruim para Críticos!)",
+        "up":   "text-sky-600 — fa-arrow-up (bom para Total, Ativos; ruim para Críticos!)",
         "down": "text-red-600 — fa-arrow-down (bom para Críticos; ruim para Total)",
         "neutral": "text-gray-500 — fa-minus"
       }
@@ -397,7 +397,7 @@
 
     "button": {
       "primary": {
-        "class": "px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-medium transition-colors",
+        "class": "px-5 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-lg text-sm font-medium transition-colors",
         "use": "Ação principal da tela (Guardar, Executar, Adicionar)"
       },
       "secondary": {
@@ -414,7 +414,7 @@
       },
       "tonal": {
         "patternByColor": "px-3 py-1.5 bg-{c}-100 hover:bg-{c}-200 text-{c}-800 rounded-lg text-xs font-medium",
-        "use": "CTAs secundárias com afinidade temática (ex: 'Etiqueta QR' em gray-100, 'Kardex' em teal-100)"
+        "use": "CTAs secundárias com afinidade temática (ex: 'Etiqueta QR' em gray-100, 'Kardex' em cyan-100, 'Histórico' em purple-100)"
       },
       "iconOnly": {
         "class": "p-2 rounded-lg text-gray-600 hover:text-blue-600 hover:bg-gray-50",
@@ -424,7 +424,7 @@
     },
 
     "input": {
-      "base": "w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none",
+      "base": "w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-sky-500 focus:outline-none",
       "withLeadingIcon": "Wrapper relative; ícone absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs; input com pl-8",
       "label": "block text-xs text-gray-500 mb-1",
       "hint": "text-[10px] text-gray-400 mt-1",
@@ -437,7 +437,7 @@
     "searchableSelect": {
       "description": "Combobox que substitui <select> nativo quando há mais de ~15 opções. Implementado em public/inventory/_searchable-select.js — usar via makeSearchable('selectId', opts).",
       "behavior": "Substring case-insensitive, ↑↓ navegam, Enter seleciona, Esc fecha, X limpa.",
-      "visuals": "Mesmo estilo do input base; dropdown com max-h-60 overflow-y-auto, items px-3 py-2, hover bg-emerald-50."
+      "visuals": "Mesmo estilo do input base; dropdown com max-h-60 overflow-y-auto, items px-3 py-2, hover bg-sky-50."
     },
 
     "modal": {
@@ -489,7 +489,7 @@
       "base": "inline-flex items-center text-xs px-2 py-0.5 rounded font-medium",
       "withDot": "<span class='w-1.5 h-1.5 rounded-full bg-{c}-500 mr-1.5'></span> texto",
       "variants": {
-        "success":  "bg-emerald-100 text-emerald-800",
+        "success":  "bg-sky-100 text-sky-800",
         "info":     "bg-blue-100 text-blue-700",
         "warning":  "bg-amber-100 text-amber-700",
         "danger":   "bg-red-100 text-red-700",
@@ -505,7 +505,7 @@
       "value": "text-2xl font-bold text-gray-800",
       "valueWithPrefix": "Prefixo € antes do número para valor financeiro",
       "trend": {
-        "positiveContext": "text-emerald-600 (ex: receita subindo)",
+        "positiveContext": "text-sky-600 (ex: receita subindo)",
         "negativeContext": "text-red-600 (ex: rutura subindo)"
       }
     },
@@ -518,14 +518,14 @@
         "lg": "w-10 h-10 text-sm",
         "xl": "w-16 h-16 text-lg"
       },
-      "fallback": "Bg colorido (emerald-100 padrão; bg-blue-100 para info) + iniciais bold em cor escura match",
+      "fallback": "Bg colorido (sky-100 padrão; bg-blue-100 para info) + iniciais bold em cor escura match",
       "withImage": "img object-cover; usar 'rounded-full' no img direto"
     },
 
     "toast": {
       "container": "fixed top-6 right-6 z-50 px-5 py-3 rounded-lg text-white text-sm shadow-lg",
       "variants": {
-        "success": "bg-emerald-500",
+        "success": "bg-sky-500",
         "error": "bg-red-500",
         "info": "bg-blue-500",
         "warn": "bg-amber-500"
@@ -536,7 +536,7 @@
 
     "emptyState": {
       "pattern": "Centralizado, com ícone grande gray-300 + título gray-600 + sugestão de ação",
-      "example": "<div class='text-center py-12'><i class='fas fa-box text-4xl text-gray-300 mb-3'></i><p class='text-sm text-gray-600'>Nenhum item ainda.</p><a href='item-form.html' class='inline-block mt-3 text-emerald-600 text-sm font-medium'>Adicionar primeiro item →</a></div>"
+      "example": "<div class='text-center py-12'><i class='fas fa-box text-4xl text-gray-300 mb-3'></i><p class='text-sm text-gray-600'>Nenhum item ainda.</p><a href='item-form.html' class='inline-block mt-3 text-sky-600 text-sm font-medium'>Adicionar primeiro item →</a></div>"
     },
 
     "listEntry": {
@@ -598,7 +598,7 @@
 
     "exportTrio": {
       "description": "Padrão para listagens que suportam exportação",
-      "buttonsRight": "CSV (gray-100) + Excel (green-100) + PDF (red-100), tamanho xs",
+      "buttonsRight": "CSV (gray-100) + Excel (sky-100) + PDF (red-100), tamanho xs",
       "tooltip": "title='Exportar em CSV/Excel/PDF'",
       "behavior": "Aplica os filtros atuais ao export"
     }
@@ -606,7 +606,7 @@
 
   "doAndDont": {
     "do": [
-      "Usar emerald (verde-mint) como cor de marca em todos os elementos de identidade (logo, botões primários, links).",
+      "Usar sky (azul-céu) como cor de marca em todos os elementos de identidade (logo, botões primários, links, sidebar active).",
       "Reservar vermelho para criticidade real (rutura, erro 5xx, alerta).",
       "Códigos sempre em font-mono cor cinza-500.",
       "Cards com sombra suave + border hairline — nunca cards 'flutuando' sem nenhuma estrutura.",
@@ -629,7 +629,7 @@
       "stack": "Tailwind CDN + Inter (Google Fonts) + Font Awesome 6 + Vanilla JS — sem build step",
       "sharedLayout": "public/inventory/_layout.js exporta renderInventoryLayout({ activePage, title, subtitle }) e injeta sidebar + header + #pageContent",
       "sharedHelpers": "apiCall(), toast(), showViewModal(), makeSearchable() — já implementados",
-      "primaryColorMigration": "O projeto começou com 'blue' como cor de marca. Este design.json estabelece 'emerald' como a cor canónica. Migração progressiva: nas próximas alterações, trocar bg-blue-*/text-blue-*/border-blue-*/focus:ring-blue-* por emerald onde representam marca (logo, botões primários, sidebar active, focus rings). Manter blue como cor 'info' (badges, alertas informativos)."
+      "primaryColorMigration": "O projeto começou com 'blue' (azul Tailwind padrão) como cor de marca. Este design.json estabelece 'sky' (azul-céu vibrante, mais clínico) como a cor canónica de marca. Migração progressiva: nas próximas alterações, trocar bg-blue-*/text-blue-*/border-blue-*/focus:ring-blue-* por sky onde representam marca (logo, botões primários, sidebar active, focus rings, links). Manter 'blue' como cor de status 'info' (badges informativos, banners de informação, badges de Consumo). Como sky e blue são da mesma família mas com luminosidades distintas, a leitura visual continua nítida."
     },
     "applyingToNewScreens": [
       "1. Comece com <body class='bg-gray-50 font-inter'> (ou gradiente se a tela for hero/dashboard)",
@@ -641,9 +641,9 @@
     "checklistBeforeCommit": [
       "Tabela tem coluna de ações com olho (visualizar)?",
       "Códigos (SKU, UUID) estão em font-mono gray-500?",
-      "Botão primário é emerald?",
+      "Botão primário é sky-600?",
       "Nenhum texto visível ao operador cita § ou RN/RF?",
-      "Hover de rows clicáveis usa bg-gray-50 ou bg-emerald-50, nunca borda?",
+      "Hover de rows clicáveis usa bg-gray-50 ou bg-sky-50, nunca borda?",
       "Ações destrutivas têm confirmação descrevendo consequências?"
     ]
   }
