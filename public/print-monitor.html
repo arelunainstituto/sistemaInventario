@@ -177,6 +177,22 @@
     </main>
 
     <script>
+        // Auth guard + injeção de Authorization em todas as chamadas /api/.
+        // Os endpoints de impressão agora exigem token JWT — sem guard, a página
+        // ficaria quebrada após o reforço de segurança.
+        (function () {
+            const token = localStorage.getItem('access_token');
+            if (!token) { window.location.href = '/login.html'; return; }
+            const _fetch = window.fetch.bind(window);
+            window.fetch = function (url, opts = {}) {
+                if (typeof url === 'string' && url.startsWith('/api/')) {
+                    opts.headers = { ...(opts.headers || {}), Authorization: 'Bearer ' + token };
+                }
+                return _fetch(url, opts);
+            };
+        })();
+        // NOTA: EventSource (SSE) não permite custom headers — o stream de status
+        // ficará 401 até refatorar para autenticação via cookie ou query token.
         class PrintMonitor {
             constructor() {
                 this.currentPage = 1;

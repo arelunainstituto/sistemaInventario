@@ -1284,7 +1284,7 @@ app.post('/api/collaborators', authenticateToken, requirePermission('inventory',
 
 // Endpoint para atualizar QR codes existentes
 // Endpoint para gerar QR code para um item específico
-app.post('/api/items/:id/generate-qr', async (req, res) => {
+app.post('/api/items/:id/generate-qr', authenticateToken, requirePermission('inventory', 'update_item'), async (req, res) => {
     try {
         const { id } = req.params;
         console.log(`🔄 Gerando QR code para o item ${id}...`);
@@ -1359,7 +1359,7 @@ app.post('/api/items/:id/generate-qr', async (req, res) => {
     }
 });
 
-app.post('/api/update-qr-codes', async (req, res) => {
+app.post('/api/update-qr-codes', authenticateToken, requireRole(['Inventory_Admin', 'Admin', 'admin']), async (req, res) => {
     try {
         console.log('🔄 Iniciando atualização dos QR codes...');
 
@@ -1464,7 +1464,7 @@ app.post('/api/update-qr-codes', async (req, res) => {
 // ========== PRINT QUEUE API ENDPOINTS ==========
 
 // Endpoint para adicionar item à fila de impressão
-app.post('/api/print/:itemId', async (req, res) => {
+app.post('/api/print/:itemId', authenticateToken, requirePermission('inventory', 'read'), async (req, res) => {
     try {
         const { itemId } = req.params;
         const { priority = 1, qrCodeSize = '25mm' } = req.body;
@@ -1548,7 +1548,7 @@ app.post('/api/print/:itemId', async (req, res) => {
 });
 
 // Endpoint para consultar status da fila de impressão
-app.get('/api/print-status', async (req, res) => {
+app.get('/api/print-status', authenticateToken, requirePermission('inventory', 'read'), async (req, res) => {
     try {
         const { job_id, item_id, status } = req.query;
 
@@ -1590,7 +1590,7 @@ app.get('/api/print-status', async (req, res) => {
 });
 
 // Endpoint para atualizar status de job de impressão (usado pelo agente local)
-app.put('/api/print-status/:jobId', async (req, res) => {
+app.put('/api/print-status/:jobId', authenticateToken, requirePermission('inventory', 'read'), async (req, res) => {
     try {
         const { jobId } = req.params;
         const { status, error_message } = req.body;
@@ -1635,7 +1635,7 @@ app.put('/api/print-status/:jobId', async (req, res) => {
 });
 
 // Endpoint para monitorar status de impressão em tempo real (Server-Sent Events)
-app.get('/api/print-status/stream/:jobId', async (req, res) => {
+app.get('/api/print-status/stream/:jobId', authenticateToken, requirePermission('inventory', 'read'), async (req, res) => {
     const { jobId } = req.params;
 
     // Configurar headers para Server-Sent Events
@@ -1711,7 +1711,7 @@ app.get('/api/print-status/stream/:jobId', async (req, res) => {
 });
 
 // Endpoint para obter histórico de impressões
-app.get('/api/print-history', async (req, res) => {
+app.get('/api/print-history', authenticateToken, requirePermission('inventory', 'read'), async (req, res) => {
     try {
         const { page = 1, limit = 20, status } = req.query;
         const offset = (page - 1) * limit;
@@ -1768,7 +1768,7 @@ app.get('/api/print-history', async (req, res) => {
 });
 
 // Endpoint para estatísticas de impressão
-app.get('/api/print-stats', async (req, res) => {
+app.get('/api/print-stats', authenticateToken, requirePermission('inventory', 'read'), async (req, res) => {
     try {
         const { data: stats, error } = await supabase
             .from('print_queue')
@@ -1815,7 +1815,7 @@ app.get('/api/print-stats', async (req, res) => {
 });
 
 // Endpoint para cancelar job de impressão
-app.post('/api/print-cancel/:jobId', async (req, res) => {
+app.post('/api/print-cancel/:jobId', authenticateToken, requirePermission('inventory', 'read'), async (req, res) => {
     try {
         const { jobId } = req.params;
 
@@ -1880,7 +1880,7 @@ app.post('/api/print-cancel/:jobId', async (req, res) => {
 });
 
 // Endpoint para limpar jobs antigos da fila
-app.delete('/api/print-cleanup', async (req, res) => {
+app.delete('/api/print-cleanup', authenticateToken, requireRole(['Inventory_Admin', 'Admin', 'admin']), async (req, res) => {
     try {
         const { days = 7 } = req.query;
         const cutoffDate = new Date();
@@ -1917,7 +1917,7 @@ app.delete('/api/print-cleanup', async (req, res) => {
 });
 
 // Endpoint para criar a tabela print_queue
-app.post('/api/setup-print-table', async (req, res) => {
+app.post('/api/setup-print-table', authenticateToken, requireRole(['Admin', 'admin']), async (req, res) => {
     try {
         const createTableSQL = `
             CREATE TABLE IF NOT EXISTS print_queue (

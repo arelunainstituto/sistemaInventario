@@ -5,33 +5,37 @@ const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
+// Debug logger — silencioso em produção para evitar vazar PII (user id, email,
+// permissões, perfis) nos logs do servidor. Erros continuam via console.error.
+const log = process.env.NODE_ENV === 'production' ? () => {} : console.log;
+
 /**
  * Middleware para verificar autenticação JWT
  */
 async function authenticateToken(req, res, next) {
     try {
-        console.log('🔍 [AUTH] Starting authentication...');
+        log('🔍 [AUTH] Starting authentication...');
         const authHeader = req.headers.authorization;
         const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
 
         if (!token) {
-            console.log('❌ [AUTH] No token provided');
+            log('❌ [AUTH] No token provided');
             return res.status(401).json({ error: 'Token de acesso requerido' });
         }
 
-        console.log('🔑 [AUTH] Token found, verifying with Supabase...');
+        log('🔑 [AUTH] Token found, verifying with Supabase...');
         // Verificar o token JWT com Supabase
         const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
 
         if (error || !user) {
-            console.log('❌ [AUTH] Token verification failed:', error);
+            log('❌ [AUTH] Token verification failed:', error);
             return res.status(403).json({ error: 'Token inválido' });
         }
 
-        console.log('✅ [AUTH] Token verified for user:', user.id, user.email);
+        log('✅ [AUTH] Token verified for user:', user.id, user.email);
 
         // Buscar perfil do usuário
-        console.log('👤 [AUTH] Looking up user profile...');
+        log('👤 [AUTH] Looking up user profile...');
         const { data: userProfile, error: profileError } = await supabaseAdmin
             .from('user_profiles')
             .select('*')
@@ -39,19 +43,19 @@ async function authenticateToken(req, res, next) {
             .eq('is_active', true)
             .single();
 
-        console.log('👤 [AUTH] Profile lookup result:', { profileError, hasProfile: !!userProfile, profileData: userProfile });
+        log('👤 [AUTH] Profile lookup result:', { profileError, hasProfile: !!userProfile, profileData: userProfile });
 
         if (profileError || !userProfile) {
-            console.log('❌ [AUTH] Profile not found or error:', profileError);
+            log('❌ [AUTH] Profile not found or error:', profileError);
             return res.status(403).json({ error: 'Perfil de usuário não encontrado' });
         }
 
-        console.log('✅ [AUTH] Profile found, continuing to role lookup...');
+        log('✅ [AUTH] Profile found, continuing to role lookup...');
 
-        console.log('✅ [AUTH] Profile found, continuing to role lookup...');
+        log('✅ [AUTH] Profile found, continuing to role lookup...');
 
         // Buscar roles do usuário
-        console.log('👥 [AUTH] Looking up user roles...');
+        log('👥 [AUTH] Looking up user roles...');
         let finalUserRoles = [];
 
         try {
@@ -62,15 +66,15 @@ async function authenticateToken(req, res, next) {
                 .eq('user_id', user.id)
                 .eq('is_active', true);
 
-            console.log('👥 [AUTH] Simple user roles lookup result:', { rolesError, rolesCount: userRoles?.length || 0, userRoles });
+            log('👥 [AUTH] Simple user roles lookup result:', { rolesError, rolesCount: userRoles?.length || 0, userRoles });
 
             if (rolesError) {
-                console.log('❌ [AUTH] Error loading user roles:', rolesError);
+                log('❌ [AUTH] Error loading user roles:', rolesError);
                 return res.status(403).json({ error: 'Erro ao carregar permissões do usuário' });
             }
 
             // Se chegou até aqui, vamos continuar com uma query mais complexa
-            console.log('👥 [AUTH] Now trying complex query with joins...');
+            log('👥 [AUTH] Now trying complex query with joins...');
             const { data: userRolesWithPermissions, error: complexError } = await supabaseAdmin
                 .from('user_roles')
                 .select(`
@@ -89,45 +93,45 @@ async function authenticateToken(req, res, next) {
                 .eq('user_id', user.id)
                 .eq('is_active', true);
 
-            console.log('👥 [AUTH] Complex query result:', { complexError, complexCount: userRolesWithPermissions?.length || 0 });
+            log('👥 [AUTH] Complex query result:', { complexError, complexCount: userRolesWithPermissions?.length || 0 });
 
             if (complexError) {
-                console.log('❌ [AUTH] Error in complex query:', complexError);
+                log('❌ [AUTH] Error in complex query:', complexError);
                 return res.status(403).json({ error: 'Erro ao carregar permissões do usuário' });
             }
 
             // Use the complex result if available, otherwise fall back to simple
             finalUserRoles = userRolesWithPermissions || userRoles;
-            console.log('👥 [AUTH] Using final user roles:', finalUserRoles?.length || 0);
+            log('👥 [AUTH] Using final user roles:', finalUserRoles?.length || 0);
 
         } catch (roleQueryError) {
-            console.log('💥 [AUTH] Exception during role query:', roleQueryError);
+            log('💥 [AUTH] Exception during role query:', roleQueryError);
             return res.status(403).json({ error: 'Erro ao carregar permissões do usuário' });
         }
 
         // Combinar perfil com roles e permissões
         userProfile.user_roles = finalUserRoles || [];
-        console.log('🔗 [AUTH] Combined profile with roles, userRoles count:', finalUserRoles?.length || 0);
+        log('🔗 [AUTH] Combined profile with roles, userRoles count:', finalUserRoles?.length || 0);
 
         // Estruturar as permissões do usuário
         const userPermissions = new Set();
         const roleNames = [];
-        console.log('🏗️ [AUTH] Starting to structure user permissions...');
+        log('🏗️ [AUTH] Starting to structure user permissions...');
 
         userProfile.user_roles.forEach(userRole => {
             const role = userRole.roles;
             roleNames.push(role.name);
-            console.log('👑 [AUTH] Processing role:', role.name, 'with permissions count:', role.role_permissions?.length || 0);
+            log('👑 [AUTH] Processing role:', role.name, 'with permissions count:', role.role_permissions?.length || 0);
 
             role.role_permissions.forEach(rolePermission => {
                 const permission = rolePermission.permissions;
                 const permissionString = `${permission.module_name}:${permission.action}`;
                 userPermissions.add(permissionString);
-                console.log('🔑 [AUTH] Added permission:', permissionString);
+                log('🔑 [AUTH] Added permission:', permissionString);
             });
         });
 
-        console.log('📋 [AUTH] Final permissions structure:', {
+        log('📋 [AUTH] Final permissions structure:', {
             roleNames,
             permissionsArray: Array.from(userPermissions)
         });
@@ -149,7 +153,7 @@ async function authenticateToken(req, res, next) {
                 userModuleCodes = userModuleAccess
                     .map(uma => uma.modules?.code)
                     .filter(code => code);
-                console.log('📦 [AUTH] User has direct module access:', userModuleCodes);
+                log('📦 [AUTH] User has direct module access:', userModuleCodes);
 
                 // Adicionar permissões genéricas para cada módulo
                 userModuleCodes.forEach(moduleCode => {
@@ -170,7 +174,7 @@ async function authenticateToken(req, res, next) {
             module_codes: userModuleCodes // NOVO: códigos dos módulos com acesso direto
         };
 
-        console.log('✅ [AUTH] User object created:', {
+        log('✅ [AUTH] User object created:', {
             id: req.user.id,
             email: req.user.email,
             rolesCount: req.user.roles.length,
@@ -178,12 +182,12 @@ async function authenticateToken(req, res, next) {
             roles: req.user.roles,
             permissions: req.user.permissions
         });
-        console.log('✅ [AUTH] Calling next() to proceed to next middleware...');
+        log('✅ [AUTH] Calling next() to proceed to next middleware...');
 
         next();
     } catch (error) {
-        console.log('💥 [AUTH] Unexpected error in authenticateToken:', error);
-        console.log('💥 [AUTH] Error stack:', error.stack);
+        log('💥 [AUTH] Unexpected error in authenticateToken:', error);
+        log('💥 [AUTH] Error stack:', error.stack);
         console.error('Erro na autenticação:', error);
         return res.status(500).json({ error: 'Erro interno do servidor' });
     }
@@ -196,34 +200,34 @@ async function authenticateToken(req, res, next) {
  */
 function requirePermission(module, action) {
     return (req, res, next) => {
-        console.log('🔐 [PERMISSION] ===== PERMISSION CHECK STARTED =====');
-        console.log('🔐 [PERMISSION] Checking permission:', { module, action });
-        console.log('🔐 [PERMISSION] Required permission:', `${module}:${action}`);
-        console.log('🔐 [PERMISSION] User object exists:', !!req.user);
-        console.log('🔐 [PERMISSION] User permissions:', req.user?.permissions || []);
-        console.log('🔐 [PERMISSION] User roles:', req.user?.roles || []);
+        log('🔐 [PERMISSION] ===== PERMISSION CHECK STARTED =====');
+        log('🔐 [PERMISSION] Checking permission:', { module, action });
+        log('🔐 [PERMISSION] Required permission:', `${module}:${action}`);
+        log('🔐 [PERMISSION] User object exists:', !!req.user);
+        log('🔐 [PERMISSION] User permissions:', req.user?.permissions || []);
+        log('🔐 [PERMISSION] User roles:', req.user?.roles || []);
 
         if (!req.user) {
-            console.log('❌ [PERMISSION] No user found in request');
+            log('❌ [PERMISSION] No user found in request');
             return res.status(401).json({ error: 'Usuário não autenticado' });
         }
 
         // BYPASS: Admins always have access
         if (req.user.roles && req.user.roles.some(role => role.toLowerCase() === 'admin')) {
-            console.log('✅ [PERMISSION] Admin bypass - Access granted');
+            log('✅ [PERMISSION] Admin bypass - Access granted');
             return next();
         }
 
         const requiredPermission = `${module}:${action}`;
         const hasPermission = req.user.permissions && req.user.permissions.includes(requiredPermission);
 
-        console.log('🔐 [PERMISSION] Has permission check result:', hasPermission);
+        log('🔐 [PERMISSION] Has permission check result:', hasPermission);
 
         if (hasPermission) {
-            console.log('✅ [PERMISSION] Permission granted - proceeding to next middleware');
+            log('✅ [PERMISSION] Permission granted - proceeding to next middleware');
             return next();
         } else {
-            console.log('❌ [PERMISSION] Permission denied - returning 403');
+            log('❌ [PERMISSION] Permission denied - returning 403');
             return res.status(403).json({
                 error: 'Acesso negado',
                 required: requiredPermission,
@@ -300,7 +304,7 @@ async function getCurrentUser(req, res) {
             available_modules: Array.from(availableModules)
         };
 
-        console.log('📤 [AUTH] Sending user data:', JSON.stringify(userData, null, 2));
+        log('📤 [AUTH] Sending user data:', JSON.stringify(userData, null, 2));
 
         res.json(userData);
     } catch (error) {
@@ -315,10 +319,10 @@ async function getCurrentUser(req, res) {
 function requireModuleAccess(moduleCode) {
     return async (req, res, next) => {
         try {
-            console.log(`🔐 [MODULE] Checking access to module: ${moduleCode} for user: ${req.user && req.user.id}`);
+            log(`🔐 [MODULE] Checking access to module: ${moduleCode} for user: ${req.user && req.user.id}`);
 
             if (!req.user) {
-                console.log('❌ [MODULE] User not authenticated');
+                log('❌ [MODULE] User not authenticated');
                 return res.status(401).json({ error: 'Não autenticado' });
             }
 
@@ -349,14 +353,14 @@ function requireModuleAccess(moduleCode) {
             }
 
             if (!hasAccess) {
-                console.log(`❌ [MODULE] Access denied to module: ${moduleCode}`);
+                log(`❌ [MODULE] Access denied to module: ${moduleCode}`);
                 return res.status(403).json({
                     error: 'Acesso negado',
                     message: 'Você não tem permissão para acessar este módulo'
                 });
             }
 
-            console.log(`✅ [MODULE] Access granted to module: ${moduleCode}`);
+            log(`✅ [MODULE] Access granted to module: ${moduleCode}`);
             next();
         } catch (error) {
             console.error('❌ [MODULE] Error in requireModuleAccess middleware:', error);

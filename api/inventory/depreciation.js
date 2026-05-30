@@ -1,10 +1,11 @@
 const express = require('express');
 const router = express.Router();
-const { requireRole } = require('../middleware/auth');
+const { requireRole, requirePermission } = require('../middleware/auth');
 const { supabaseAdmin } = require('./_stock');
 
 // GET /runs — histórico de execuções
-router.get('/runs', async (req, res) => {
+// Reports + financial: any inventory user with reports can list; financial breakdown apenas no detalhe.
+router.get('/runs', requirePermission('inventory', 'reports'), async (req, res) => {
     try {
         const { data, error } = await supabaseAdmin
             .from('inv_depreciation_runs')
