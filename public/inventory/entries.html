@@ -129,7 +129,7 @@ function addLine() {
         <div class="col-span-3"><label class="text-xs text-gray-500">Item</label>
             <select required onchange="onItemChange(this, ${idx})" class="line-item w-full px-2 py-1.5 border border-gray-300 rounded text-xs" id="lineItem-${idx}">
                 <option value="">—</option>
-                ${items.map(i => `<option value="${i.id}" data-controls-lot="${i.controls_lot}">${escapeHtml(i.internal_code)} · ${escapeHtml(i.name)}${i.subcategory?.name ? ' · ' + escapeHtml(i.subcategory.name) : ''}</option>`).join('')}
+                ${items.map(i => `<option value="${i.id}" data-controls-lot="${i.controls_lot}" data-conversion="${i.conversion_factor ?? 1}" data-purchase-uom="${escapeHtml(i.purchase_uom?.code || i.base_uom?.code || '')}" data-consumption-uom="${escapeHtml(i.consumption_uom?.code || i.base_uom?.code || '')}">${escapeHtml(i.internal_code)} · ${escapeHtml(i.name)}${i.subcategory?.name ? ' · ' + escapeHtml(i.subcategory.name) : ''}</option>`).join('')}
             </select>
         </div>
         <div class="col-span-2"><label class="text-xs text-gray-500">Localização</label>
@@ -139,7 +139,10 @@ function addLine() {
             </select>
         </div>
         <div class="col-span-1"><label class="text-xs text-gray-500">Qtd</label><input type="number" step="0.0001" required class="line-qty w-full px-2 py-1.5 border border-gray-300 rounded text-xs" oninput="recalcTotal()"></div>
-        <div class="col-span-1"><label class="text-xs text-gray-500">Fator</label><input type="number" step="0.0001" value="1" class="line-factor w-full px-2 py-1.5 border border-gray-300 rounded text-xs"></div>
+        <div class="col-span-1">
+            <label class="text-xs text-gray-500 flex items-center gap-1">Fator <span class="line-uom-hint text-[10px] text-gray-400"></span></label>
+            <input type="number" step="0.0001" value="1" readonly title="Fator definido no cadastro do item. Para alterar, edite o item em Itens → Editar." class="line-factor w-full px-2 py-1.5 border border-gray-200 rounded text-xs bg-gray-50 text-gray-600 cursor-not-allowed">
+        </div>
         <div class="col-span-1"><label class="text-xs text-gray-500">€ unit</label><input type="number" step="0.0001" required class="line-cost w-full px-2 py-1.5 border border-gray-300 rounded text-xs" oninput="recalcTotal()"></div>
         <div class="col-span-2 line-lot-area hidden"><label class="text-xs text-gray-500">Lote</label><input type="text" class="line-lot w-full px-2 py-1.5 border border-gray-300 rounded text-xs"></div>
         <div class="col-span-1 line-expiry-area hidden"><label class="text-xs text-gray-500">Validade</label><input type="date" class="line-expiry w-full px-2 py-1.5 border border-gray-300 rounded text-xs"></div>
@@ -152,10 +155,22 @@ function addLine() {
 
 function onItemChange(sel, idx) {
     const line = sel.closest('[data-line]');
-    const controlsLot = sel.selectedOptions[0]?.dataset.controlsLot === 'true';
+    const opt = sel.selectedOptions[0];
+    const controlsLot = opt?.dataset.controlsLot === 'true';
     line.querySelector('.line-lot-area').classList.toggle('hidden', !controlsLot);
     line.querySelector('.line-expiry-area').classList.toggle('hidden', !controlsLot);
     line.querySelectorAll('.line-lot, .line-expiry').forEach(el => el.required = controlsLot);
+
+    // Fator de conversão e UoMs vêm do cadastro do item (read-only).
+    const factor       = parseFloat(opt?.dataset.conversion) || 1;
+    const purchaseUom  = opt?.dataset.purchaseUom || '';
+    const consumeUom   = opt?.dataset.consumptionUom || '';
+    line.querySelector('.line-factor').value = factor;
+    const hint = line.querySelector('.line-uom-hint');
+    if (hint) hint.textContent = (purchaseUom && consumeUom)
+        ? `(${purchaseUom} → ${consumeUom})`
+        : '';
+    recalcTotal();
 }
 
 function recalcTotal() {
