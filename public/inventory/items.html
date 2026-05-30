@@ -9,8 +9,9 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/styles.css">
     <script>if (!localStorage.getItem('access_token')) window.location.href = '/login.html';</script>
+    <style>body{font-family:'Inter',system-ui,sans-serif}</style>
 </head>
-<body class="bg-gray-50" style="font-family: 'Inter', sans-serif;">
+<body class="bg-white">
 
 <div id="layoutRoot"></div>
 
@@ -19,54 +20,62 @@
 renderInventoryLayout({ activePage: 'items', title: 'Itens', subtitle: 'Catálogo de itens do inventário' });
 
 document.getElementById('pageContent').innerHTML = `
-    <div class="flex flex-wrap gap-3 items-end mb-6">
-        <div>
-            <label class="block text-xs text-gray-500 mb-1">Pesquisar</label>
-            <input id="filterSearch" type="text" placeholder="Nome, código, ref, código de barras"
-                   class="px-3 py-2 border border-gray-300 rounded-lg text-sm w-72 focus:ring-2 focus:ring-blue-500 focus:outline-none">
-        </div>
-        <div>
-            <label class="block text-xs text-gray-500 mb-1">Categoria macro</label>
-            <select id="filterMacro" class="px-3 py-2 border border-gray-300 rounded-lg text-sm">
-                <option value="">Todas</option>
-                <option value="consumo">Consumo</option>
-                <option value="patrimonial">Patrimonial</option>
-            </select>
-        </div>
-        <div>
-            <label class="block text-xs text-gray-500 mb-1">Subcategoria</label>
-            <select id="filterSubcategory" class="px-3 py-2 border border-gray-300 rounded-lg text-sm w-48">
-                <option value="">Todas</option>
-            </select>
-        </div>
-        <button id="btnFilter" class="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700">
-            <i class="fas fa-search"></i> Filtrar
-        </button>
-        <div class="ml-auto">
-            <a href="item-form.html" class="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700">
-                <i class="fas fa-plus"></i> Novo item
-            </a>
+    <div class="bg-white border border-gray-200/70 rounded-xl shadow-sm p-4 mb-5">
+        <div class="flex flex-wrap gap-3 items-end">
+            <div class="flex-1 min-w-[260px]">
+                <label class="block text-[10px] uppercase tracking-wider text-gray-500 font-semibold mb-1.5">Pesquisar</label>
+                <div class="relative">
+                    <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs"></i>
+                    <input id="filterSearch" type="text" placeholder="Nome, código, referência ou código de barras…"
+                           class="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-sky-500/30 focus:border-sky-500 focus:outline-none transition">
+                </div>
+            </div>
+            <div>
+                <label class="block text-[10px] uppercase tracking-wider text-gray-500 font-semibold mb-1.5">Categoria</label>
+                <select id="filterMacro" class="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-sky-500/30 focus:border-sky-500 focus:outline-none transition">
+                    <option value="">Todas</option>
+                    <option value="consumo">Consumo</option>
+                    <option value="patrimonial">Patrimonial</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-[10px] uppercase tracking-wider text-gray-500 font-semibold mb-1.5">Subcategoria</label>
+                <select id="filterSubcategory" class="px-3 py-2 border border-gray-300 rounded-lg text-sm w-48 focus:ring-2 focus:ring-sky-500/30 focus:border-sky-500 focus:outline-none transition">
+                    <option value="">Todas</option>
+                </select>
+            </div>
+            <button id="btnFilter" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm font-medium transition">
+                <i class="fas fa-filter text-xs"></i> Aplicar
+            </button>
+            <div class="ml-auto">
+                <a href="item-form.html" class="inline-flex items-center gap-2 px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-lg text-sm font-medium shadow-sm shadow-sky-500/20 transition">
+                    <i class="fas fa-plus text-xs"></i> Novo item
+                </a>
+            </div>
         </div>
     </div>
 
-    <div class="bg-white rounded-lg shadow overflow-hidden">
-        <table class="w-full text-sm">
-            <thead class="bg-gray-50 text-gray-600 text-xs uppercase">
-                <tr>
-                    <th class="px-4 py-3 text-left">Código</th>
-                    <th class="px-4 py-3 text-left">Nome</th>
-                    <th class="px-4 py-3 text-left">Macro</th>
-                    <th class="px-4 py-3 text-left">Subcategoria</th>
-                    <th class="px-4 py-3 text-right">CMP</th>
-                    <th class="px-4 py-3 text-right">Min</th>
-                    <th class="px-4 py-3 text-center">Estado</th>
-                    <th class="px-4 py-3 text-center w-32">Ações</th>
-                </tr>
-            </thead>
-            <tbody id="itemsTbody" class="divide-y divide-gray-100">
-                <tr><td colspan="8" class="px-4 py-8 text-center text-gray-400">Carregando…</td></tr>
-            </tbody>
-        </table>
+    <div class="bg-white border border-gray-200/70 rounded-xl shadow-sm overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+                <thead class="bg-gray-50/50 text-gray-500 text-[10px] uppercase tracking-wider border-b border-gray-200">
+                    <tr>
+                        <th class="px-4 py-3 text-left font-semibold">Código</th>
+                        <th class="px-4 py-3 text-left font-semibold">Item</th>
+                        <th class="px-4 py-3 text-left font-semibold">Categoria</th>
+                        <th class="px-4 py-3 text-left font-semibold">Subcategoria</th>
+                        <th class="px-4 py-3 text-right font-semibold">CMP</th>
+                        <th class="px-4 py-3 text-right font-semibold">Stock mín.</th>
+                        <th class="px-4 py-3 text-center font-semibold">Estado</th>
+                        <th class="px-4 py-3 text-center font-semibold w-32">Ações</th>
+                    </tr>
+                </thead>
+                <tbody id="itemsTbody" class="divide-y divide-gray-100">
+                    <tr><td colspan="8" class="px-4 py-10 text-center text-gray-400 text-xs">Carregando…</td></tr>
+                </tbody>
+            </table>
+        </div>
+        <div id="itemsFooter" class="px-4 py-2.5 bg-gray-50/50 border-t border-gray-100 text-[11px] text-gray-500"></div>
     </div>
 `;
 
@@ -74,13 +83,12 @@ const filterSearch = document.getElementById('filterSearch');
 const filterMacro = document.getElementById('filterMacro');
 const filterSubcategory = document.getElementById('filterSubcategory');
 
-// Carregar categorias no filtro
 (async () => {
     try {
         const cats = await apiCall('/api/inventory/categories');
         filterSubcategory.innerHTML = '<option value="">Todas</option>' +
-            cats.data.map(c => `<option value="${c.id}">[${c.parent_macro}] ${escapeHtml(c.name)}</option>`).join('');
-    } catch (e) { /* silent */ }
+            cats.data.map(c => `<option value="${c.id}">${escapeHtml(c.name)} (${c.parent_macro})</option>`).join('');
+    } catch (e) {}
 })();
 
 document.getElementById('btnFilter').addEventListener('click', loadItems);
@@ -96,42 +104,61 @@ async function loadItems() {
     params.set('limit', '200');
 
     const tbody = document.getElementById('itemsTbody');
-    tbody.innerHTML = '<tr><td colspan="8" class="px-4 py-8 text-center text-gray-400">Carregando…</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="8" class="px-4 py-10 text-center text-gray-400 text-xs">Carregando…</td></tr>';
     try {
         const res = await apiCall(`/api/inventory/items?${params}`);
         if (!res.data.length) {
-            tbody.innerHTML = '<tr><td colspan="8" class="px-4 py-8 text-center text-gray-400">Nenhum item encontrado.</td></tr>';
+            tbody.innerHTML = `<tr><td colspan="8" class="px-4 py-12 text-center">
+                <div class="inline-flex w-10 h-10 rounded-full bg-gray-100 items-center justify-center text-gray-400 mb-2">
+                    <i class="fas fa-box-open"></i>
+                </div>
+                <p class="text-sm text-gray-600">Nenhum item encontrado.</p>
+                <p class="text-xs text-gray-400 mt-1">Ajuste os filtros ou adicione um novo item.</p>
+            </td></tr>`;
+            document.getElementById('itemsFooter').textContent = '';
             return;
         }
-        tbody.innerHTML = res.data.map(it => `
-            <tr class="hover:bg-gray-50">
-                <td class="px-4 py-3 font-mono text-xs text-gray-600">${escapeHtml(it.internal_code)}</td>
-                <td class="px-4 py-3 font-medium text-gray-800">${escapeHtml(it.name)}</td>
+        tbody.innerHTML = res.data.map(it => {
+            const macroColor = it.macro_category === 'consumo' ? 'sky' : 'purple';
+            const macroIcon  = it.macro_category === 'consumo' ? 'fa-prescription-bottle' : 'fa-laptop-medical';
+            return `
+            <tr class="hover:bg-sky-50/30 transition">
+                <td class="px-4 py-3 font-mono text-[11px] text-gray-500">${escapeHtml(it.internal_code)}</td>
                 <td class="px-4 py-3">
-                    <span class="text-xs px-2 py-0.5 rounded ${it.macro_category === 'consumo' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}">
-                        ${it.macro_category}
+                    <p class="font-medium text-gray-900 text-sm">${escapeHtml(it.name)}</p>
+                    ${it.manufacturer_ref ? `<p class="text-[11px] text-gray-400 font-mono mt-0.5">${escapeHtml(it.manufacturer_ref)}</p>` : ''}
+                </td>
+                <td class="px-4 py-3">
+                    <span class="inline-flex items-center gap-1.5 text-[11px] px-2 py-0.5 rounded-md bg-${macroColor}-50 text-${macroColor}-700 border border-${macroColor}-100 font-medium capitalize">
+                        <i class="fas ${macroIcon} text-[9px]"></i>${it.macro_category}
                     </span>
                 </td>
-                <td class="px-4 py-3 text-gray-600">${escapeHtml(it.subcategory?.name || '—')}</td>
-                <td class="px-4 py-3 text-right text-gray-700">€ ${(parseFloat(it.cmp) || 0).toFixed(2)}</td>
-                <td class="px-4 py-3 text-right text-gray-700">${parseFloat(it.min_stock) || 0}</td>
+                <td class="px-4 py-3 text-gray-600 text-xs">${escapeHtml(it.subcategory?.name || '—')}</td>
+                <td class="px-4 py-3 text-right text-gray-700 tabular-nums font-medium">€ ${(parseFloat(it.cmp) || 0).toFixed(2)}</td>
+                <td class="px-4 py-3 text-right text-gray-600 tabular-nums">${parseFloat(it.min_stock) || 0}</td>
                 <td class="px-4 py-3 text-center">
-                    ${it.is_active ? '<span class="text-xs text-green-600">● Ativo</span>' : '<span class="text-xs text-gray-400">● Inativo</span>'}
+                    ${it.is_active
+                        ? '<span class="inline-flex items-center gap-1.5 text-[11px] text-sky-700"><span class="w-1.5 h-1.5 rounded-full bg-sky-500"></span>Ativo</span>'
+                        : '<span class="inline-flex items-center gap-1.5 text-[11px] text-gray-400"><span class="w-1.5 h-1.5 rounded-full bg-gray-400"></span>Inativo</span>'}
                 </td>
                 <td class="px-4 py-3 text-center whitespace-nowrap">
-                    <a href="item-view.html?id=${it.id}" class="text-gray-600 hover:text-blue-600 mx-1" title="Visualizar">
-                        <i class="fas fa-eye"></i>
-                    </a>
-                    <a href="item-form.html?id=${it.id}" class="text-blue-600 hover:text-blue-800 mx-1" title="Editar">
-                        <i class="fas fa-edit"></i>
-                    </a>
-                    <a href="item-label.html?id=${it.id}" class="text-gray-600 hover:text-gray-800 mx-1" title="Etiqueta QR">
-                        <i class="fas fa-qrcode"></i>
-                    </a>
+                    <div class="inline-flex items-center gap-0.5">
+                        <a href="item-view.html?id=${it.id}" class="w-7 h-7 inline-flex items-center justify-center rounded text-gray-500 hover:text-sky-600 hover:bg-sky-50 transition" title="Visualizar">
+                            <i class="fas fa-eye text-xs"></i>
+                        </a>
+                        <a href="item-form.html?id=${it.id}" class="w-7 h-7 inline-flex items-center justify-center rounded text-gray-500 hover:text-sky-600 hover:bg-sky-50 transition" title="Editar">
+                            <i class="fas fa-edit text-xs"></i>
+                        </a>
+                        <a href="item-label.html?id=${it.id}" class="w-7 h-7 inline-flex items-center justify-center rounded text-gray-500 hover:text-gray-700 hover:bg-gray-100 transition" title="Etiqueta QR">
+                            <i class="fas fa-qrcode text-xs"></i>
+                        </a>
+                    </div>
                 </td>
-            </tr>`).join('');
+            </tr>`;
+        }).join('');
+        document.getElementById('itemsFooter').textContent = `${res.data.length} itens · página ${res.pagination?.page || 1} de ${res.pagination?.totalPages || 1}`;
     } catch (err) {
-        tbody.innerHTML = `<tr><td colspan="8" class="px-4 py-8 text-center text-red-500">${err.message}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="8" class="px-4 py-10 text-center text-red-500 text-xs">${err.message}</td></tr>`;
     }
 }
 

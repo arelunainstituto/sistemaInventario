@@ -9,7 +9,7 @@
     <link rel="stylesheet" href="/styles.css">
     <script>if (!localStorage.getItem('access_token')) window.location.href = '/login.html';</script>
 </head>
-<body class="bg-gray-50" style="font-family: 'Inter', sans-serif;">
+<body class="bg-white">
 <div id="layoutRoot"></div>
 <script src="_layout.js"></script>
 <script>
@@ -23,23 +23,23 @@ renderInventoryLayout({ activePage: 'locations', title: 'Localizações', subtit
 
 document.getElementById('pageContent').innerHTML = `
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <section class="bg-white rounded-lg shadow p-6">
+        <section class="bg-white rounded-xl border border-gray-200/70 shadow-sm p-6">
             <div class="flex justify-between items-center mb-4">
                 <h3 class="font-bold text-gray-800"><i class="fas fa-building text-blue-600"></i> Unidades</h3>
-                <button id="btnNewUnit" class="text-sm bg-blue-600 text-white px-3 py-1.5 rounded-lg"><i class="fas fa-plus"></i></button>
+                <button id="btnNewUnit" class="text-sm bg-sky-600 hover:bg-sky-700 text-white px-3 py-1.5 rounded-lg font-medium shadow-sm shadow-sky-500/20 transition"><i class="fas fa-plus"></i></button>
             </div>
-            <ul id="unitsList" class="divide-y divide-gray-100"></ul>
+            <ul id="unitsList" class="divide-y divide-gray-50"></ul>
         </section>
-        <section class="bg-white rounded-lg shadow p-6 lg:col-span-2">
+        <section class="bg-white rounded-xl border border-gray-200/70 shadow-sm p-6 lg:col-span-2">
             <div class="flex justify-between items-center mb-4">
                 <div>
                     <h3 class="font-bold text-gray-800"><i class="fas fa-map-marker-alt text-blue-600"></i> Sublocais</h3>
                     <p class="text-xs text-gray-500" id="selectedUnitLabel">Selecione uma unidade ao lado</p>
                 </div>
-                <button id="btnNewLoc" disabled class="text-sm bg-blue-600 text-white px-3 py-1.5 rounded-lg opacity-50"><i class="fas fa-plus"></i> Novo sublocal</button>
+                <button id="btnNewLoc" disabled class="text-sm bg-sky-600 hover:bg-sky-700 text-white px-3 py-1.5 rounded-lg font-medium opacity-50 cursor-not-allowed"><i class="fas fa-plus"></i> Novo sublocal</button>
             </div>
             <table class="w-full text-sm">
-                <thead class="bg-gray-50 text-xs uppercase text-gray-600">
+                <thead class="bg-gray-50/50 text-[10px] uppercase tracking-wider text-gray-500 border-b border-gray-200">
                     <tr><th class="text-left p-2">Nome</th><th class="text-left p-2">Tipo</th><th class="text-center p-2">Recebe</th><th class="text-center p-2">Envia</th><th class="text-center p-2">Estado</th><th class="p-2"></th></tr>
                 </thead>
                 <tbody id="locsTbody"><tr><td colspan="6" class="p-6 text-center text-gray-400">—</td></tr></tbody>
@@ -47,8 +47,8 @@ document.getElementById('pageContent').innerHTML = `
         </section>
     </div>
 
-    <div id="modal" class="hidden fixed inset-0 bg-black/40 z-50 flex items-center justify-center">
-        <div class="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
+    <div id="modal" class="hidden fixed inset-0 bg-gray-900/40 backdrop-blur-[2px] z-50 flex items-center justify-center">
+        <div class="bg-white rounded-xl border border-gray-200 shadow-2xl max-w-md w-full mx-4">
             <div class="flex justify-between items-center p-4 border-b">
                 <h3 id="modalTitle" class="font-bold text-gray-800">—</h3>
                 <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600"><i class="fas fa-times"></i></button>
@@ -64,7 +64,7 @@ async function loadUnits() {
     const r = await apiCall('/api/inventory/units?include_inactive=1');
     units = r.data;
     document.getElementById('unitsList').innerHTML = units.map(u => `
-        <li class="flex justify-between items-center py-2 cursor-pointer hover:bg-gray-50 px-2 rounded ${currentUnit?.id === u.id ? 'bg-blue-50' : ''}"
+        <li class="flex justify-between items-center py-2 cursor-pointer hover:bg-gray-50 px-2 rounded ${currentUnit?.id === u.id ? 'bg-sky-50 ring-1 ring-sky-200' : ''}"
             onclick='selectUnit(${JSON.stringify(u)})'>
             <div>
                 <p class="font-medium text-gray-800">${escapeHtml(u.name)}</p>
@@ -88,8 +88,8 @@ async function selectUnit(u) {
             <td class="p-2 text-xs text-gray-600">${escapeHtml((LOC_TYPES.find(t=>t[0]===l.type)||['',l.type])[1])}</td>
             <td class="p-2 text-center">${l.can_receive ? '✓' : '—'}</td>
             <td class="p-2 text-center">${l.can_send ? '✓' : '—'}</td>
-            <td class="p-2 text-center">${l.is_active ? '<span class="text-green-600">●</span>' : '<span class="text-gray-300">●</span>'}</td>
-            <td class="p-2 text-right"><button onclick='openLocForm(${JSON.stringify(l)})' class="text-blue-600 hover:text-blue-800"><i class="fas fa-edit"></i></button></td>
+            <td class="p-2 text-center">${l.is_active ? '<span class="text-sky-600">●</span>' : '<span class="text-gray-300">●</span>'}</td>
+            <td class="p-2 text-right"><button onclick='openLocForm(${JSON.stringify(l)})' class="text-sky-600 hover:text-sky-700"><i class="fas fa-edit"></i></button></td>
         </tr>`).join('') || '<tr><td colspan="6" class="p-6 text-center text-gray-400">Sem sublocais.</td></tr>';
 }
 
@@ -102,7 +102,7 @@ function openUnitForm(unit) {
         <div><label class="text-xs text-gray-500">Código *</label><input name="code" required ${unit ? 'readonly' : ''} value="${unit?.code || ''}" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"></div>
         <div><label class="text-xs text-gray-500">Nome *</label><input name="name" required value="${unit?.name || ''}" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"></div>
         <label class="flex items-center gap-2 text-sm"><input type="checkbox" name="is_active" ${(!unit || unit.is_active) ? 'checked' : ''}> Ativa</label>
-        <button type="submit" class="w-full bg-blue-600 text-white py-2 rounded-lg">Salvar</button>`;
+        <button type="submit" class="w-full bg-sky-600 hover:bg-sky-700 text-white py-2.5 rounded-lg text-sm font-medium shadow-sm shadow-sky-500/20 transition">Salvar</button>`;
     document.getElementById('modalForm').onsubmit = async e => {
         e.preventDefault();
         const fd = Object.fromEntries(new FormData(e.target));
@@ -131,7 +131,7 @@ function openLocForm(loc) {
             <label><input type="checkbox" name="can_send" ${(!loc || loc.can_send)?'checked':''}> Pode enviar</label>
             <label><input type="checkbox" name="is_active" ${(!loc || loc.is_active)?'checked':''}> Ativa</label>
         </div>
-        <button type="submit" class="w-full bg-blue-600 text-white py-2 rounded-lg">Salvar</button>`;
+        <button type="submit" class="w-full bg-sky-600 hover:bg-sky-700 text-white py-2.5 rounded-lg text-sm font-medium shadow-sm shadow-sky-500/20 transition">Salvar</button>`;
     document.getElementById('modalForm').onsubmit = async e => {
         e.preventDefault();
         const fd = Object.fromEntries(new FormData(e.target));

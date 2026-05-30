@@ -9,7 +9,7 @@
     <link rel="stylesheet" href="/styles.css">
     <script>if (!localStorage.getItem('access_token')) window.location.href = '/login.html';</script>
 </head>
-<body class="bg-gray-50" style="font-family: 'Inter', sans-serif;">
+<body class="bg-white">
 <div id="layoutRoot"></div>
 <script src="_layout.js"></script>
 <script>
@@ -37,9 +37,10 @@ async function loadItem() {
 }
 
 function infoRow(label, value, mono = false) {
-    return `<div class="flex justify-between py-2 border-b border-gray-100 last:border-0">
-        <span class="text-xs text-gray-500">${label}</span>
-        <span class="text-sm text-gray-800 ${mono ? 'font-mono' : ''}">${value === null || value === undefined || value === '' ? '—' : escapeHtml(String(value))}</span>
+    const empty = value === null || value === undefined || value === '';
+    return `<div class="flex justify-between items-center gap-3 py-2 border-b border-gray-50 last:border-0">
+        <span class="text-xs text-gray-500 flex-shrink-0">${label}</span>
+        <span class="text-sm ${mono ? 'font-mono text-xs' : ''} ${empty ? 'text-gray-300' : 'text-gray-800'} text-right tabular-nums">${empty ? '—' : escapeHtml(String(value))}</span>
     </div>`;
 }
 
@@ -50,28 +51,32 @@ function render(it) {
 
     document.getElementById('content').innerHTML = `
         <!-- Header -->
-        <div class="bg-white rounded-lg shadow p-6 mb-4">
+        <div class="bg-white rounded-xl border border-gray-200/70 shadow-sm p-6 mb-4">
             <div class="flex flex-col md:flex-row gap-6 items-start">
                 <div class="flex-shrink-0">
                     ${it.image_url
-                        ? `<img src="${it.image_url}" class="w-40 h-40 object-cover rounded-lg border border-gray-200">`
-                        : `<div class="w-40 h-40 bg-gray-100 rounded-lg flex items-center justify-center text-gray-300 text-4xl"><i class="fas fa-box"></i></div>`}
+                        ? `<img src="${it.image_url}" class="w-40 h-40 object-cover rounded-xl border border-gray-200">`
+                        : `<div class="w-40 h-40 bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl border border-gray-200 flex items-center justify-center text-gray-300 text-4xl"><i class="fas fa-box"></i></div>`}
                 </div>
-                <div class="flex-1">
-                    <div class="flex items-center gap-2 mb-2">
-                        <span class="text-xs font-mono text-gray-500">${escapeHtml(it.internal_code)}</span>
-                        <span class="text-xs px-2 py-0.5 rounded ${isPatrimonial ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}">${it.macro_category}</span>
-                        ${it.is_active ? '<span class="text-xs text-green-600">● Ativo</span>' : '<span class="text-xs text-gray-400">● Inativo</span>'}
+                <div class="flex-1 min-w-0">
+                    <div class="flex items-center gap-2 mb-2 flex-wrap">
+                        <span class="text-[11px] font-mono text-gray-400">${escapeHtml(it.internal_code)}</span>
+                        <span class="inline-flex items-center gap-1.5 text-[11px] px-2 py-0.5 rounded-md ${isPatrimonial ? 'bg-purple-50 text-purple-700 border border-purple-100' : 'bg-sky-50 text-sky-700 border border-sky-100'} font-medium capitalize">
+                            <i class="fas ${isPatrimonial ? 'fa-laptop-medical' : 'fa-prescription-bottle'} text-[9px]"></i>${it.macro_category}
+                        </span>
+                        ${it.is_active
+                            ? '<span class="inline-flex items-center gap-1.5 text-[11px] text-sky-700"><span class="w-1.5 h-1.5 rounded-full bg-sky-500"></span>Ativo</span>'
+                            : '<span class="inline-flex items-center gap-1.5 text-[11px] text-gray-400"><span class="w-1.5 h-1.5 rounded-full bg-gray-400"></span>Inativo</span>'}
                     </div>
-                    <h2 class="text-2xl font-bold text-gray-800 mb-1">${escapeHtml(it.name)}</h2>
-                    <p class="text-sm text-gray-600">${escapeHtml(it.description || '')}</p>
+                    <h2 class="text-2xl font-bold text-gray-900 mb-1.5 leading-tight">${escapeHtml(it.name)}</h2>
+                    <p class="text-sm text-gray-600 leading-relaxed">${escapeHtml(it.description || '')}</p>
 
-                    <div class="flex flex-wrap gap-2 mt-4">
-                        <a href="item-form.html?id=${it.id}" class="px-3 py-1.5 bg-blue-100 hover:bg-blue-200 text-blue-800 rounded text-xs"><i class="fas fa-edit"></i> Editar</a>
-                        <a href="kardex.html?item=${it.id}" class="px-3 py-1.5 bg-teal-100 hover:bg-teal-200 text-teal-800 rounded text-xs"><i class="fas fa-clipboard-list"></i> Kardex</a>
-                        <a href="item-label.html?id=${it.id}" class="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-800 rounded text-xs"><i class="fas fa-qrcode"></i> Etiqueta QR</a>
-                        <a href="movements.html?item_id=${it.id}" class="px-3 py-1.5 bg-purple-100 hover:bg-purple-200 text-purple-800 rounded text-xs"><i class="fas fa-history"></i> Histórico</a>
-                        <a href="items.html" class="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 rounded text-xs"><i class="fas fa-arrow-left"></i> Voltar</a>
+                    <div class="flex flex-wrap gap-2 mt-5">
+                        <a href="item-form.html?id=${it.id}" class="px-3 py-1.5 bg-sky-50 hover:bg-sky-100 text-sky-700 border border-sky-100 rounded-lg text-xs font-medium transition flex items-center gap-1.5"><i class="fas fa-edit text-[10px]"></i> Editar</a>
+                        <a href="kardex.html?item=${it.id}" class="px-3 py-1.5 bg-cyan-50 hover:bg-cyan-100 text-cyan-700 border border-cyan-100 rounded-lg text-xs font-medium transition flex items-center gap-1.5"><i class="fas fa-clipboard-list text-[10px]"></i> Kardex</a>
+                        <a href="item-label.html?id=${it.id}" class="px-3 py-1.5 bg-gray-50 hover:bg-gray-100 text-gray-700 border border-gray-200 rounded-lg text-xs font-medium transition flex items-center gap-1.5"><i class="fas fa-qrcode text-[10px]"></i> Etiqueta QR</a>
+                        <a href="movements.html?item_id=${it.id}" class="px-3 py-1.5 bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-100 rounded-lg text-xs font-medium transition flex items-center gap-1.5"><i class="fas fa-history text-[10px]"></i> Histórico</a>
+                        <a href="items.html" class="ml-auto px-3 py-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-50 rounded-lg text-xs font-medium transition flex items-center gap-1.5"><i class="fas fa-arrow-left text-[10px]"></i> Voltar à lista</a>
                     </div>
                 </div>
             </div>
@@ -79,8 +84,8 @@ function render(it) {
 
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
             <!-- Identificação -->
-            <div class="bg-white rounded-lg shadow p-6">
-                <h3 class="font-bold text-gray-800 mb-3"><i class="fas fa-id-card text-gray-600"></i> Identificação</h3>
+            <div class="bg-white rounded-xl border border-gray-200/70 shadow-sm p-6">
+                <h3 class="font-bold text-gray-900 mb-3 text-sm flex items-center gap-2"><i class="fas fa-id-card text-gray-600"></i> Identificação</h3>
                 ${infoRow('Subcategoria', it.subcategory?.name)}
                 ${infoRow('Ref. fabricante', it.manufacturer_ref)}
                 ${infoRow('Código de barras', it.barcode, true)}
@@ -89,8 +94,8 @@ function render(it) {
             </div>
 
             <!-- Unidades & CMP -->
-            <div class="bg-white rounded-lg shadow p-6">
-                <h3 class="font-bold text-gray-800 mb-3"><i class="fas fa-ruler text-gray-600"></i> Unidades e custo</h3>
+            <div class="bg-white rounded-xl border border-gray-200/70 shadow-sm p-6">
+                <h3 class="font-bold text-gray-900 mb-3 text-sm flex items-center gap-2"><i class="fas fa-ruler text-gray-600"></i> Unidades e custo</h3>
                 ${infoRow('UoM base', it.base_uom ? `${it.base_uom.name} (${it.base_uom.code})` : null)}
                 ${infoRow('UoM compra', it.purchase_uom ? `${it.purchase_uom.name} (${it.purchase_uom.code})` : null)}
                 ${infoRow('UoM consumo', it.consumption_uom ? `${it.consumption_uom.name} (${it.consumption_uom.code})` : null)}
@@ -99,8 +104,8 @@ function render(it) {
             </div>
 
             <!-- Parâmetros de stock -->
-            <div class="bg-white rounded-lg shadow p-6">
-                <h3 class="font-bold text-gray-800 mb-3"><i class="fas fa-warehouse text-gray-600"></i> Stock & reposição</h3>
+            <div class="bg-white rounded-xl border border-gray-200/70 shadow-sm p-6">
+                <h3 class="font-bold text-gray-900 mb-3 text-sm flex items-center gap-2"><i class="fas fa-warehouse text-gray-600"></i> Stock & reposição</h3>
                 ${infoRow('Stock mínimo', it.min_stock)}
                 ${infoRow('Stock máximo', it.max_stock)}
                 ${infoRow('Lead time (dias)', it.lead_time_days)}
@@ -112,8 +117,8 @@ function render(it) {
 
             ${isPatrimonial ? `
             <!-- Patrimoniais -->
-            <div class="bg-white rounded-lg shadow p-6 lg:col-span-1">
-                <h3 class="font-bold text-gray-800 mb-3"><i class="fas fa-laptop-medical text-purple-600"></i> Dados patrimoniais</h3>
+            <div class="bg-white rounded-xl border border-gray-200/70 shadow-sm p-6 lg:col-span-1">
+                <h3 class="font-bold text-gray-900 mb-3 text-sm flex items-center gap-2"><i class="fas fa-laptop-medical text-purple-600"></i> Dados patrimoniais</h3>
                 ${infoRow('Data aquisição', it.acquisition_date)}
                 ${infoRow('Valor de aquisição', it.acquisition_value ? `€ ${parseFloat(it.acquisition_value).toFixed(2)}` : null)}
                 ${infoRow('Taxa depreciação anual', it.depreciation_rate ? `${it.depreciation_rate}%` : null)}
@@ -121,28 +126,35 @@ function render(it) {
             </div>` : ''}
 
             <!-- Stock por localização -->
-            <div class="bg-white rounded-lg shadow p-6 ${isPatrimonial ? 'lg:col-span-2' : 'lg:col-span-3'}">
-                <h3 class="font-bold text-gray-800 mb-3"><i class="fas fa-map-marker-alt text-blue-600"></i> Stock por localização <span class="text-xs text-gray-500 font-normal">(total: ${totalStock.toFixed(2)})</span></h3>
+            <div class="bg-white rounded-xl border border-gray-200/70 shadow-sm p-6 ${isPatrimonial ? 'lg:col-span-2' : 'lg:col-span-3'}">
+                <h3 class="font-bold text-gray-900 mb-3 text-sm flex items-center gap-2"><i class="fas fa-map-marker-alt text-sky-600"></i> Stock por localização <span class="text-xs text-gray-500 font-normal">(total: ${totalStock.toFixed(2)})</span></h3>
                 ${stockByLoc.length ? `
+                <div class="overflow-x-auto -mx-6 -mb-6">
                 <table class="w-full text-sm">
-                    <thead class="bg-gray-50 text-xs uppercase text-gray-600">
+                    <thead class="bg-gray-50/50 text-[10px] uppercase tracking-wider text-gray-500 border-y border-gray-200">
                         <tr>
-                            <th class="text-left p-2">Localização</th>
-                            <th class="text-left p-2">Lote</th>
-                            <th class="text-left p-2">Validade</th>
-                            <th class="text-right p-2">Quantidade</th>
+                            <th class="text-left px-6 py-2.5 font-semibold">Localização</th>
+                            <th class="text-left px-3 py-2.5 font-semibold">Lote</th>
+                            <th class="text-left px-3 py-2.5 font-semibold">Validade</th>
+                            <th class="text-right px-6 py-2.5 font-semibold">Quantidade</th>
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-gray-100">
+                    <tbody class="divide-y divide-gray-50">
                         ${stockByLoc.map(s => `
-                            <tr>
-                                <td class="p-2">${escapeHtml(s.location?.unit?.name || '')} · ${escapeHtml(s.location?.name || '')}</td>
-                                <td class="p-2 font-mono text-xs">${s.lot?.lot_number ? escapeHtml(s.lot.lot_number) : '—'}</td>
-                                <td class="p-2 text-xs text-gray-600">${s.lot?.expiry_date || '—'}</td>
-                                <td class="p-2 text-right font-bold">${parseFloat(s.quantity).toFixed(2)}</td>
+                            <tr class="hover:bg-sky-50/30 transition">
+                                <td class="px-6 py-2.5 text-gray-800"><span class="text-gray-400 text-xs">${escapeHtml(s.location?.unit?.name || '')} ·</span> ${escapeHtml(s.location?.name || '')}</td>
+                                <td class="px-3 py-2.5 font-mono text-xs text-gray-500">${s.lot?.lot_number ? escapeHtml(s.lot.lot_number) : '—'}</td>
+                                <td class="px-3 py-2.5 text-xs ${s.lot?.expiry_date ? 'text-amber-600' : 'text-gray-400'}">${s.lot?.expiry_date || '—'}</td>
+                                <td class="px-6 py-2.5 text-right font-bold tabular-nums">${parseFloat(s.quantity).toFixed(2)}</td>
                             </tr>`).join('')}
                     </tbody>
-                </table>` : '<p class="text-sm text-gray-400 text-center py-6">Sem stock registado.</p>'}
+                </table>
+                </div>` : `<div class="py-8 text-center">
+                    <div class="inline-flex w-9 h-9 rounded-full bg-gray-100 items-center justify-center text-gray-400 mb-2">
+                        <i class="fas fa-warehouse"></i>
+                    </div>
+                    <p class="text-sm text-gray-500">Sem stock registado.</p>
+                </div>`}
             </div>
         </div>
     `;

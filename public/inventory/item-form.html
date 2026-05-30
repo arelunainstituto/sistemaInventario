@@ -9,8 +9,14 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/styles.css">
     <script>if (!localStorage.getItem('access_token')) window.location.href = '/login.html';</script>
+    <style>
+        body{font-family:'Inter',system-ui,sans-serif}
+        .field-label{display:block;font-size:10px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px}
+        .field-input{width:100%;padding:8px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:14px;transition:all 150ms}
+        .field-input:focus{outline:none;border-color:#0ea5e9;box-shadow:0 0 0 3px rgba(14,165,233,0.15)}
+    </style>
 </head>
-<body class="bg-gray-50" style="font-family: 'Inter', sans-serif;">
+<body class="bg-white">
 
 <div id="layoutRoot"></div>
 
@@ -25,147 +31,163 @@ renderInventoryLayout({
     subtitle: editingId ? 'Atualize os dados do item' : 'Selecione o tipo e preencha o formulário'
 });
 
-// Passo 1: seletor de macro categoria (PRIMEIRA OPÇÃO, conforme especificado pelo utilizador)
 document.getElementById('pageContent').innerHTML = `
-    <div id="step1" class="bg-white rounded-lg shadow p-8 max-w-3xl mx-auto">
-        <h3 class="text-lg font-bold text-gray-800 mb-2">Qual o tipo de item?</h3>
-        <p class="text-sm text-gray-500 mb-6">Esta escolha define os campos do cadastro e regras de controlo aplicáveis.</p>
+    <div id="step1" class="bg-white border border-gray-200/70 rounded-xl shadow-sm p-8 max-w-3xl mx-auto">
+        <div class="text-center mb-8">
+            <h3 class="text-xl font-bold text-gray-900">Qual o tipo de item?</h3>
+            <p class="text-sm text-gray-500 mt-1.5">Esta escolha define os campos do cadastro e regras de controlo aplicáveis.</p>
+        </div>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <label class="border-2 border-gray-200 hover:border-blue-500 rounded-lg p-6 cursor-pointer transition" data-macro="consumo">
+            <label class="group border-2 border-gray-200 hover:border-sky-500 hover:bg-sky-50/30 rounded-xl p-6 cursor-pointer transition-all" data-macro="consumo">
                 <input type="radio" name="macro" value="consumo" class="hidden">
                 <div class="flex items-start gap-4">
-                    <div class="w-12 h-12 rounded-lg bg-blue-100 flex items-center justify-center text-blue-600 text-xl">
+                    <div class="w-12 h-12 rounded-xl bg-sky-50 group-hover:bg-sky-100 flex items-center justify-center text-sky-600 text-xl transition">
                         <i class="fas fa-prescription-bottle"></i>
                     </div>
-                    <div>
-                        <h4 class="font-bold text-gray-800">Consumo</h4>
-                        <p class="text-sm text-gray-600 mt-1">Material clínico, descartável, administrativo. <strong>Controla lote e validade automaticamente.</strong></p>
+                    <div class="flex-1">
+                        <h4 class="font-bold text-gray-900">Consumo</h4>
+                        <p class="text-sm text-gray-600 mt-1 leading-relaxed">Material clínico, descartável, administrativo.</p>
+                        <p class="text-xs text-sky-700 mt-2 font-medium">⚡ Controla lote e validade automaticamente</p>
                     </div>
                 </div>
             </label>
-            <label class="border-2 border-gray-200 hover:border-purple-500 rounded-lg p-6 cursor-pointer transition" data-macro="patrimonial">
+            <label class="group border-2 border-gray-200 hover:border-purple-500 hover:bg-purple-50/30 rounded-xl p-6 cursor-pointer transition-all" data-macro="patrimonial">
                 <input type="radio" name="macro" value="patrimonial" class="hidden">
                 <div class="flex items-start gap-4">
-                    <div class="w-12 h-12 rounded-lg bg-purple-100 flex items-center justify-center text-purple-600 text-xl">
+                    <div class="w-12 h-12 rounded-xl bg-purple-50 group-hover:bg-purple-100 flex items-center justify-center text-purple-600 text-xl transition">
                         <i class="fas fa-laptop-medical"></i>
                     </div>
-                    <div>
-                        <h4 class="font-bold text-gray-800">Equipamento Patrimonial</h4>
-                        <p class="text-sm text-gray-600 mt-1">Equipamentos duradouros, mobiliário, informática. <strong>Usa número de série e depreciação.</strong></p>
+                    <div class="flex-1">
+                        <h4 class="font-bold text-gray-900">Equipamento Patrimonial</h4>
+                        <p class="text-sm text-gray-600 mt-1 leading-relaxed">Equipamentos duradouros, mobiliário, informática.</p>
+                        <p class="text-xs text-purple-700 mt-2 font-medium">⚡ Usa número de série e depreciação</p>
                     </div>
                 </div>
             </label>
         </div>
     </div>
 
-    <div id="step2" class="hidden bg-white rounded-lg shadow p-8 max-w-4xl mx-auto">
-        <div class="flex items-center justify-between mb-6">
+    <div id="step2" class="hidden bg-white border border-gray-200/70 rounded-xl shadow-sm p-8 max-w-4xl mx-auto">
+        <div class="flex items-center justify-between mb-6 pb-4 border-b border-gray-100">
             <div>
-                <h3 class="text-lg font-bold text-gray-800" id="formHeading">Dados do item</h3>
-                <p class="text-sm text-gray-500" id="formMacroLabel"></p>
+                <h3 class="text-lg font-bold text-gray-900" id="formHeading">Dados do item</h3>
+                <p class="text-xs text-gray-500 mt-0.5" id="formMacroLabel"></p>
             </div>
-            <button id="btnChangeType" class="text-sm text-blue-600 hover:underline ${editingId ? 'hidden' : ''}">
-                <i class="fas fa-arrow-left"></i> Trocar tipo
+            <button id="btnChangeType" class="text-sm text-sky-600 hover:text-sky-700 font-medium ${editingId ? 'hidden' : ''}">
+                <i class="fas fa-arrow-left text-xs"></i> Trocar tipo
             </button>
         </div>
 
-        <form id="itemForm" class="space-y-6">
+        <form id="itemForm" class="space-y-7">
             <input type="hidden" name="macro_category" id="macroField">
 
-            <fieldset class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <legend class="text-sm font-bold text-gray-700 mb-3">Dados gerais</legend>
-                <div class="md:col-span-2">
-                    <label class="block text-xs text-gray-500 mb-1">Nome *</label>
-                    <input name="name" required class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none">
+            <section>
+                <h4 class="text-[10px] uppercase tracking-wider font-bold text-gray-500 mb-3">Dados gerais</h4>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="md:col-span-2">
+                        <label class="field-label">Nome <span class="text-red-500">*</span></label>
+                        <input name="name" required class="field-input">
+                    </div>
+                    <div class="md:col-span-2">
+                        <label class="field-label">Descrição</label>
+                        <textarea name="description" rows="2" class="field-input"></textarea>
+                    </div>
+                    <div>
+                        <label class="field-label">Subcategoria</label>
+                        <select name="subcategory_id" id="subcategorySelect" class="field-input"></select>
+                    </div>
+                    <div>
+                        <label class="field-label">Ref. fabricante</label>
+                        <input name="manufacturer_ref" class="field-input">
+                    </div>
+                    <div>
+                        <label class="field-label">Código de barras</label>
+                        <input name="barcode" class="field-input">
+                    </div>
+                    <div class="flex items-end">
+                        <p class="text-[11px] text-gray-500 bg-sky-50/50 border border-sky-100 rounded-lg px-3 py-2 flex items-start gap-2">
+                            <i class="fas fa-circle-info text-sky-500 mt-0.5"></i>
+                            <span>Código interno e QR Code são gerados automaticamente.</span>
+                        </p>
+                    </div>
                 </div>
-                <div class="md:col-span-2">
-                    <label class="block text-xs text-gray-500 mb-1">Descrição</label>
-                    <textarea name="description" rows="2" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"></textarea>
-                </div>
-                <div>
-                    <label class="block text-xs text-gray-500 mb-1">Subcategoria</label>
-                    <select name="subcategory_id" id="subcategorySelect" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"></select>
-                </div>
-                <div>
-                    <label class="block text-xs text-gray-500 mb-1">Ref. fabricante</label>
-                    <input name="manufacturer_ref" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
-                </div>
-                <div>
-                    <label class="block text-xs text-gray-500 mb-1">Código de barras (opcional)</label>
-                    <input name="barcode" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
-                </div>
-                <div class="text-xs text-gray-500 self-end">
-                    <i class="fas fa-info-circle"></i> Código interno e QR Code são gerados automaticamente.
-                </div>
-            </fieldset>
+            </section>
 
-            <fieldset class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <legend class="text-sm font-bold text-gray-700 mb-3">Unidades e conversão</legend>
-                <div>
-                    <label class="block text-xs text-gray-500 mb-1">UoM base *</label>
-                    <select name="base_uom_id" id="baseUomSelect" required class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"></select>
+            <section>
+                <h4 class="text-[10px] uppercase tracking-wider font-bold text-gray-500 mb-3">Unidades e conversão</h4>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                        <label class="field-label">UoM base <span class="text-red-500">*</span></label>
+                        <select name="base_uom_id" id="baseUomSelect" required class="field-input"></select>
+                    </div>
+                    <div>
+                        <label class="field-label">UoM de compra</label>
+                        <select name="purchase_uom_id" id="purchaseUomSelect" class="field-input"></select>
+                    </div>
+                    <div>
+                        <label class="field-label">UoM de consumo</label>
+                        <select name="consumption_uom_id" id="consumptionUomSelect" class="field-input"></select>
+                    </div>
+                    <div>
+                        <label class="field-label">Fator de conversão</label>
+                        <input name="conversion_factor" type="number" step="0.0001" value="1" class="field-input">
+                        <p class="text-[11px] text-gray-400 mt-1.5">Ex.: 1 caixa = 100 unidades → 100</p>
+                    </div>
                 </div>
-                <div>
-                    <label class="block text-xs text-gray-500 mb-1">UoM de compra</label>
-                    <select name="purchase_uom_id" id="purchaseUomSelect" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"></select>
-                </div>
-                <div>
-                    <label class="block text-xs text-gray-500 mb-1">UoM de consumo</label>
-                    <select name="consumption_uom_id" id="consumptionUomSelect" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"></select>
-                </div>
-                <div>
-                    <label class="block text-xs text-gray-500 mb-1">Fator de conversão</label>
-                    <input name="conversion_factor" type="number" step="0.0001" value="1" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
-                    <p class="text-xs text-gray-400 mt-1">Ex.: 1 caixa = 100 unidades → 100</p>
-                </div>
-            </fieldset>
+            </section>
 
-            <fieldset id="stockFieldset" class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <legend class="text-sm font-bold text-gray-700 mb-3">Parâmetros de stock</legend>
-                <div>
-                    <label class="block text-xs text-gray-500 mb-1">Stock mínimo</label>
-                    <input name="min_stock" type="number" step="0.0001" value="0" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+            <section id="stockFieldset">
+                <h4 class="text-[10px] uppercase tracking-wider font-bold text-gray-500 mb-3">Parâmetros de stock</h4>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                        <label class="field-label">Stock mínimo</label>
+                        <input name="min_stock" type="number" step="0.0001" value="0" class="field-input">
+                    </div>
+                    <div>
+                        <label class="field-label">Stock máximo</label>
+                        <input name="max_stock" type="number" step="0.0001" class="field-input">
+                    </div>
+                    <div>
+                        <label class="field-label">Tempo de reposição (dias)</label>
+                        <input name="lead_time_days" type="number" value="0" class="field-input">
+                    </div>
                 </div>
-                <div>
-                    <label class="block text-xs text-gray-500 mb-1">Stock máximo</label>
-                    <input name="max_stock" type="number" step="0.0001" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
-                </div>
-                <div>
-                    <label class="block text-xs text-gray-500 mb-1">Lead time (dias)</label>
-                    <input name="lead_time_days" type="number" value="0" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
-                </div>
-            </fieldset>
+            </section>
 
-            <!-- Campos exclusivos PATRIMONIAL -->
-            <fieldset id="patrimonyFieldset" class="hidden grid-cols-1 md:grid-cols-3 gap-4">
-                <legend class="text-sm font-bold text-gray-700 mb-3">Dados patrimoniais</legend>
-                <div>
-                    <label class="block text-xs text-gray-500 mb-1">Data de aquisição</label>
-                    <input name="acquisition_date" type="date" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+            <section id="patrimonyFieldset" class="hidden">
+                <h4 class="text-[10px] uppercase tracking-wider font-bold text-purple-600 mb-3">Dados patrimoniais</h4>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                        <label class="field-label">Data de aquisição</label>
+                        <input name="acquisition_date" type="date" class="field-input">
+                    </div>
+                    <div>
+                        <label class="field-label">Valor de aquisição (€)</label>
+                        <input name="acquisition_value" type="number" step="0.01" class="field-input">
+                    </div>
+                    <div>
+                        <label class="field-label">Taxa de depreciação anual (%)</label>
+                        <input name="depreciation_rate" type="number" step="0.01" min="0" max="100" class="field-input">
+                    </div>
                 </div>
-                <div>
-                    <label class="block text-xs text-gray-500 mb-1">Valor de aquisição (€)</label>
-                    <input name="acquisition_value" type="number" step="0.01" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
-                </div>
-                <div>
-                    <label class="block text-xs text-gray-500 mb-1">Taxa de depreciação anual (%)</label>
-                    <input name="depreciation_rate" type="number" step="0.01" min="0" max="100" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
-                </div>
-                <div class="md:col-span-3 text-xs text-gray-500">
-                    <i class="fas fa-info-circle"></i> O número de património (PAT-XXXXXX) é gerado automaticamente.
-                </div>
-            </fieldset>
+                <p class="text-[11px] text-gray-500 bg-purple-50/50 border border-purple-100 rounded-lg px-3 py-2 mt-3 flex items-start gap-2">
+                    <i class="fas fa-circle-info text-purple-500 mt-0.5"></i>
+                    <span>O número de património (PAT-XXXXXX) é gerado automaticamente ao criar o item.</span>
+                </p>
+            </section>
 
-            <fieldset>
-                <legend class="text-sm font-bold text-gray-700 mb-3">Imagem (opcional)</legend>
-                <input id="imageFile" type="file" accept="image/*" class="text-sm">
-                <p id="imagePreview" class="mt-2"></p>
-            </fieldset>
+            <section>
+                <h4 class="text-[10px] uppercase tracking-wider font-bold text-gray-500 mb-3">Imagem</h4>
+                <label class="border-2 border-dashed border-gray-200 rounded-lg p-4 block cursor-pointer hover:border-sky-400 hover:bg-sky-50/30 transition">
+                    <input id="imageFile" type="file" accept="image/*" class="text-sm w-full">
+                </label>
+                <div id="imagePreview" class="mt-3"></div>
+            </section>
 
-            <div class="flex gap-3 justify-end border-t border-gray-100 pt-4">
-                <a href="items.html" class="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">Cancelar</a>
-                <button type="submit" class="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium">
-                    <i class="fas fa-save"></i> ${editingId ? 'Salvar alterações' : 'Criar item'}
+            <div class="flex gap-3 justify-end border-t border-gray-100 pt-5">
+                <a href="items.html" class="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg font-medium transition">Cancelar</a>
+                <button type="submit" class="px-5 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-lg text-sm font-medium shadow-sm shadow-sky-500/20 transition flex items-center gap-2">
+                    <i class="fas fa-save text-xs"></i> ${editingId ? 'Salvar alterações' : 'Criar item'}
                 </button>
             </div>
         </form>
@@ -178,7 +200,6 @@ const macroField = document.getElementById('macroField');
 const subcategorySelect = document.getElementById('subcategorySelect');
 const patrimonyFieldset = document.getElementById('patrimonyFieldset');
 
-// Seleção do tipo macro
 document.querySelectorAll('[data-macro]').forEach(label => {
     label.addEventListener('click', () => activateMacro(label.dataset.macro));
 });
@@ -210,15 +231,14 @@ async function bootstrap() {
 
 function activateMacro(macro) {
     macroField.value = macro;
-    document.getElementById('formMacroLabel').textContent =
-        macro === 'consumo' ? 'Consumo · controla lote e validade' : 'Patrimonial · controla nº de série e depreciação';
-    // Filtra subcategorias
+    const isConsumo = macro === 'consumo';
+    document.getElementById('formMacroLabel').innerHTML = isConsumo
+        ? '<span class="inline-flex items-center gap-1.5"><span class="w-1.5 h-1.5 rounded-full bg-sky-500"></span>Consumo · controla lote e validade</span>'
+        : '<span class="inline-flex items-center gap-1.5"><span class="w-1.5 h-1.5 rounded-full bg-purple-500"></span>Patrimonial · controla nº de série e depreciação</span>';
     subcategorySelect.innerHTML = '<option value="">—</option>' +
         categoriesAll.filter(c => c.parent_macro === macro)
                      .map(c => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('');
-    // Mostra/esconde fieldset patrimonial
-    if (macro === 'patrimonial') patrimonyFieldset.classList.remove('hidden');
-    else                          patrimonyFieldset.classList.add('hidden');
+    patrimonyFieldset.classList.toggle('hidden', macro !== 'patrimonial');
     step1.classList.add('hidden');
     step2.classList.remove('hidden');
 }
@@ -235,13 +255,11 @@ async function loadForEdit() {
         }
         if (it.image_url) {
             document.getElementById('imagePreview').innerHTML =
-                `<img src="${it.image_url}" class="h-24 rounded border border-gray-200">`;
+                `<img src="${it.image_url}" class="h-24 rounded-lg border border-gray-200 object-cover">`;
         }
     } catch (err) { toast(err.message, 'error'); }
 }
 
-// Em modo edição: esconde o seletor de tipo imediatamente para evitar
-// o flash do passo 1 antes do passo 2 montar.
 if (editingId) {
     step1.classList.add('hidden');
     step2.classList.remove('hidden');
@@ -267,14 +285,13 @@ document.getElementById('itemForm').addEventListener('submit', async (e) => {
             const r = await apiCall('/api/inventory/items', { method: 'POST', body: JSON.stringify(payload) });
             saved = r.data;
         }
-        // Upload de imagem (se selecionada)
         const file = document.getElementById('imageFile').files[0];
         if (file) {
             const fd = new FormData();
             fd.append('image', file);
             await apiCall(`/api/inventory/items/${saved.id}/image`, { method: 'POST', body: fd });
         }
-        toast('Item salvo com sucesso');
+        toast('Item guardado com sucesso');
         setTimeout(() => location.href = 'items.html', 800);
     } catch (err) {
         toast(err.message, 'error');

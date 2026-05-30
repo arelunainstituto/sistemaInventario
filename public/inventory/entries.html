@@ -9,7 +9,7 @@
     <link rel="stylesheet" href="/styles.css">
     <script>if (!localStorage.getItem('access_token')) window.location.href = '/login.html';</script>
 </head>
-<body class="bg-gray-50" style="font-family: 'Inter', sans-serif;">
+<body class="bg-white">
 <div id="layoutRoot"></div>
 <script src="_layout.js"></script>
 <script src="_searchable-select.js"></script>
@@ -18,20 +18,20 @@ renderInventoryLayout({ activePage: 'entries', title: 'Entradas', subtitle: 'Rec
 
 document.getElementById('pageContent').innerHTML = `
     <div class="flex justify-between items-center mb-4">
-        <h3 class="text-lg font-bold text-gray-800">Registos de entradas</h3>
-        <button onclick="openNewEntryForm()" class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm"><i class="fas fa-plus"></i> Nova entrada</button>
+        <h3 class="text-base font-bold text-gray-900">Registos de entradas</h3>
+        <button onclick="openNewEntryForm()" class="bg-sky-600 hover:bg-sky-700 text-white px-4 py-2 rounded-lg text-sm"><i class="fas fa-plus"></i> Nova entrada</button>
     </div>
-    <div class="bg-white rounded-lg shadow overflow-hidden">
+    <div class="bg-white rounded-xl border border-gray-200/70 shadow-sm overflow-hidden">
         <table class="w-full text-sm">
-            <thead class="bg-gray-50 text-xs uppercase text-gray-600">
+            <thead class="bg-gray-50/50 text-[10px] uppercase tracking-wider text-gray-500 border-b border-gray-200">
                 <tr><th class="text-left p-3">Data</th><th class="text-left p-3">Documento</th><th class="text-left p-3">Fornecedor</th><th class="text-right p-3">Linhas</th><th class="text-right p-3">Valor total</th><th class="text-center p-3">Ações</th></tr>
             </thead>
-            <tbody id="tbody" class="divide-y divide-gray-100"></tbody>
+            <tbody id="tbody" class="divide-y divide-gray-50"></tbody>
         </table>
     </div>
 
-    <div id="entryModal" class="hidden fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
-        <div class="bg-white rounded-lg shadow-xl max-w-5xl w-full max-h-[90vh] overflow-y-auto">
+    <div id="entryModal" class="hidden fixed inset-0 bg-gray-900/40 backdrop-blur-[2px] z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-xl border border-gray-200 shadow-2xl max-w-5xl w-full max-h-[90vh] overflow-y-auto">
             <div class="flex justify-between items-center p-4 border-b">
                 <h3 id="entryModalTitle" class="font-bold text-gray-800">Nova Entrada</h3>
                 <button onclick="closeEntryModal()" class="text-gray-400 hover:text-gray-600"><i class="fas fa-times"></i></button>
@@ -63,7 +63,7 @@ document.getElementById('pageContent').innerHTML = `
 
                 <div class="flex gap-3 justify-end border-t pt-4">
                     <button type="button" onclick="closeEntryModal()" class="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">Cancelar</button>
-                    <button type="submit" class="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium"><i class="fas fa-save"></i> Registar entrada</button>
+                    <button type="submit" class="px-5 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-lg text-sm font-medium shadow-sm shadow-sky-500/20 transition flex items-center gap-2"><i class="fas fa-save"></i> Registar entrada</button>
                 </div>
             </form>
         </div>
@@ -93,7 +93,7 @@ async function load() {
     try {
         const r = await apiCall('/api/inventory/entries?limit=50');
         document.getElementById('tbody').innerHTML = r.data.map(e => `
-            <tr class="hover:bg-gray-50">
+            <tr class="hover:bg-sky-50/30 transition">
                 <td class="p-3">${e.document_date}</td>
                 <td class="p-3 font-mono text-xs" title="${escapeHtml(e.document_type)}">${escapeHtml(e.document_number)}</td>
                 <td class="p-3 font-medium">${escapeHtml(e.supplier?.name || '—')}</td>
@@ -206,6 +206,7 @@ document.getElementById('entryForm').addEventListener('submit', async e => {
 function escapeHtml(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
 function viewEntry(e) {
+    const lines = e.lines || [];
     const sections = [
         { title: 'Documento', rows: [
             ['Tipo', e.document_type],
@@ -215,19 +216,25 @@ function viewEntry(e) {
             ['NIF/Tax ID', e.supplier?.tax_id, { mono: true }],
             ['Valor total', `€ ${parseFloat(e.total_value || 0).toFixed(2)}`, { bold: true }],
             ['Notas', e.notes]
-        ]},
-        { title: 'Linhas', rows: (e.lines || []).flatMap((l, idx) => [
-            [`Linha ${idx + 1} — Item`, `${l.item?.internal_code || ''} · ${l.item?.name || ''}`],
-            [`Linha ${idx + 1} — Localização`, l.location?.name],
-            [`Linha ${idx + 1} — Quantidade compra`, l.purchase_qty],
-            [`Linha ${idx + 1} — Fator conversão`, l.conversion_factor],
-            [`Linha ${idx + 1} — Quantidade consumo`, l.consumption_qty],
-            [`Linha ${idx + 1} — Custo unitário`, `€ ${parseFloat(l.unit_cost || 0).toFixed(4)}`],
-            [`Linha ${idx + 1} — Custo total`, `€ ${parseFloat(l.total_cost || 0).toFixed(2)}`, { bold: true }],
-            [`Linha ${idx + 1} — Lote`, l.lot_number, { mono: true }],
-            [`Linha ${idx + 1} — Validade`, l.expiry_date]
-        ])}
+        ]}
     ];
+    // Uma secção por linha — mais legível que repetir "Linha N —" como prefixo
+    lines.forEach((l, idx) => {
+        sections.push({
+            title: lines.length > 1 ? `Linha ${idx + 1}` : 'Linha',
+            rows: [
+                ['Item',               `${l.item?.internal_code || ''} · ${l.item?.name || ''}`],
+                ['Localização',        l.location?.name],
+                ['Quantidade compra',  l.purchase_qty],
+                ['Fator conversão',    l.conversion_factor],
+                ['Quantidade consumo', l.consumption_qty],
+                ['Custo unitário',     `€ ${parseFloat(l.unit_cost || 0).toFixed(4)}`],
+                ['Custo total',        `€ ${parseFloat(l.total_cost || 0).toFixed(2)}`, { bold: true }],
+                ['Lote',               l.lot_number, { mono: true }],
+                ['Validade',           l.expiry_date]
+            ]
+        });
+    });
     showViewModal({ title: `Entrada · ${e.document_number}`, sections });
 }
 

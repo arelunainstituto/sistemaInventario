@@ -9,7 +9,7 @@
     <link rel="stylesheet" href="/styles.css">
     <script>if (!localStorage.getItem('access_token')) window.location.href = '/login.html';</script>
 </head>
-<body class="bg-gray-50" style="font-family: 'Inter', sans-serif;">
+<body class="bg-white">
 <div id="layoutRoot"></div>
 <script src="_layout.js"></script>
 <script>
@@ -17,18 +17,18 @@ renderInventoryLayout({ activePage: 'uoms', title: 'Unidades de Medida', subtitl
 
 document.getElementById('pageContent').innerHTML = `
     <div class="flex justify-end mb-4">
-        <button onclick="openForm(null)" class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm"><i class="fas fa-plus"></i> Nova UoM</button>
+        <button onclick="openForm(null)" class="bg-sky-600 hover:bg-sky-700 text-white px-4 py-2 rounded-lg text-sm"><i class="fas fa-plus"></i> Nova UoM</button>
     </div>
-    <div class="bg-white rounded-lg shadow overflow-hidden">
+    <div class="bg-white rounded-xl border border-gray-200/70 shadow-sm overflow-hidden">
         <table class="w-full text-sm">
-            <thead class="bg-gray-50 text-xs uppercase text-gray-600">
+            <thead class="bg-gray-50/50 text-[10px] uppercase tracking-wider text-gray-500 border-b border-gray-200">
                 <tr><th class="text-left p-3">Código</th><th class="text-left p-3">Nome</th><th class="text-center p-3">Estado</th><th class="p-3"></th></tr>
             </thead>
-            <tbody id="tbody" class="divide-y divide-gray-100"></tbody>
+            <tbody id="tbody" class="divide-y divide-gray-50"></tbody>
         </table>
     </div>
-    <div id="modal" class="hidden fixed inset-0 bg-black/40 z-50 flex items-center justify-center">
-        <div class="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
+    <div id="modal" class="hidden fixed inset-0 bg-gray-900/40 backdrop-blur-[2px] z-50 flex items-center justify-center">
+        <div class="bg-white rounded-xl border border-gray-200 shadow-2xl max-w-md w-full mx-4">
             <div class="flex justify-between items-center p-4 border-b">
                 <h3 id="modalTitle" class="font-bold text-gray-800">—</h3>
                 <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600"><i class="fas fa-times"></i></button>
@@ -42,11 +42,11 @@ async function load() {
     try {
         const r = await apiCall('/api/inventory/uoms?include_inactive=1');
         document.getElementById('tbody').innerHTML = r.data.map(u => `
-            <tr class="hover:bg-gray-50">
+            <tr class="hover:bg-sky-50/30 transition">
                 <td class="p-3 font-mono">${escapeHtml(u.code)}</td>
                 <td class="p-3">${escapeHtml(u.name)}</td>
-                <td class="p-3 text-center">${u.is_active ? '<span class="text-green-600">●</span>' : '<span class="text-gray-300">●</span>'}</td>
-                <td class="p-3 text-right"><button onclick='openForm(${JSON.stringify(u)})' class="text-blue-600 hover:text-blue-800"><i class="fas fa-edit"></i></button></td>
+                <td class="p-3 text-center">${u.is_active ? '<span class="text-sky-600">●</span>' : '<span class="text-gray-300">●</span>'}</td>
+                <td class="p-3 text-right"><button onclick='openForm(${JSON.stringify(u)})' class="text-sky-600 hover:text-sky-700"><i class="fas fa-edit"></i></button></td>
             </tr>`).join('') || '<tr><td colspan="4" class="p-6 text-center text-gray-400">Nenhuma UoM.</td></tr>';
     } catch (err) { toast(err.message, 'error'); }
 }
@@ -57,7 +57,7 @@ function openForm(u) {
         <div><label class="text-xs text-gray-500">Código *</label><input name="code" required ${u?'readonly':''} value="${u?.code || ''}" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"></div>
         <div><label class="text-xs text-gray-500">Nome *</label><input name="name" required value="${u?.name || ''}" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"></div>
         <label class="flex items-center gap-2 text-sm"><input type="checkbox" name="is_active" ${(!u || u.is_active) ? 'checked' : ''}> Ativa</label>
-        <button type="submit" class="w-full bg-blue-600 text-white py-2 rounded-lg">Salvar</button>`;
+        <button type="submit" class="w-full bg-sky-600 hover:bg-sky-700 text-white py-2.5 rounded-lg text-sm font-medium shadow-sm shadow-sky-500/20 transition">Salvar</button>`;
     document.getElementById('modalForm').onsubmit = async e => {
         e.preventDefault();
         const fd = Object.fromEntries(new FormData(e.target));

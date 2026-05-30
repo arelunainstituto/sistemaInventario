@@ -9,7 +9,7 @@
     <link rel="stylesheet" href="/styles.css">
     <script>if (!localStorage.getItem('access_token')) window.location.href = '/login.html';</script>
 </head>
-<body class="bg-gray-50" style="font-family: 'Inter', sans-serif;">
+<body class="bg-white">
 <div id="layoutRoot"></div>
 <script src="_layout.js"></script>
 <script>
@@ -21,48 +21,49 @@ const REPORTS = [
     { key: 'coverage',           label: 'Cobertura de Stock',                  icon: 'fa-clock',                 color: 'blue',    hint: 'Dias de cobertura por item',              endpoint: '/reports/coverage' },
     { key: 'valuation',          label: 'Valorização de Stock',                icon: 'fa-euro-sign',             color: 'purple',  hint: 'Stock × CMP por item, categoria e local', endpoint: '/reports/valuation' },
     { key: 'inventory-sessions', label: 'Inventário (Contagem)',               icon: 'fa-list-check',            color: 'indigo',  hint: 'Diferenças apuradas em sessões',          endpoint: '/reports/inventory-sessions' },
-    { key: 'consumption-trend',  label: 'Tendência de Consumo',                icon: 'fa-chart-line',            color: 'green',   hint: 'Mensal com comparativo anual',            endpoint: '/reports/consumption-trend' },
+    { key: 'consumption-trend',  label: 'Tendência de Consumo',                icon: 'fa-chart-line',            color: 'sky',   hint: 'Mensal com comparativo anual',            endpoint: '/reports/consumption-trend' },
     { key: 'user-activity',      label: 'Movimentos por Utilizador',           icon: 'fa-user-clock',            color: 'gray',    hint: 'Auditoria de operações por utilizador',   endpoint: '/reports/user-activity' }
 ];
 
 document.getElementById('pageContent').innerHTML = `
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+    <p class="text-[10px] uppercase tracking-wider font-bold text-gray-500 mb-3">Relatórios disponíveis</p>
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 mb-6">
         ${REPORTS.map(r => `
-            <button onclick="openReport('${r.key}')" class="bg-white rounded-lg shadow p-5 text-left hover:shadow-md transition">
+            <button onclick="openReport('${r.key}')" class="group bg-white rounded-xl border border-gray-200/70 shadow-sm p-4 text-left hover:border-${r.color}-300 hover:shadow transition-all">
                 <div class="flex items-start gap-3">
-                    <div class="w-10 h-10 rounded-lg bg-${r.color}-100 flex items-center justify-center text-${r.color}-600 flex-shrink-0">
+                    <div class="w-10 h-10 rounded-lg bg-${r.color}-50 group-hover:bg-${r.color}-100 flex items-center justify-center text-${r.color}-600 flex-shrink-0 transition">
                         <i class="fas ${r.icon}"></i>
                     </div>
-                    <div>
-                        <p class="font-bold text-gray-800">${r.label}</p>
-                        <p class="text-xs text-gray-500 mt-1">${r.hint}</p>
+                    <div class="min-w-0">
+                        <p class="font-semibold text-gray-900 text-sm leading-tight">${r.label}</p>
+                        <p class="text-[11px] text-gray-500 mt-1 leading-relaxed">${r.hint}</p>
                     </div>
                 </div>
             </button>
         `).join('')}
-        <a href="kardex.html" class="bg-white rounded-lg shadow p-5 text-left hover:shadow-md transition block">
+        <a href="kardex.html" class="group bg-white rounded-xl border border-gray-200/70 shadow-sm p-4 text-left hover:border-cyan-300 hover:shadow transition-all block">
             <div class="flex items-start gap-3">
-                <div class="w-10 h-10 rounded-lg bg-teal-100 flex items-center justify-center text-teal-600 flex-shrink-0">
+                <div class="w-10 h-10 rounded-lg bg-cyan-50 group-hover:bg-cyan-100 flex items-center justify-center text-cyan-600 flex-shrink-0 transition">
                     <i class="fas fa-clipboard-list"></i>
                 </div>
                 <div>
-                    <p class="font-bold text-gray-800">Ficha Kardex</p>
-                    <p class="text-xs text-gray-500 mt-1">Movimentos cronológicos por item</p>
+                    <p class="font-semibold text-gray-900 text-sm leading-tight">Ficha Kardex</p>
+                    <p class="text-[11px] text-gray-500 mt-1 leading-relaxed">Movimentos cronológicos por item</p>
                 </div>
             </div>
         </a>
     </div>
 
-    <div id="reportPanel" class="bg-white rounded-lg shadow p-6 hidden">
-        <div class="flex justify-between items-start mb-4">
-            <div>
-                <h3 id="reportTitle" class="text-lg font-bold text-gray-800">—</h3>
-                <p id="reportSubtitle" class="text-sm text-gray-500"></p>
+    <div id="reportPanel" class="bg-white rounded-xl border border-gray-200/70 shadow-sm overflow-hidden hidden">
+        <div class="px-5 py-4 border-b border-gray-100 flex justify-between items-start gap-4">
+            <div class="min-w-0">
+                <h3 id="reportTitle" class="text-base font-bold text-gray-900">—</h3>
+                <p id="reportSubtitle" class="text-xs text-gray-500 mt-0.5"></p>
             </div>
-            <div class="flex gap-2">
-                <button onclick="downloadCurrent('csv')" class="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 rounded-lg text-xs"><i class="fas fa-file-csv"></i> CSV</button>
-                <button onclick="downloadCurrent('xlsx')" class="px-3 py-1.5 bg-green-100 hover:bg-green-200 text-green-800 rounded-lg text-xs"><i class="fas fa-file-excel"></i> Excel</button>
-                <button onclick="downloadCurrent('pdf')" class="px-3 py-1.5 bg-red-100 hover:bg-red-200 text-red-800 rounded-lg text-xs"><i class="fas fa-file-pdf"></i> PDF</button>
+            <div class="flex gap-2 flex-shrink-0">
+                <button onclick="downloadCurrent('csv')" class="px-2.5 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-xs font-medium transition"><i class="fas fa-file-csv"></i> CSV</button>
+                <button onclick="downloadCurrent('xlsx')" class="px-2.5 py-1.5 bg-sky-50 hover:bg-sky-100 text-sky-700 border border-sky-100 rounded-lg text-xs font-medium transition"><i class="fas fa-file-excel"></i> Excel</button>
+                <button onclick="downloadCurrent('pdf')" class="px-2.5 py-1.5 bg-red-50 hover:bg-red-100 text-red-700 border border-red-100 rounded-lg text-xs font-medium transition"><i class="fas fa-file-pdf"></i> PDF</button>
             </div>
         </div>
         <div id="reportTable" class="overflow-x-auto max-h-[600px] overflow-y-auto"></div>
@@ -89,13 +90,13 @@ async function openReport(key) {
         }
         const html = `
             <table class="w-full text-xs">
-                <thead class="bg-gray-50 text-xs uppercase text-gray-600 sticky top-0">
-                    <tr>${columns.map(c => `<th class="text-left p-2">${escapeHtml(c.label || c.key)}</th>`).join('')}</tr>
+                <thead class="bg-gray-50/50 text-[10px] uppercase tracking-wider text-gray-500 sticky top-0 border-b border-gray-200">
+                    <tr>${columns.map(c => `<th class="text-left px-3 py-2.5 font-semibold">${escapeHtml(c.label || c.key)}</th>`).join('')}</tr>
                 </thead>
-                <tbody class="divide-y divide-gray-100">
-                    ${rows.map(row => `<tr class="hover:bg-gray-50">${columns.map(c => {
+                <tbody class="divide-y divide-gray-50">
+                    ${rows.map(row => `<tr class="hover:bg-sky-50/30 transition">${columns.map(c => {
                         const v = row[c.key];
-                        return `<td class="p-2">${v === null || v === undefined ? '—' : escapeHtml(String(v))}</td>`;
+                        return `<td class="px-3 py-2 text-gray-700 tabular-nums">${v === null || v === undefined ? '<span class="text-gray-300">—</span>' : escapeHtml(String(v))}</td>`;
                     }).join('')}</tr>`).join('')}
                 </tbody>
             </table>`;

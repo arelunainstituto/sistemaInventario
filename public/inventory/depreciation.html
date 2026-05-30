@@ -9,7 +9,7 @@
     <link rel="stylesheet" href="/styles.css">
     <script>if (!localStorage.getItem('access_token')) window.location.href = '/login.html';</script>
 </head>
-<body class="bg-gray-50" style="font-family: 'Inter', sans-serif;">
+<body class="bg-white">
 <div id="layoutRoot"></div>
 <script src="_layout.js"></script>
 <script>
@@ -21,7 +21,7 @@ renderInventoryLayout({
 
 document.getElementById('pageContent').innerHTML = `
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div class="bg-white rounded-lg shadow p-6 lg:col-span-1">
+        <div class="bg-white rounded-xl border border-gray-200/70 shadow-sm p-6 lg:col-span-1">
             <h3 class="font-bold text-gray-800 mb-2 flex items-center gap-2">
                 <i class="fas fa-play-circle text-purple-600"></i> Executar depreciação
             </h3>
@@ -38,7 +38,7 @@ document.getElementById('pageContent').innerHTML = `
                            class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
                 </div>
                 <button type="submit"
-                        class="w-full bg-purple-600 hover:bg-purple-700 text-white py-2 rounded-lg text-sm font-medium">
+                        class="w-full bg-purple-600 hover:bg-purple-700 text-white py-2.5 rounded-lg text-sm font-medium shadow-sm shadow-purple-500/20 transition flex items-center justify-center gap-2">
                     <i class="fas fa-play"></i> Executar depreciação
                 </button>
             </form>
@@ -47,12 +47,12 @@ document.getElementById('pageContent').innerHTML = `
             </p>
         </div>
 
-        <div class="bg-white rounded-lg shadow p-6 lg:col-span-2">
+        <div class="bg-white rounded-xl border border-gray-200/70 shadow-sm p-6 lg:col-span-2">
             <h3 class="font-bold text-gray-800 mb-4 flex items-center gap-2">
                 <i class="fas fa-history text-gray-600"></i> Histórico de execuções
             </h3>
             <table class="w-full text-sm">
-                <thead class="bg-gray-50 text-xs uppercase text-gray-600">
+                <thead class="bg-gray-50/50 text-[10px] uppercase tracking-wider text-gray-500 border-b border-gray-200">
                     <tr>
                         <th class="text-left p-2">Ano</th>
                         <th class="text-left p-2">Executado em</th>
@@ -63,7 +63,7 @@ document.getElementById('pageContent').innerHTML = `
                         <th class="text-center p-2">Estado</th>
                     </tr>
                 </thead>
-                <tbody id="runsTbody" class="divide-y divide-gray-100">
+                <tbody id="runsTbody" class="divide-y divide-gray-50">
                     <tr><td colspan="7" class="p-6 text-center text-gray-400">Carregando…</td></tr>
                 </tbody>
             </table>
@@ -77,7 +77,7 @@ async function loadRuns() {
         const rows = r.data || [];
         document.getElementById('runsTbody').innerHTML = rows.length
             ? rows.map(run => `
-                <tr class="hover:bg-gray-50">
+                <tr class="hover:bg-sky-50/30 transition">
                     <td class="p-2 font-bold">${run.year}</td>
                     <td class="p-2 text-xs">${new Date(run.run_at).toLocaleString('pt-PT')}</td>
                     <td class="p-2"><span class="text-xs px-2 py-0.5 rounded ${run.triggered_by === 'cron' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}">${run.triggered_by}</span></td>
@@ -85,7 +85,7 @@ async function loadRuns() {
                     <td class="p-2 text-right text-red-600">${run.items_written_off}</td>
                     <td class="p-2 text-right">€ ${parseFloat(run.total_value || 0).toFixed(2)}</td>
                     <td class="p-2 text-center">
-                        <span class="text-xs px-2 py-0.5 rounded ${run.status === 'concluido' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}">${run.status}</span>
+                        <span class="text-xs px-2 py-0.5 rounded ${run.status === 'concluido' ? 'bg-sky-100 text-sky-700' : 'bg-red-100 text-red-700'}">${run.status}</span>
                     </td>
                 </tr>`).join('')
             : '<tr><td colspan="7" class="p-6 text-center text-gray-400">Nenhuma execução registada.</td></tr>';

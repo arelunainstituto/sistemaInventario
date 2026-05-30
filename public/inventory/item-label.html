@@ -16,12 +16,12 @@
         body { font-family: 'Inter', sans-serif; }
     </style>
 </head>
-<body class="bg-gray-100 p-8">
+<body class="bg-gradient-to-b from-sky-50/40 via-blue-50/20 to-white min-h-screen p-8">
 <div class="max-w-3xl mx-auto">
     <div class="no-print flex justify-between items-center mb-6">
-        <a href="items.html" class="text-blue-600 hover:underline text-sm"><i class="fas fa-arrow-left"></i> Voltar à lista</a>
-        <button onclick="window.print()" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg text-sm">
-            <i class="fas fa-print"></i> Imprimir
+        <a href="items.html" class="inline-flex items-center gap-2 text-sky-600 hover:text-sky-700 text-sm font-medium"><i class="fas fa-arrow-left text-xs"></i> Voltar à lista</a>
+        <button onclick="window.print()" class="bg-sky-600 hover:bg-sky-700 text-white px-5 py-2 rounded-lg text-sm font-medium shadow-sm shadow-sky-500/20 transition flex items-center gap-2">
+            <i class="fas fa-print text-xs"></i> Imprimir
         </button>
     </div>
 
@@ -40,29 +40,51 @@ async function load() {
         if (!res.ok) throw new Error(json.error || 'Erro');
         const it = json.data;
 
-        // QR PNG vem do endpoint /qr.png — usamos via <img> que carrega a URL autenticada?
-        // O endpoint exige Authorization Bearer, então precisamos buscar como blob.
-        const qrRes = await fetch(`/api/inventory/items/${id}/qr.png`, { headers: { Authorization: 'Bearer ' + token } });
-        if (!qrRes.ok) throw new Error('Falha ao gerar QR');
-        const blob = await qrRes.blob();
-        const qrUrl = URL.createObjectURL(blob);
+        // Endpoint atual devolve JSON { data: { data_url: "data:image/png;base64,…" } }.
+        // Mantemos compatibilidade com versões antigas que devolviam PNG binário direto,
+        // detetando o content-type da resposta. cache-bust (`?_=timestamp`) garante
+        // que browser/proxy não devolvem resposta antiga (mudou de PNG para JSON).
+        const qrRes = await fetch(`/api/inventory/items/${id}/qr?_=${Date.now()}`, {
+            headers: { Authorization: 'Bearer ' + token, 'Cache-Control': 'no-cache' },
+            cache: 'no-store'
+        });
+        if (!qrRes.ok) {
+            const msg = await qrRes.text();
+            throw new Error(`Falha ao gerar QR (status ${qrRes.status}): ${msg.slice(0, 200)}`);
+        }
+        const ct = qrRes.headers.get('content-type') || '';
+        let qrUrl;
+        if (ct.includes('application/json')) {
+            const qrJson = await qrRes.json();
+            qrUrl = qrJson.data?.data_url;
+            if (!qrUrl) throw new Error('Resposta sem data_url do QR');
+        } else if (ct.startsWith('image/')) {
+            // Fallback: servidor ainda devolve binário (precisa de restart)
+            qrUrl = URL.createObjectURL(await qrRes.blob());
+        } else {
+            const txt = await qrRes.text();
+            throw new Error(`Content-type inesperado (${ct}): ${txt.slice(0, 200)}`);
+        }
 
+        const isPatrim = it.macro_category === 'patrimonial';
         document.getElementById('labelContainer').innerHTML = `
-            <div class="label bg-white rounded-lg shadow p-8 mx-auto" style="width: 400px;">
-                <div class="text-center">
-                    <p class="text-xs text-gray-500 uppercase tracking-wider">Instituto Areluna</p>
-                    <h2 class="text-lg font-bold text-gray-800 mt-1">${escapeHtml(it.name)}</h2>
-                    <p class="text-sm text-gray-600 mt-1">${it.macro_category === 'patrimonial' ? '🏷️ Patrimonial' : '📦 Consumo'}</p>
+            <div class="label bg-white rounded-2xl border-2 border-gray-200 shadow-sm p-8 mx-auto" style="width: 400px;">
+                <div class="text-center border-b border-gray-100 pb-4">
+                    <p class="text-[10px] text-sky-700 uppercase tracking-widest font-bold">Instituto Areluna · Inventário</p>
+                    <h2 class="text-lg font-bold text-gray-900 mt-2">${escapeHtml(it.name)}</h2>
+                    <span class="inline-flex items-center gap-1.5 text-[11px] px-2 py-0.5 rounded-md ${isPatrim ? 'bg-purple-50 text-purple-700 border border-purple-100' : 'bg-sky-50 text-sky-700 border border-sky-100'} font-medium mt-2 capitalize">
+                        <i class="fas ${isPatrim ? 'fa-laptop-medical' : 'fa-prescription-bottle'} text-[9px]"></i>${it.macro_category}
+                    </span>
                 </div>
                 <div class="my-6 flex justify-center">
-                    <img src="${qrUrl}" alt="QR Code" class="w-56 h-56">
+                    <img src="${qrUrl}" alt="QR Code do item" class="w-60 h-60" onerror="this.parentElement.innerHTML='<p class=&quot;text-red-500 text-xs py-12&quot;>Erro a renderizar imagem do QR</p>'">
                 </div>
-                <div class="text-center text-xs text-gray-700 space-y-1">
-                    <p><strong>Código:</strong> ${escapeHtml(it.internal_code)}</p>
-                    ${it.patrimony_number ? `<p><strong>Património:</strong> ${escapeHtml(it.patrimony_number)}</p>` : ''}
-                    ${it.subcategory ? `<p><strong>Categoria:</strong> ${escapeHtml(it.subcategory.name)}</p>` : ''}
+                <div class="text-center text-xs text-gray-700 space-y-1.5 border-t border-gray-100 pt-4">
+                    <p>Código: <span class="font-mono font-semibold text-gray-900">${escapeHtml(it.internal_code)}</span></p>
+                    ${it.patrimony_number ? `<p>Património: <span class="font-mono font-semibold text-gray-900">${escapeHtml(it.patrimony_number)}</span></p>` : ''}
+                    ${it.subcategory ? `<p class="text-gray-500">${escapeHtml(it.subcategory.name)}</p>` : ''}
                 </div>
-                <p class="text-center text-[10px] text-gray-400 mt-4">Aponte a câmera do telemóvel para abrir a ficha.</p>
+                <p class="text-center text-[10px] text-gray-400 mt-5 italic">Aponte a câmara do telemóvel para abrir a ficha.</p>
             </div>`;
     } catch (err) {
         document.getElementById('labelContainer').innerHTML = `<p class="text-red-500">${err.message}</p>`;

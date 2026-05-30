@@ -9,7 +9,7 @@
     <link rel="stylesheet" href="/styles.css">
     <script>if (!localStorage.getItem('access_token')) window.location.href = '/login.html';</script>
 </head>
-<body class="bg-gray-50" style="font-family: 'Inter', sans-serif;">
+<body class="bg-white">
 <div id="layoutRoot"></div>
 <script src="_layout.js"></script>
 <script>
@@ -21,13 +21,13 @@ renderInventoryLayout({
 
 document.getElementById('pageContent').innerHTML = `
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
-        <div class="bg-white rounded-lg shadow p-4 lg:col-span-1">
+        <div class="bg-white rounded-xl border border-gray-200/70 shadow-sm p-4 lg:col-span-1">
             <h3 class="text-sm font-bold text-gray-800 mb-3"><i class="fas fa-clock-rotate-left text-blue-600"></i> Retenção</h3>
             <form id="retentionForm" class="space-y-2">
                 <label class="text-xs text-gray-500">Manter registos por (meses)</label>
                 <div class="flex gap-2">
                     <input id="retentionInput" name="months" type="number" min="1" max="120" class="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm">
-                    <button type="submit" class="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs"><i class="fas fa-save"></i></button>
+                    <button type="submit" class="px-3 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-lg text-xs"><i class="fas fa-save"></i></button>
                 </div>
                 <p class="text-[10px] text-gray-500">Cron mensal purga registos mais antigos. Atual: <span id="currentRetention">—</span> meses.</p>
                 <div class="flex gap-3 mt-2">
@@ -36,7 +36,7 @@ document.getElementById('pageContent').innerHTML = `
                 </div>
             </form>
         </div>
-        <div class="bg-white rounded-lg shadow p-4 lg:col-span-2">
+        <div class="bg-white rounded-xl border border-gray-200/70 shadow-sm p-4 lg:col-span-2">
             <h3 class="text-sm font-bold text-gray-800 mb-3"><i class="fas fa-filter text-gray-600"></i> Filtros</h3>
             <form id="filtersForm" class="grid grid-cols-2 md:grid-cols-3 gap-2 items-end">
                 <div>
@@ -72,23 +72,23 @@ document.getElementById('pageContent').innerHTML = `
                 </div>
                 <div class="col-span-2 md:col-span-3 flex justify-between gap-2">
                     <div class="flex gap-2">
-                        <button type="submit" class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs"><i class="fas fa-search"></i> Aplicar</button>
+                        <button type="submit" class="px-3 py-1.5 bg-sky-600 hover:bg-sky-700 text-white rounded-lg text-xs"><i class="fas fa-search"></i> Aplicar</button>
                         <button type="button" onclick="resetFilters()" class="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 rounded-lg text-xs">Limpar</button>
                     </div>
                     <div class="flex gap-1">
                         <button type="button" onclick="downloadCurrent('csv')" class="px-2 py-1.5 bg-gray-100 rounded text-xs"><i class="fas fa-file-csv"></i></button>
-                        <button type="button" onclick="downloadCurrent('xlsx')" class="px-2 py-1.5 bg-green-100 text-green-800 rounded text-xs"><i class="fas fa-file-excel"></i></button>
-                        <button type="button" onclick="downloadCurrent('pdf')" class="px-2 py-1.5 bg-red-100 text-red-800 rounded text-xs"><i class="fas fa-file-pdf"></i></button>
+                        <button type="button" onclick="downloadCurrent('xlsx')" class="px-2 py-1.5 bg-sky-50 hover:bg-sky-100 text-sky-700 border border-sky-100 rounded text-xs"><i class="fas fa-file-excel"></i></button>
+                        <button type="button" onclick="downloadCurrent('pdf')" class="px-2 py-1.5 bg-red-100 text-red-700 rounded text-xs"><i class="fas fa-file-pdf"></i></button>
                     </div>
                 </div>
             </form>
         </div>
     </div>
 
-    <div class="bg-white rounded-lg shadow overflow-hidden">
+    <div class="bg-white rounded-xl border border-gray-200/70 shadow-sm overflow-hidden">
         <div class="overflow-x-auto max-h-[600px] overflow-y-auto">
             <table class="w-full text-xs">
-                <thead class="bg-gray-50 uppercase text-gray-600 sticky top-0">
+                <thead class="bg-gray-50/50 text-[10px] uppercase tracking-wider text-gray-500 sticky top-0 border-b border-gray-200">
                     <tr>
                         <th class="text-left p-2">Data/hora</th>
                         <th class="text-left p-2">Utilizador</th>
@@ -99,7 +99,7 @@ document.getElementById('pageContent').innerHTML = `
                         <th class="text-right p-2">ms</th>
                     </tr>
                 </thead>
-                <tbody id="tbody" class="divide-y divide-gray-100"></tbody>
+                <tbody id="tbody" class="divide-y divide-gray-50"></tbody>
             </table>
         </div>
         <div id="pagination" class="p-3 border-t border-gray-100 flex justify-between items-center text-xs text-gray-500"></div>
@@ -141,13 +141,13 @@ function describeAction(l) {
 }
 
 function methodBadge(m) {
-    const map = { GET: 'bg-blue-100 text-blue-700', POST: 'bg-green-100 text-green-700', PUT: 'bg-amber-100 text-amber-700', PATCH: 'bg-amber-100 text-amber-700', DELETE: 'bg-red-100 text-red-700' };
+    const map = { GET: 'bg-blue-100 text-blue-700', POST: 'bg-sky-100 text-sky-700', PUT: 'bg-amber-100 text-amber-700', PATCH: 'bg-amber-100 text-amber-700', DELETE: 'bg-red-100 text-red-700' };
     return map[m] || 'bg-gray-100 text-gray-700';
 }
 function statusColor(s) {
     if (s >= 500) return 'text-red-700 font-bold';
     if (s >= 400) return 'text-orange-600';
-    if (s >= 200) return 'text-green-700';
+    if (s >= 200) return 'text-sky-700';
     return 'text-gray-500';
 }
 
@@ -217,7 +217,7 @@ async function load(page = 1) {
             tbody.innerHTML = rows.map(l => {
                 const action = describeAction(l);
                 return `
-                <tr class="hover:bg-gray-50">
+                <tr class="hover:bg-sky-50/30 transition">
                     <td class="p-2 whitespace-nowrap">${new Date(l.created_at).toLocaleString('pt-PT')}</td>
                     <td class="p-2">
                         ${escapeHtml(l.user?.display_name || l.user?.email || (l.user_id ? l.user_id.slice(0,8) : '—'))}
@@ -245,8 +245,8 @@ function renderPagination(p) {
     document.getElementById('pagination').innerHTML = `
         <span>${p.total} registos · página ${p.page} de ${p.totalPages || 1}</span>
         <div class="flex gap-1">
-            <button onclick="load(${Math.max(1, p.page - 1)})" ${p.page <= 1 ? 'disabled' : ''} class="px-2 py-1 ${p.page <= 1 ? 'text-gray-300' : 'text-blue-600 hover:bg-blue-50'} rounded">← Anterior</button>
-            <button onclick="load(${Math.min(p.totalPages || 1, p.page + 1)})" ${p.page >= p.totalPages ? 'disabled' : ''} class="px-2 py-1 ${p.page >= p.totalPages ? 'text-gray-300' : 'text-blue-600 hover:bg-blue-50'} rounded">Próxima →</button>
+            <button onclick="load(${Math.max(1, p.page - 1)})" ${p.page <= 1 ? 'disabled' : ''} class="px-2 py-1 ${p.page <= 1 ? 'text-gray-300' : 'text-sky-600 hover:bg-sky-50'} rounded">← Anterior</button>
+            <button onclick="load(${Math.min(p.totalPages || 1, p.page + 1)})" ${p.page >= p.totalPages ? 'disabled' : ''} class="px-2 py-1 ${p.page >= p.totalPages ? 'text-gray-300' : 'text-sky-600 hover:bg-sky-50'} rounded">Próxima →</button>
         </div>`;
 }
 

@@ -51,7 +51,7 @@
         input.type = 'text';
         input.autocomplete = 'off';
         input.placeholder = placeholder;
-        input.className = select.className.replace('hidden','') || 'w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none';
+        input.className = select.className.replace('hidden','') || 'w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-sky-500/30 focus:border-sky-500 focus:outline-none transition';
         wrapper.appendChild(input);
 
         // Mini-ícone de "limpar" quando há valor selecionado
@@ -101,7 +101,7 @@
                 return;
             }
             dropdown.innerHTML = matches.map(({ opt }, i) => `
-                <div class="px-3 py-2 hover:bg-blue-50 cursor-pointer text-sm ${i === highlighted ? 'bg-blue-50' : ''}"
+                <div class="px-3 py-2 hover:bg-sky-50 cursor-pointer text-sm ${i === highlighted ? 'bg-sky-50' : ''}"
                      data-value="${escapeHtml(opt.value)}" data-idx="${i}">${escapeHtml(opt.textContent.trim())}</div>
             `).join('');
             [...dropdown.querySelectorAll('[data-value]')].forEach(el => {
@@ -142,12 +142,12 @@
             if (e.key === 'ArrowDown') {
                 e.preventDefault();
                 highlighted = Math.min(highlighted + 1, items.length - 1);
-                items.forEach((el, i) => el.classList.toggle('bg-blue-50', i === highlighted));
+                items.forEach((el, i) => el.classList.toggle('bg-sky-50', i === highlighted));
                 items[highlighted].scrollIntoView({ block: 'nearest' });
             } else if (e.key === 'ArrowUp') {
                 e.preventDefault();
                 highlighted = Math.max(highlighted - 1, 0);
-                items.forEach((el, i) => el.classList.toggle('bg-blue-50', i === highlighted));
+                items.forEach((el, i) => el.classList.toggle('bg-sky-50', i === highlighted));
                 items[highlighted].scrollIntoView({ block: 'nearest' });
             } else if (e.key === 'Enter' && highlighted >= 0) {
                 e.preventDefault();

@@ -26,97 +26,107 @@ const INVENTORY_NAV_SETUP = [
 
 function navItemHtml(item, active) {
     const isActive = item.id === active;
-    const base = 'w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium rounded-lg transition-colors';
+    const base = 'sidebar-nav-item w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg transition-colors relative';
     const state = isActive
-        ? 'text-blue-600 bg-blue-50'
+        ? 'text-sky-700 bg-sky-50'
         : item.disabled
             ? 'text-gray-400 cursor-not-allowed'
-            : 'text-gray-600 hover:bg-gray-50';
+            : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900';
+    const activeBar = isActive
+        ? '<span class="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 rounded-r bg-sky-500"></span>'
+        : '';
     const onclick = item.disabled ? '' : `onclick="window.location.href='${item.href}'"`;
-    const badge = item.badge ? `<span class="ml-auto text-[10px] font-bold px-1.5 py-0.5 rounded bg-gray-200 text-gray-600">${item.badge}</span>` : '';
-    return `<button ${onclick} class="${base} ${state}">
-        <i class="fas ${item.icon} w-5"></i>
-        <span class="flex-1 text-left">${item.label}</span>
+    const badge = item.badge ? `<span class="sidebar-label ml-auto text-[10px] font-bold px-1.5 py-0.5 rounded bg-gray-200 text-gray-600">${item.badge}</span>` : '';
+    return `<button ${onclick} class="${base} ${state}" title="${item.label}">
+        ${activeBar}
+        <i class="fas ${item.icon} w-5 text-center ${isActive ? 'text-sky-600' : ''}"></i>
+        <span class="sidebar-label flex-1 text-left whitespace-nowrap overflow-hidden">${item.label}</span>
         ${badge}
     </button>`;
 }
 
 function renderInventoryLayout({ activePage = 'dashboard', title = 'Inventário', subtitle = '' } = {}) {
     const sidebar = `
-        <aside class="w-64 bg-white border-r border-gray-200 flex flex-col z-10">
-            <div class="p-6 border-b border-gray-100 flex items-center gap-3">
-                <div class="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center text-blue-600">
-                    <i class="fas fa-warehouse text-xl"></i>
+        <aside id="inventorySidebar" class="bg-white border-r border-gray-200 flex flex-col z-10 transition-[width] duration-200" style="width: 256px;">
+            <div class="p-5 border-b border-gray-100 flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-sky-500 to-sky-600 flex items-center justify-center text-white shadow-sm shadow-sky-500/30 flex-shrink-0">
+                    <i class="fas fa-warehouse text-base"></i>
                 </div>
-                <div>
-                    <h1 class="text-lg font-bold text-gray-800">Inventário</h1>
-                    <p class="text-xs text-gray-500">Gestão de Estoques</p>
+                <div class="sidebar-label overflow-hidden">
+                    <h1 class="text-base font-bold text-gray-900 leading-tight whitespace-nowrap">Inventário</h1>
+                    <p class="text-[11px] text-gray-500 leading-tight whitespace-nowrap">Areluna · Gestão de Estoques</p>
                 </div>
             </div>
 
-            <nav class="flex-1 overflow-y-auto p-4 space-y-1">
-                <p class="text-[10px] uppercase font-bold text-gray-400 px-3 mt-2 mb-1">Operações</p>
+            <nav class="flex-1 overflow-y-auto overflow-x-hidden p-4 space-y-0.5">
+                <p class="sidebar-label text-[10px] uppercase font-bold text-gray-400 tracking-wider px-3 mt-2 mb-2">Operações</p>
                 ${INVENTORY_NAV.map(i => navItemHtml(i, activePage)).join('')}
 
-                <p class="text-[10px] uppercase font-bold text-gray-400 px-3 mt-4 mb-1">Cadastros</p>
+                <p class="sidebar-label text-[10px] uppercase font-bold text-gray-400 tracking-wider px-3 mt-5 mb-2">Cadastros</p>
                 ${INVENTORY_NAV_SETUP.map(i => navItemHtml(i, activePage)).join('')}
             </nav>
 
-            <div class="p-4 border-t border-gray-100">
-                <button onclick="window.location.href='/module-selection.html'"
-                    class="w-full flex items-center gap-3 px-4 py-3 text-sm font-medium text-gray-600 hover:bg-gray-50 rounded-lg transition-colors">
-                    <i class="fas fa-arrow-left w-5"></i>
-                    Voltar ao Menu
+            <div class="p-3 border-t border-gray-100 space-y-1">
+                <button onclick="toggleSidebar()" id="sidebarToggleBtn" title="Recolher menu"
+                    class="w-full flex items-center gap-3 px-3 py-2 text-sm font-medium text-gray-400 hover:bg-gray-50 hover:text-gray-600 rounded-lg transition-colors">
+                    <i id="sidebarToggleIcon" class="fas fa-chevron-left w-5 text-center"></i>
+                    <span class="sidebar-label flex-1 text-left whitespace-nowrap text-[11px] uppercase tracking-wider">Recolher</span>
+                </button>
+                <button onclick="window.location.href='/dashboard.html'" title="Voltar ao Menu"
+                    class="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-gray-500 hover:bg-gray-50 hover:text-gray-700 rounded-lg transition-colors">
+                    <i class="fas fa-arrow-left w-5 text-center"></i>
+                    <span class="sidebar-label flex-1 text-left whitespace-nowrap">Voltar ao Menu</span>
                 </button>
             </div>
         </aside>`;
 
     const header = `
-        <header class="bg-white border-b border-gray-200 px-8 py-4 flex justify-between items-center sticky top-0 z-10">
+        <header class="bg-white/80 backdrop-blur border-b border-gray-200/80 px-8 py-3.5 flex justify-between items-center sticky top-0 z-10">
             <div class="flex-shrink-0">
-                <h2 class="text-xl font-bold text-gray-800">${title}</h2>
-                <p class="text-sm text-gray-500">${subtitle}</p>
+                <h2 class="text-[19px] font-bold text-gray-900 leading-tight">${title}</h2>
+                <p class="text-[13px] text-gray-500 leading-tight mt-0.5">${subtitle}</p>
             </div>
 
-            <!-- Busca global (§16) -->
+            <!-- Busca global -->
             <div class="relative flex-1 max-w-md mx-8">
                 <div class="relative">
-                    <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs"></i>
+                    <i class="fas fa-search absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 text-xs"></i>
                     <input id="globalSearch" type="text"
                            placeholder="Buscar item, lote, fornecedor…"
                            autocomplete="off"
-                           class="w-full pl-8 pr-3 py-2 border border-gray-200 bg-gray-50 rounded-lg text-sm focus:bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                           class="w-full pl-9 pr-3 py-2 border border-gray-200 bg-gray-50/80 rounded-lg text-sm placeholder:text-gray-400 focus:bg-white focus:ring-2 focus:ring-sky-500/30 focus:border-sky-500 focus:outline-none transition">
+                    <kbd class="hidden md:inline-flex absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-gray-400 font-mono bg-white border border-gray-200 rounded px-1.5 py-0.5">⌘K</kbd>
                 </div>
-                <div id="searchDropdown" class="hidden absolute left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-[480px] overflow-y-auto z-30">
+                <div id="searchDropdown" class="hidden absolute left-0 right-0 mt-2 bg-white border border-gray-200 rounded-xl shadow-lg max-h-[480px] overflow-y-auto z-30">
                     <div id="searchResults" class="p-2 text-sm"></div>
                 </div>
             </div>
 
-            <div class="flex items-center gap-4 flex-shrink-0">
-                <!-- Badge global de alertas (§16) -->
+            <div class="flex items-center gap-3 flex-shrink-0">
+                <!-- Badge global de alertas -->
                 <div class="relative">
                     <button id="alertsBell" onclick="toggleAlertsPanel()"
-                            class="relative w-10 h-10 rounded-lg bg-gray-50 hover:bg-gray-100 border border-gray-200 flex items-center justify-center text-gray-600">
-                        <i class="fas fa-bell"></i>
+                            class="relative w-9 h-9 rounded-lg bg-gray-50 hover:bg-gray-100 border border-gray-200 flex items-center justify-center text-gray-600 transition">
+                        <i class="fas fa-bell text-sm"></i>
                         <span id="alertsBadge" class="hidden absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1
-                              rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center">0</span>
+                              rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center ring-2 ring-white">0</span>
                     </button>
                     <div id="alertsPanel" class="hidden absolute right-0 mt-2 w-80 bg-white border border-gray-200
-                         rounded-lg shadow-lg z-20 max-h-[480px] overflow-y-auto">
+                         rounded-xl shadow-lg z-20 max-h-[480px] overflow-y-auto">
                         <div class="p-3 border-b border-gray-100 flex justify-between items-center">
                             <p class="font-bold text-gray-800 text-sm">Alertas</p>
-                            <button onclick="toggleAlertsPanel()" class="text-gray-400 hover:text-gray-600 text-xs"><i class="fas fa-times"></i></button>
+                            <button onclick="toggleAlertsPanel()" class="text-gray-400 hover:text-gray-600 w-6 h-6 flex items-center justify-center rounded hover:bg-gray-100"><i class="fas fa-times text-xs"></i></button>
                         </div>
                         <div id="alertsContent" class="p-3 text-sm text-gray-500">Carregando…</div>
                     </div>
                 </div>
 
-                <div id="userAvatarBox" class="flex items-center gap-3 px-4 py-2 bg-gray-50 rounded-lg border border-gray-200">
-                    <div class="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold" id="userAvatar">U</div>
-                    <span class="text-sm text-gray-700" id="userName">Utilizador</span>
+                <div id="userAvatarBox" class="flex items-center gap-3 pl-1 pr-3 py-1 bg-gray-50 rounded-lg border border-gray-200">
+                    <div class="w-8 h-8 rounded-md bg-gradient-to-br from-sky-500 to-sky-600 flex items-center justify-center text-white text-xs font-bold" id="userAvatar">U</div>
+                    <span class="text-sm font-medium text-gray-700" id="userName">Utilizador</span>
                 </div>
-                <button onclick="logout()" class="text-sm text-gray-500 hover:text-gray-700">
-                    <i class="fas fa-sign-out-alt"></i>
+                <button onclick="logout()" title="Sair" class="w-9 h-9 rounded-lg bg-gray-50 hover:bg-red-50 border border-gray-200 hover:border-red-200 hover:text-red-600 flex items-center justify-center text-gray-500 transition">
+                    <i class="fas fa-sign-out-alt text-sm"></i>
                 </button>
             </div>
         </header>`;
@@ -127,18 +137,82 @@ function renderInventoryLayout({ activePage = 'dashboard', title = 'Inventário'
         return;
     }
     layoutRoot.innerHTML = `<div class="flex h-screen overflow-hidden">${sidebar}
-        <main class="flex-1 overflow-y-auto bg-gray-50">${header}
+        <main class="flex-1 overflow-y-auto bg-gradient-to-b from-sky-50 via-blue-50 to-white">${header}
             <div id="pageContent" class="p-8"></div>
         </main></div>`;
 
-    // Popula user avatar a partir do localStorage
+    // Popula user info: tenta localStorage primeiro (fast path), depois /api/auth/me
+    populateUserHeader();
+    restoreSidebarState();
+}
+
+async function populateUserHeader() {
+    // Fast path: localStorage.user (objeto auth.users do Supabase)
+    let display = null;
     try {
-        const profile = JSON.parse(localStorage.getItem('user_profile') || '{}');
-        const display = profile.display_name || profile.first_name || profile.email || 'Utilizador';
-        const avatar = (display.match(/\b\w/g) || ['U']).slice(0, 2).join('').toUpperCase();
-        document.getElementById('userAvatar').textContent = avatar;
-        document.getElementById('userName').textContent = display;
+        const user = JSON.parse(localStorage.getItem('user') || '{}');
+        display = user.user_metadata?.full_name || user.user_metadata?.display_name || user.email || null;
     } catch {}
+
+    if (display) renderUserAvatar(display);
+
+    // Slow path: /api/auth/me devolve roles + full_name (mais autoritativo)
+    try {
+        const token = localStorage.getItem('access_token');
+        if (!token) return;
+        const r = await fetch('/api/auth/me', { headers: { Authorization: 'Bearer ' + token } });
+        if (!r.ok) return;
+        const data = await r.json();
+        const full = data.full_name || data.display_name || data.email;
+        if (full && full !== display) renderUserAvatar(full);
+    } catch {}
+}
+
+function renderUserAvatar(display) {
+    const avatar = (display.match(/\b\w/g) || ['U']).slice(0, 2).join('').toUpperCase();
+    const avEl = document.getElementById('userAvatar');
+    const nmEl = document.getElementById('userName');
+    if (avEl) avEl.textContent = avatar;
+    if (nmEl) nmEl.textContent = display;
+}
+
+// =====================================================
+// Sidebar retrátil (estado persistido em localStorage)
+// =====================================================
+
+const SIDEBAR_STATE_KEY = 'inventory_sidebar_collapsed';
+
+function toggleSidebar() {
+    const collapsed = document.documentElement.classList.toggle('sidebar-collapsed');
+    try { localStorage.setItem(SIDEBAR_STATE_KEY, collapsed ? '1' : '0'); } catch {}
+    applySidebarState(collapsed);
+}
+
+function restoreSidebarState() {
+    let collapsed = false;
+    try { collapsed = localStorage.getItem(SIDEBAR_STATE_KEY) === '1'; } catch {}
+    document.documentElement.classList.toggle('sidebar-collapsed', collapsed);
+    applySidebarState(collapsed);
+
+    // Injecta CSS uma vez (controla as larguras e visibilidade dos labels)
+    if (!document.getElementById('sidebarCollapsedStyle')) {
+        const style = document.createElement('style');
+        style.id = 'sidebarCollapsedStyle';
+        style.textContent = `
+            html.sidebar-collapsed #inventorySidebar { width: 72px !important; }
+            html.sidebar-collapsed #inventorySidebar .sidebar-label { display: none; }
+            html.sidebar-collapsed #inventorySidebar .sidebar-nav-item { justify-content: center; padding-left: 0; padding-right: 0; }
+            html.sidebar-collapsed #inventorySidebar nav { padding-left: 0.5rem; padding-right: 0.5rem; }
+        `;
+        document.head.appendChild(style);
+    }
+}
+
+function applySidebarState(collapsed) {
+    const icon = document.getElementById('sidebarToggleIcon');
+    const btn  = document.getElementById('sidebarToggleBtn');
+    if (icon) icon.className = `fas ${collapsed ? 'fa-chevron-right' : 'fa-chevron-left'} w-5 text-center`;
+    if (btn)  btn.title = collapsed ? 'Expandir menu' : 'Recolher menu';
 }
 
 function logout() {
@@ -165,10 +239,16 @@ async function apiCall(path, options = {}) {
 
 // Toast helper
 function toast(message, type = 'success') {
-    const colors = { success: 'bg-green-500', error: 'bg-red-500', info: 'bg-blue-500', warn: 'bg-yellow-500' };
+    const variants = {
+        success: { bg: 'bg-sky-500',    icon: 'fa-check-circle' },
+        error:   { bg: 'bg-red-500',    icon: 'fa-circle-xmark' },
+        info:    { bg: 'bg-blue-500',   icon: 'fa-circle-info' },
+        warn:    { bg: 'bg-amber-500',  icon: 'fa-triangle-exclamation' }
+    };
+    const v = variants[type] || variants.info;
     const el = document.createElement('div');
-    el.className = `fixed top-6 right-6 z-50 px-5 py-3 rounded-lg text-white text-sm shadow-lg ${colors[type] || colors.info}`;
-    el.textContent = message;
+    el.className = `fixed top-6 right-6 z-[60] flex items-center gap-2.5 px-4 py-3 rounded-lg text-white text-sm shadow-lg ${v.bg} transition-opacity duration-300`;
+    el.innerHTML = `<i class="fas ${v.icon}"></i><span>${message}</span>`;
     document.body.appendChild(el);
     setTimeout(() => { el.classList.add('opacity-0'); setTimeout(() => el.remove(), 300); }, 3000);
 }
@@ -220,28 +300,34 @@ function renderAlertsContent() {
     let html = '';
 
     if (critical.length === 0 && expiring.length === 0) {
-        html = '<p class="text-green-600 py-4 text-center"><i class="fas fa-check-circle"></i> Tudo em ordem.</p>';
+        html = `<div class="py-6 text-center">
+            <div class="inline-flex w-10 h-10 rounded-full bg-sky-100 items-center justify-center text-sky-600 mb-2">
+                <i class="fas fa-check"></i>
+            </div>
+            <p class="text-sm text-gray-700 font-medium">Tudo em ordem</p>
+            <p class="text-xs text-gray-500 mt-1">Sem alertas no momento.</p>
+        </div>`;
     } else {
         if (critical.length > 0) {
             html += `<div class="mb-3">
-                <p class="text-[10px] uppercase font-bold text-red-600 mb-1">Stock abaixo do mínimo</p>
+                <p class="text-[10px] uppercase font-bold text-red-600 tracking-wider mb-2 flex items-center gap-1.5"><span class="w-1.5 h-1.5 rounded-full bg-red-500"></span> Stock abaixo do mínimo</p>
                 ${critical.slice(0, 5).map(i => `
-                    <div class="flex justify-between py-1 border-b border-gray-50 last:border-0 text-xs">
-                        <span class="text-gray-800 truncate">${escapeAlerts(i.internal_code)} · ${escapeAlerts(i.name)}</span>
-                        <span class="${i.stock === 0 ? 'text-red-600 font-bold' : 'text-yellow-600'} ml-2 flex-shrink-0">${parseFloat(i.stock).toFixed(0)} / ${parseFloat(i.min_stock).toFixed(0)}</span>
+                    <div class="flex justify-between py-1.5 border-b border-gray-50 last:border-0 text-xs">
+                        <span class="text-gray-800 truncate"><span class="font-mono text-gray-400">${escapeAlerts(i.internal_code)}</span> ${escapeAlerts(i.name)}</span>
+                        <span class="${i.stock === 0 ? 'text-red-600 font-bold' : 'text-amber-600'} ml-2 flex-shrink-0 tabular-nums">${parseFloat(i.stock).toFixed(0)} / ${parseFloat(i.min_stock).toFixed(0)}</span>
                     </div>`).join('')}
-                ${critical.length > 5 ? `<a href="/inventory/reports.html" class="text-xs text-blue-600 hover:underline mt-1 inline-block">+ ${critical.length - 5} → ver relatório completo</a>` : ''}
+                ${critical.length > 5 ? `<a href="/inventory/reports.html" class="text-xs text-sky-600 hover:text-sky-700 hover:underline mt-2 inline-flex items-center gap-1">+ ${critical.length - 5} mais <i class="fas fa-arrow-right text-[10px]"></i></a>` : ''}
             </div>`;
         }
         if (expiring.length > 0) {
             html += `<div>
-                <p class="text-[10px] uppercase font-bold text-orange-600 mb-1">Lotes vencendo (30 dias)</p>
+                <p class="text-[10px] uppercase font-bold text-amber-600 tracking-wider mb-2 flex items-center gap-1.5"><span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span> Lotes vencendo (30 dias)</p>
                 ${expiring.slice(0, 5).map(l => `
-                    <div class="flex justify-between py-1 border-b border-gray-50 last:border-0 text-xs">
-                        <span class="text-gray-800 truncate">${escapeAlerts(l.item?.name || '')} · <span class="font-mono">${escapeAlerts(l.lot_number)}</span></span>
-                        <span class="text-orange-600 ml-2 flex-shrink-0">${l.expiry_date}</span>
+                    <div class="flex justify-between py-1.5 border-b border-gray-50 last:border-0 text-xs">
+                        <span class="text-gray-800 truncate">${escapeAlerts(l.item?.name || '')} · <span class="font-mono text-gray-400">${escapeAlerts(l.lot_number)}</span></span>
+                        <span class="text-amber-600 ml-2 flex-shrink-0 tabular-nums">${l.expiry_date}</span>
                     </div>`).join('')}
-                ${expiring.length > 5 ? `<a href="/inventory/index.html" class="text-xs text-blue-600 hover:underline mt-1 inline-block">+ ${expiring.length - 5} → ver dashboard</a>` : ''}
+                ${expiring.length > 5 ? `<a href="/inventory/index.html" class="text-xs text-sky-600 hover:text-sky-700 hover:underline mt-2 inline-flex items-center gap-1">+ ${expiring.length - 5} mais <i class="fas fa-arrow-right text-[10px]"></i></a>` : ''}
             </div>`;
         }
     }
@@ -331,35 +417,35 @@ async function runGlobalSearch(q) {
 
         let html = '';
         if (items.length) {
-            html += '<p class="text-[10px] uppercase font-bold text-gray-400 px-2 mt-1 mb-1">Itens</p>';
+            html += '<p class="text-[10px] uppercase font-bold text-gray-400 tracking-wider px-2 mt-1 mb-1">Itens</p>';
             html += items.map(i => `
                 <button onclick='openActionPanel(${JSON.stringify({kind:"item", ...i}).replace(/'/g,"&#39;")})'
-                        class="w-full text-left flex items-center gap-2 px-2 py-1.5 hover:bg-blue-50 rounded text-xs">
-                    <i class="fas fa-box ${i.macro_category === "patrimonial" ? "text-purple-500" : "text-blue-500"}"></i>
-                    <span class="font-mono text-gray-500">${escapeAlerts(i.internal_code)}</span>
-                    <span class="text-gray-800 truncate">${escapeAlerts(i.name)}</span>
+                        class="w-full text-left flex items-center gap-2.5 px-2 py-1.5 hover:bg-sky-50 rounded-md text-xs transition">
+                    <i class="fas fa-box ${i.macro_category === "patrimonial" ? "text-purple-500" : "text-sky-500"} w-4 text-center"></i>
+                    <span class="font-mono text-gray-400">${escapeAlerts(i.internal_code)}</span>
+                    <span class="text-gray-800 truncate flex-1">${escapeAlerts(i.name)}</span>
                     ${!i.is_active ? '<span class="text-[10px] text-gray-400">(inativo)</span>' : ''}
                 </button>`).join('');
         }
         if (lots.length) {
-            html += '<p class="text-[10px] uppercase font-bold text-gray-400 px-2 mt-2 mb-1">Lotes</p>';
+            html += '<p class="text-[10px] uppercase font-bold text-gray-400 tracking-wider px-2 mt-3 mb-1">Lotes</p>';
             html += lots.map(l => `
                 <button onclick='openActionPanel(${JSON.stringify({kind:"lot", id:l.id, lot_number:l.lot_number, expiry_date:l.expiry_date, item:l.item}).replace(/'/g,"&#39;")})'
-                        class="w-full text-left flex items-center gap-2 px-2 py-1.5 hover:bg-yellow-50 rounded text-xs">
-                    <i class="fas fa-flask text-yellow-600"></i>
+                        class="w-full text-left flex items-center gap-2.5 px-2 py-1.5 hover:bg-amber-50 rounded-md text-xs transition">
+                    <i class="fas fa-flask text-amber-600 w-4 text-center"></i>
                     <span class="font-mono">${escapeAlerts(l.lot_number)}</span>
-                    <span class="text-gray-600 truncate">${escapeAlerts(l.item?.name || '')}</span>
-                    ${l.expiry_date ? `<span class="text-[10px] text-gray-400 ml-auto">val ${l.expiry_date}</span>` : ''}
+                    <span class="text-gray-600 truncate flex-1">${escapeAlerts(l.item?.name || '')}</span>
+                    ${l.expiry_date ? `<span class="text-[10px] text-gray-400">val ${l.expiry_date}</span>` : ''}
                 </button>`).join('');
         }
         if (suppliers.length) {
-            html += '<p class="text-[10px] uppercase font-bold text-gray-400 px-2 mt-2 mb-1">Fornecedores</p>';
+            html += '<p class="text-[10px] uppercase font-bold text-gray-400 tracking-wider px-2 mt-3 mb-1">Fornecedores</p>';
             html += suppliers.map(s => `
                 <button onclick='openActionPanel(${JSON.stringify({kind:"supplier", ...s}).replace(/'/g,"&#39;")})'
-                        class="w-full text-left flex items-center gap-2 px-2 py-1.5 hover:bg-green-50 rounded text-xs">
-                    <i class="fas fa-truck text-green-600"></i>
-                    <span class="text-gray-800 truncate">${escapeAlerts(s.name)}</span>
-                    ${s.tax_id ? `<span class="text-[10px] text-gray-400">${escapeAlerts(s.tax_id)}</span>` : ''}
+                        class="w-full text-left flex items-center gap-2.5 px-2 py-1.5 hover:bg-indigo-50 rounded-md text-xs transition">
+                    <i class="fas fa-truck text-indigo-500 w-4 text-center"></i>
+                    <span class="text-gray-800 truncate flex-1">${escapeAlerts(s.name)}</span>
+                    ${s.tax_id ? `<span class="text-[10px] text-gray-400 font-mono">${escapeAlerts(s.tax_id)}</span>` : ''}
                 </button>`).join('');
         }
         resultsEl.innerHTML = html;
@@ -378,13 +464,13 @@ function injectActionPanel() {
     panel.id = 'actionPanel';
     panel.className = 'hidden fixed inset-0 z-40';
     panel.innerHTML = `
-        <div class="absolute inset-0 bg-black/30" onclick="closeActionPanel()"></div>
-        <div class="absolute right-0 top-0 bottom-0 w-96 bg-white shadow-xl overflow-y-auto">
-            <div class="p-4 border-b flex justify-between items-center">
-                <h3 id="actionPanelTitle" class="font-bold text-gray-800">—</h3>
-                <button onclick="closeActionPanel()" class="text-gray-400 hover:text-gray-600"><i class="fas fa-times"></i></button>
+        <div class="absolute inset-0 bg-gray-900/30 backdrop-blur-[2px]" onclick="closeActionPanel()"></div>
+        <div class="absolute right-0 top-0 bottom-0 w-[400px] bg-white shadow-2xl overflow-y-auto border-l border-gray-200">
+            <div class="px-5 py-4 border-b border-gray-100 flex justify-between items-start gap-2 sticky top-0 bg-white z-10">
+                <h3 id="actionPanelTitle" class="font-bold text-gray-900 text-sm">—</h3>
+                <button onclick="closeActionPanel()" class="text-gray-400 hover:text-gray-600 w-7 h-7 flex items-center justify-center rounded hover:bg-gray-100 flex-shrink-0"><i class="fas fa-times text-xs"></i></button>
             </div>
-            <div id="actionPanelBody" class="p-4 space-y-3"></div>
+            <div id="actionPanelBody" class="p-5 space-y-4"></div>
         </div>`;
     document.body.appendChild(panel);
 }
@@ -398,36 +484,53 @@ function openActionPanel(entity) {
     const body  = document.getElementById('actionPanelBody');
     panel.classList.remove('hidden');
 
+    // Helper para criar action button consistente
+    const actionBtn = (href, color, icon, label) =>
+        `<a href="${href}" class="px-3 py-2.5 bg-${color}-50 hover:bg-${color}-100 text-${color}-700 border border-${color}-100 rounded-lg text-xs text-center font-medium transition flex items-center justify-center gap-1.5"><i class="fas ${icon}"></i> ${label}</a>`;
+
     if (entity.kind === 'item') {
-        title.innerHTML = `<span class="text-xs text-gray-400 font-mono">${escapeAlerts(entity.internal_code)}</span> · ${escapeAlerts(entity.name)}`;
+        const macroColor = entity.macro_category === 'patrimonial' ? 'purple' : 'sky';
+        title.innerHTML = `<div class="flex items-center gap-2">
+            <span class="font-mono text-[11px] text-gray-400">${escapeAlerts(entity.internal_code)}</span>
+            <span class="text-gray-900">${escapeAlerts(entity.name)}</span>
+        </div>`;
         body.innerHTML = `
-            <p class="text-xs text-gray-500">Categoria: <span class="font-medium">${escapeAlerts(entity.macro_category)}</span></p>
-            ${entity.image_url ? `<img src="${entity.image_url}" class="w-full h-32 object-cover rounded">` : ''}
-            <div class="grid grid-cols-2 gap-2 pt-2">
-                <a href="/inventory/item-form.html?id=${entity.id}" class="px-3 py-2 bg-blue-100 hover:bg-blue-200 text-blue-800 rounded text-xs text-center"><i class="fas fa-edit"></i> Editar</a>
-                <a href="/inventory/kardex.html?item=${entity.id}" class="px-3 py-2 bg-teal-100 hover:bg-teal-200 text-teal-800 rounded text-xs text-center"><i class="fas fa-clipboard-list"></i> Kardex</a>
-                <a href="/inventory/item-label.html?id=${entity.id}" class="px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-800 rounded text-xs text-center"><i class="fas fa-qrcode"></i> Etiqueta</a>
-                <a href="/inventory/movements.html?item_id=${entity.id}" class="px-3 py-2 bg-purple-100 hover:bg-purple-200 text-purple-800 rounded text-xs text-center"><i class="fas fa-list"></i> Histórico</a>
-                <a href="/inventory/entries.html" class="px-3 py-2 bg-green-100 hover:bg-green-200 text-green-800 rounded text-xs text-center"><i class="fas fa-arrow-right-to-bracket"></i> Nova entrada</a>
-                <a href="/inventory/exits.html" class="px-3 py-2 bg-red-100 hover:bg-red-200 text-red-800 rounded text-xs text-center"><i class="fas fa-arrow-right-from-bracket"></i> Nova saída</a>
+            <div class="flex items-center gap-2 text-xs">
+                <span class="px-2 py-0.5 rounded bg-${macroColor}-100 text-${macroColor}-700 font-medium capitalize">${escapeAlerts(entity.macro_category)}</span>
+                ${!entity.is_active ? '<span class="px-2 py-0.5 rounded bg-gray-100 text-gray-500">inativo</span>' : ''}
+            </div>
+            ${entity.image_url ? `<img src="${entity.image_url}" class="w-full h-36 object-cover rounded-lg border border-gray-100">` : ''}
+            <div class="grid grid-cols-2 gap-2 pt-1">
+                ${actionBtn(`/inventory/item-form.html?id=${entity.id}`,    'sky',    'fa-edit',                    'Editar')}
+                ${actionBtn(`/inventory/kardex.html?item=${entity.id}`,    'cyan',   'fa-clipboard-list',          'Kardex')}
+                ${actionBtn(`/inventory/item-label.html?id=${entity.id}`,  'gray',   'fa-qrcode',                  'Etiqueta')}
+                ${actionBtn(`/inventory/movements.html?item_id=${entity.id}`, 'purple', 'fa-history',              'Histórico')}
+                ${actionBtn(`/inventory/entries.html`,                      'sky',    'fa-arrow-right-to-bracket',  'Nova entrada')}
+                ${actionBtn(`/inventory/exits.html`,                        'red',    'fa-arrow-right-from-bracket','Nova saída')}
             </div>`;
     } else if (entity.kind === 'lot') {
-        title.innerHTML = `Lote <span class="font-mono">${escapeAlerts(entity.lot_number)}</span>`;
+        title.innerHTML = `<div class="flex items-center gap-2"><i class="fas fa-flask text-amber-500"></i>Lote <span class="font-mono">${escapeAlerts(entity.lot_number)}</span></div>`;
         body.innerHTML = `
-            <p class="text-xs text-gray-500">Item: <span class="font-medium">${escapeAlerts(entity.item?.internal_code || '')} · ${escapeAlerts(entity.item?.name || '')}</span></p>
-            ${entity.expiry_date ? `<p class="text-xs text-gray-500">Validade: <span class="font-medium">${entity.expiry_date}</span></p>` : ''}
-            <div class="pt-2 space-y-2">
-                <a href="/inventory/kardex.html?item=${entity.item?.id}" class="block px-3 py-2 bg-teal-100 hover:bg-teal-200 text-teal-800 rounded text-xs text-center"><i class="fas fa-clipboard-list"></i> Kardex do item</a>
-                <a href="/inventory/item-form.html?id=${entity.item?.id}" class="block px-3 py-2 bg-blue-100 hover:bg-blue-200 text-blue-800 rounded text-xs text-center"><i class="fas fa-edit"></i> Editar item</a>
+            <div class="bg-gray-50 rounded-lg p-3 space-y-1.5">
+                <p class="text-xs text-gray-500">Item</p>
+                <p class="text-sm font-medium text-gray-800"><span class="font-mono text-xs text-gray-400">${escapeAlerts(entity.item?.internal_code || '')}</span> ${escapeAlerts(entity.item?.name || '')}</p>
+                ${entity.expiry_date ? `<p class="text-xs text-gray-500 pt-2">Validade <span class="text-amber-600 font-medium ml-1">${entity.expiry_date}</span></p>` : ''}
+            </div>
+            <div class="space-y-2 pt-1">
+                ${actionBtn(`/inventory/kardex.html?item=${entity.item?.id}`,   'cyan', 'fa-clipboard-list', 'Kardex do item')}
+                ${actionBtn(`/inventory/item-form.html?id=${entity.item?.id}`, 'sky',  'fa-edit',           'Editar item')}
             </div>`;
     } else if (entity.kind === 'supplier') {
-        title.innerHTML = escapeAlerts(entity.name);
+        title.innerHTML = `<div class="flex items-center gap-2"><i class="fas fa-truck text-indigo-500"></i>${escapeAlerts(entity.name)}</div>`;
         body.innerHTML = `
-            ${entity.tax_id ? `<p class="text-xs text-gray-500">NIF: <span class="font-medium">${escapeAlerts(entity.tax_id)}</span></p>` : ''}
-            ${entity.email  ? `<p class="text-xs text-gray-500">Email: ${escapeAlerts(entity.email)}</p>` : ''}
-            <div class="pt-2 space-y-2">
-                <a href="/inventory/suppliers.html" class="block px-3 py-2 bg-green-100 hover:bg-green-200 text-green-800 rounded text-xs text-center"><i class="fas fa-list"></i> Ver lista de fornecedores</a>
-                <a href="/inventory/entries.html" class="block px-3 py-2 bg-blue-100 hover:bg-blue-200 text-blue-800 rounded text-xs text-center"><i class="fas fa-arrow-right-to-bracket"></i> Nova entrada</a>
+            <div class="bg-gray-50 rounded-lg p-3 space-y-1.5">
+                ${entity.tax_id ? `<p class="text-xs text-gray-500">NIF <span class="font-mono text-gray-700 ml-1">${escapeAlerts(entity.tax_id)}</span></p>` : ''}
+                ${entity.email  ? `<p class="text-xs text-gray-500">Email <span class="text-gray-700 ml-1">${escapeAlerts(entity.email)}</span></p>` : ''}
+                ${!entity.tax_id && !entity.email ? '<p class="text-xs text-gray-400 italic">Sem dados de contacto cadastrados.</p>' : ''}
+            </div>
+            <div class="space-y-2 pt-1">
+                ${actionBtn(`/inventory/suppliers.html`, 'sky', 'fa-list',                     'Ver lista de fornecedores')}
+                ${actionBtn(`/inventory/entries.html`,  'sky', 'fa-arrow-right-to-bracket',   'Nova entrada')}
             </div>`;
     }
 }
@@ -447,12 +550,12 @@ function showViewModal({ title, sections = [] }) {
     if (!modal) {
         modal = document.createElement('div');
         modal.id = 'genericViewModal';
-        modal.className = 'hidden fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4';
+        modal.className = 'hidden fixed inset-0 bg-gray-900/40 backdrop-blur-[2px] z-50 flex items-center justify-center p-4';
         modal.innerHTML = `
-            <div class="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-                <div class="flex justify-between items-center p-4 border-b">
-                    <h3 id="genericViewTitle" class="font-bold text-gray-800">—</h3>
-                    <button onclick="closeViewModal()" class="text-gray-400 hover:text-gray-600"><i class="fas fa-times"></i></button>
+            <div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto border border-gray-200">
+                <div class="flex justify-between items-start p-5 border-b border-gray-100 sticky top-0 bg-white z-10">
+                    <h3 id="genericViewTitle" class="font-bold text-gray-900 text-base">—</h3>
+                    <button onclick="closeViewModal()" class="text-gray-400 hover:text-gray-600 w-7 h-7 flex items-center justify-center rounded hover:bg-gray-100 flex-shrink-0"><i class="fas fa-times text-xs"></i></button>
                 </div>
                 <div id="genericViewBody" class="p-6"></div>
             </div>`;
@@ -461,12 +564,12 @@ function showViewModal({ title, sections = [] }) {
     document.getElementById('genericViewTitle').textContent = title;
     document.getElementById('genericViewBody').innerHTML = sections.map(sec => `
         <div class="mb-5 last:mb-0">
-            ${sec.title ? `<h4 class="text-xs uppercase font-bold text-gray-400 mb-2">${escapeAlerts(sec.title)}</h4>` : ''}
-            <div class="border border-gray-100 rounded-lg divide-y divide-gray-100">
+            ${sec.title ? `<h4 class="text-[10px] uppercase font-bold text-gray-400 tracking-wider mb-2">${escapeAlerts(sec.title)}</h4>` : ''}
+            <div class="bg-gray-50/50 border border-gray-100 rounded-lg divide-y divide-gray-100">
                 ${sec.rows.map(([label, value, opts = {}]) => `
-                    <div class="flex justify-between items-center px-3 py-2">
-                        <span class="text-xs text-gray-500">${escapeAlerts(label)}</span>
-                        <span class="text-sm ${opts.mono ? 'font-mono' : ''} ${opts.bold ? 'font-bold' : ''} text-gray-800 text-right max-w-[60%]">${value === null || value === undefined || value === '' ? '<span class="text-gray-300">—</span>' : escapeAlerts(String(value))}</span>
+                    <div class="flex justify-between items-center gap-3 px-3.5 py-2.5">
+                        <span class="text-xs text-gray-500 flex-shrink-0">${escapeAlerts(label)}</span>
+                        <span class="text-sm ${opts.mono ? 'font-mono text-xs' : ''} ${opts.bold ? 'font-bold' : ''} text-gray-800 text-right tabular-nums">${value === null || value === undefined || value === '' ? '<span class="text-gray-300">—</span>' : escapeAlerts(String(value))}</span>
                     </div>`).join('')}
             </div>
         </div>`).join('');

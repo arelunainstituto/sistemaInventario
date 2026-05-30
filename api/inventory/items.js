@@ -235,29 +235,43 @@ router.post('/:id/pdf', requirePermission('inventory', 'update_item'), upload.si
     }
 });
 
-// GET /:id/qr.png — PNG do QR Code para etiqueta imprimível
-router.get('/:id/qr.png', requirePermission('inventory', 'read'), async (req, res) => {
+// GET /:id/qr — devolve o QR Code como JSON { data_url: "data:image/png;base64,…" }
+// Usar data URL evita problemas de binary stream com o middleware de
+// compressão. O cliente usa diretamente como <img src="…">.
+async function handleQrCode(req, res) {
     try {
         const { id } = req.params;
         const { data: item, error } = await supabaseAdmin
             .from('inv_items')
-            .select('qr_code, name')
+            .select('id, qr_code, name')
             .eq('id', id)
             .single();
         if (error) throw error;
-        if (!item) return res.status(404).end();
+        if (!item) return res.status(404).json({ error: 'Item não encontrado' });
 
-        // O payload do QR é a URL pública da página de scan — o celular abre direto
         const base = process.env.PUBLIC_BASE_URL || `${req.protocol}://${req.get('host')}`;
         const payload = `${base}/inventory/scan.html?code=${item.qr_code}`;
-        const png = await QRCode.toBuffer(payload, { type: 'png', width: 512, margin: 2 });
-        res.setHeader('Content-Type', 'image/png');
-        res.setHeader('Cache-Control', 'public, max-age=86400');
-        res.send(png);
+        const dataUrl = await QRCode.toDataURL(payload, { width: 512, margin: 2 });
+
+        // no-store força browser/proxy a sempre buscar do servidor — evita conflito
+        // com qualquer resposta antiga cacheada (era PNG, agora é JSON).
+        res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
+        res.setHeader('Pragma', 'no-cache');
+        res.json({
+            success: true,
+            data: {
+                item_id:  item.id,
+                qr_code:  item.qr_code,
+                payload,
+                data_url: dataUrl
+            }
+        });
     } catch (err) {
-        console.error('GET inv_items/:id/qr.png error:', err);
+        console.error('GET inv_items qr error:', err);
         res.status(500).json({ error: err.message || 'Erro ao gerar QR Code' });
     }
-});
+}
+router.get('/:id/qr',     requirePermission('inventory', 'read'), handleQrCode);
+router.get('/:id/qr.png', requirePermission('inventory', 'read'), handleQrCode);
 
 module.exports = router;
