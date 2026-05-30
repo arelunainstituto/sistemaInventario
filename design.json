@@ -1,0 +1,650 @@
+{
+  "$schema": "https://areluna.local/inventory/design-system.schema.json",
+  "name": "AreLuna Inventory — Meditech-inspired Design System",
+  "version": "1.0.0",
+  "lastUpdated": "2026-05-30",
+  "purpose": "Reference for any human or AI agent making UI in the Areluna Inventory project. Captures visual language, component anatomy, and composition patterns to make every new screen feel native. Inspiration: the Meditech clinical dashboard suite — calm, trustworthy, data-dense without feeling heavy. Apply this system to all pages under /public/inventory/ and the shared _layout.js header/sidebar.",
+
+  "designPrinciples": [
+    {
+      "name": "Calm by default",
+      "rule": "White surfaces, very subtle borders, no shadows louder than a soft drop. Operators read 8+ hours a day — every shout has to be earned (errors, alerts, criticals)."
+    },
+    {
+      "name": "Data first, chrome second",
+      "rule": "Numbers and identifiers (SKU, quantities, dates, prices) must be the most legible thing on screen. Decorative gradients, illustrations and oversized icons stay out of operational views."
+    },
+    {
+      "name": "Status is colour",
+      "rule": "Use the colour palette to carry meaning consistently. Green = success/in-stock, Blue = informational/in-progress, Amber = warning/pending, Red = critical/blocked, Purple = patrimonial/asset, Teal = brand primary. Never repurpose a status colour for decoration."
+    },
+    {
+      "name": "One pill, one verb",
+      "rule": "Status badges describe state in 1–2 words ('ativo', 'baixo do mínimo', 'rutura'). Never combine state + action in the same pill."
+    },
+    {
+      "name": "Two-track typography",
+      "rule": "Inter for everything readable, JetBrains Mono / system mono only for codes (SKU, UUIDs, IPs, lot numbers). Codes get monospace + lighter colour so they don't fight item names."
+    },
+    {
+      "name": "Predictable layout",
+      "rule": "Every operational page follows the same shell: sidebar (240–256px) + sticky header (64–72px) + 24–32px padded canvas. New screens slot into the shell — they never reinvent it."
+    },
+    {
+      "name": "Confirm destructive, never block routine",
+      "rule": "Routine writes (add item, lançar entrada) are 1-click. Destructive or irreversible operations (delete, force-negative adjust, run depreciation) ask for confirmation with the consequences listed."
+    }
+  ],
+
+  "brand": {
+    "productName": "AreLuna Inventário",
+    "wordmark": "Inventário",
+    "subwordmark": "Gestão de Estoques",
+    "personality": ["clínico", "preciso", "humano", "confiável"],
+    "voiceAndCopy": {
+      "language": "pt-PT (com tolerância a pt-BR — usar pt-PT por padrão: 'utilizador', 'localização', 'fornecedor', 'palete')",
+      "tone": "direto, factual, sem jargão técnico no UI. Erros falam o que aconteceu e como resolver. Sucesso é confirmado em 1 toast curto.",
+      "buttonLabels": "verbo no infinitivo curto ('Guardar', 'Cancelar', 'Aplicar', 'Executar'). Evita 'Submeter', 'OK', 'Confirmar' sozinhos.",
+      "emptyStates": "frase positiva + sugestão. Exemplo: 'Nenhum item ainda. Adicione o primeiro em Itens → Novo item.'",
+      "forbidden": ["jargão da spec (§, RN0X, RF0X) na UI", "siglas técnicas sem contexto", "exclamações marketing", "emojis decorativos (✨🎉) — só os semânticos 🟢🟡🔴 ⚠️ são aceitáveis em alertas)"]
+    }
+  },
+
+  "colorTokens": {
+    "description": "Sistema de cores. Sempre que possível usar variáveis/utility classes — não hardcodar hex em components, mas se precisar para email/PDF, a referência está aqui.",
+    "brand": {
+      "primary":      { "hex": "#10b981", "tailwind": "emerald-500", "use": "Botões primários, links principais, ícones de marca, accent em gráficos." },
+      "primaryDark":  { "hex": "#059669", "tailwind": "emerald-600", "use": "Hover de botões primários." },
+      "primaryLight": { "hex": "#d1fae5", "tailwind": "emerald-100", "use": "Fundo de badges de sucesso, hover sutil de itens." },
+      "primarySoft":  { "hex": "#ecfdf5", "tailwind": "emerald-50",  "use": "Tinta de fundo de seções de marca, gradientes de ambiente." }
+    },
+    "surface": {
+      "appBackground":  { "hex": "#f0fdfa", "tailwind": "teal-50",   "use": "Fundo da viewport — sutil verde-mint para puxar a marca sem competir." },
+      "cardBackground": { "hex": "#ffffff", "tailwind": "white",     "use": "Cards, modais, sidebar, header. Sempre branco puro." },
+      "subtle":         { "hex": "#f9fafb", "tailwind": "gray-50",   "use": "Cabeçalhos de tabela, fundos de form não-críticos." },
+      "muted":          { "hex": "#f3f4f6", "tailwind": "gray-100",  "use": "Inputs desativados, separadores grossos." }
+    },
+    "text": {
+      "primary":   { "hex": "#111827", "tailwind": "gray-900", "use": "Títulos de página e cards." },
+      "secondary": { "hex": "#374151", "tailwind": "gray-700", "use": "Corpo de tabelas, valores em cards." },
+      "tertiary":  { "hex": "#6b7280", "tailwind": "gray-500", "use": "Subtítulos, hints, placeholder." },
+      "disabled":  { "hex": "#9ca3af", "tailwind": "gray-400", "use": "Itens inativos, deltas neutros." },
+      "inverse":   { "hex": "#ffffff", "tailwind": "white",    "use": "Texto sobre botões primários e badges escuras." },
+      "code":      { "hex": "#6b7280", "tailwind": "gray-500", "use": "Códigos internos (SKU, UUID, IP) em font-mono." }
+    },
+    "border": {
+      "default": { "hex": "#e5e7eb", "tailwind": "gray-200", "use": "Borda de cards, inputs em estado normal, divisores de tabelas." },
+      "subtle":  { "hex": "#f3f4f6", "tailwind": "gray-100", "use": "Divider interno (row separator em listas)." },
+      "focus":   { "hex": "#10b981", "tailwind": "emerald-500", "use": "Borda + ring de inputs em foco." },
+      "error":   { "hex": "#ef4444", "tailwind": "red-500",  "use": "Borda de inputs com erro." }
+    },
+    "status": {
+      "description": "Cada estado tem um par (fundo claro + texto escuro). Aplicar como '<bg> <fg>' em badges. NUNCA usar essas cores como pano de fundo de página.",
+      "success":  { "label": "Sucesso / Ativo / Pago",            "bg": "bg-emerald-100", "fg": "text-emerald-800", "dot": "bg-emerald-500" },
+      "info":     { "label": "Em curso / Informativo",            "bg": "bg-blue-100",    "fg": "text-blue-800",    "dot": "bg-blue-500"    },
+      "warning":  { "label": "Atenção / Pendente / Baixo",        "bg": "bg-amber-100",   "fg": "text-amber-800",   "dot": "bg-amber-500"   },
+      "danger":   { "label": "Crítico / Rutura / Bloqueado",      "bg": "bg-red-100",     "fg": "text-red-700",     "dot": "bg-red-500"     },
+      "neutral":  { "label": "Inativo / Cancelado",               "bg": "bg-gray-100",    "fg": "text-gray-600",    "dot": "bg-gray-400"    },
+      "patrimony":{ "label": "Patrimonial / Equipamento duradouro", "bg": "bg-purple-100", "fg": "text-purple-700", "dot": "bg-purple-500"  },
+      "consumo":  { "label": "Consumo / Material descartável",    "bg": "bg-blue-100",    "fg": "text-blue-700",    "dot": "bg-blue-500"    }
+    },
+    "chart": {
+      "primary":   { "hex": "#10b981", "use": "Série principal (receita, entradas, consumo positivo)" },
+      "secondary": { "hex": "#f43f5e", "use": "Série antagonista (despesa, saídas, perda)" },
+      "tertiary":  { "hex": "#3b82f6", "use": "Terceira série (transferências)" },
+      "quaternary":{ "hex": "#a855f7", "use": "Patrimoniais / categoria 4" },
+      "gridLine":  { "hex": "#f3f4f6", "use": "Linhas de grade de gráficos" },
+      "axisLabel": { "hex": "#9ca3af", "use": "Labels de eixos" }
+    },
+    "gradients": {
+      "appAmbient": {
+        "css": "linear-gradient(180deg, #ecfdf5 0%, #f0fdfa 40%, #f0fdfa 100%)",
+        "use": "Background da viewport quando se quer reforçar a marca. Aplicar no <body>. Tailwind: 'bg-gradient-to-b from-emerald-50 via-teal-50 to-teal-50'."
+      },
+      "cardHero": {
+        "css": "linear-gradient(135deg, rgba(16,185,129,0.06), rgba(16,185,129,0))",
+        "use": "Card hero do dashboard (opcional, sutil)"
+      }
+    }
+  },
+
+  "typography": {
+    "families": {
+      "sans": {
+        "value": "'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
+        "loadFrom": "https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap",
+        "weightsUsed": [400, 500, 600, 700]
+      },
+      "mono": {
+        "value": "'JetBrains Mono', 'SF Mono', Consolas, monospace",
+        "loadFrom": "opcional — system mono é suficiente",
+        "use": "SKU (SKU001), UUIDs, IPs, números de documento, lotes"
+      }
+    },
+    "scale": {
+      "displayLg":  { "size": "30px", "lineHeight": "36px", "weight": 700, "use": "Hero numbers (KPI maior)" },
+      "displayMd":  { "size": "24px", "lineHeight": "32px", "weight": 700, "use": "Título de página principal" },
+      "h1":         { "size": "20px", "lineHeight": "28px", "weight": 700, "tailwind": "text-xl font-bold", "use": "Título de header (página dentro do shell)" },
+      "h2":         { "size": "18px", "lineHeight": "26px", "weight": 700, "tailwind": "text-lg font-bold", "use": "Título de modal, secção dentro de card" },
+      "h3":         { "size": "16px", "lineHeight": "24px", "weight": 600, "tailwind": "font-bold text-gray-800", "use": "Cabeçalho de card, secção pequena" },
+      "bodyLg":     { "size": "15px", "lineHeight": "22px", "weight": 400, "tailwind": "text-base", "use": "Parágrafos longos (raros)" },
+      "body":       { "size": "14px", "lineHeight": "20px", "weight": 400, "tailwind": "text-sm", "use": "Padrão de UI" },
+      "bodyTight":  { "size": "13px", "lineHeight": "18px", "weight": 400, "use": "Tabelas densas" },
+      "caption":    { "size": "12px", "lineHeight": "16px", "weight": 500, "tailwind": "text-xs", "use": "Labels de form, subtítulos, breadcrumb" },
+      "overline":   { "size": "10px", "lineHeight": "14px", "weight": 700, "letterSpacing": "0.08em", "transform": "uppercase", "tailwind": "text-[10px] uppercase font-bold tracking-wide", "use": "Cabeçalhos de secção em sidebar, badges de eixo" }
+    },
+    "numericStyle": {
+      "rule": "Sempre usar `tabular-nums` para valores em colunas (quantidades, preços) para alinhamento perfeito. Em CSS: 'font-variant-numeric: tabular-nums'."
+    }
+  },
+
+  "spacing": {
+    "baseUnit": 4,
+    "scale": {
+      "0":   "0",
+      "1":   "4px",
+      "2":   "8px",
+      "3":   "12px",
+      "4":   "16px",
+      "5":   "20px",
+      "6":   "24px",
+      "8":   "32px",
+      "10":  "40px",
+      "12":  "48px",
+      "16":  "64px"
+    },
+    "rules": {
+      "cardPadding": "p-6 (24px) por defeito; p-4 (16px) em cards densos",
+      "cardGap": "gap-4 (16px) em grids de KPI; gap-6 (24px) em grids de secção",
+      "pageGutter": "p-8 (32px) no canvas principal; p-4 em mobile",
+      "rowPadding": "px-4 py-3 (16/12px) em rows de tabela; px-2 py-1.5 em listas densas",
+      "iconLabelGap": "gap-3 (12px) entre ícone e label em sidebar; gap-2 (8px) em chips",
+      "formFieldGap": "space-y-4 (16px) entre campos em formulários verticais; gap-3 em grids"
+    }
+  },
+
+  "radius": {
+    "scale": {
+      "none":  "0",
+      "sm":    "4px",
+      "md":    "6px",
+      "lg":    "8px",
+      "xl":    "12px",
+      "2xl":   "16px",
+      "full":  "9999px"
+    },
+    "usage": {
+      "card":    "rounded-lg (8px) — padrão; rounded-xl (12px) para cards hero",
+      "button":  "rounded-lg (8px)",
+      "input":   "rounded-lg (8px)",
+      "modal":   "rounded-lg (8px)",
+      "badge":   "rounded (4px) ou rounded-full para pills numéricas",
+      "avatar":  "rounded-full",
+      "image":   "rounded-lg",
+      "sidebarNavItem": "rounded-lg"
+    }
+  },
+
+  "elevation": {
+    "philosophy": "Sombras muito leves; quase toda a profundidade vem de bordas hairline (gray-200). Reservar shadow-lg apenas para overlays.",
+    "scale": {
+      "none":  { "css": "none",                                           "use": "Inline, sem container" },
+      "sm":    { "css": "0 1px 2px 0 rgb(0 0 0 / 0.05)",                  "tailwind": "shadow-sm",  "use": "Cards padrão, inputs em foco sutil" },
+      "md":    { "css": "0 4px 6px -1px rgb(0 0 0 / 0.07)",               "tailwind": "shadow",     "use": "Cards de KPI, ficha de item, dropdown" },
+      "lg":    { "css": "0 10px 15px -3px rgb(0 0 0 / 0.08)",             "tailwind": "shadow-lg",  "use": "Painéis laterais slide-in, popover de busca" },
+      "xl":    { "css": "0 20px 25px -5px rgb(0 0 0 / 0.10)",             "tailwind": "shadow-xl",  "use": "Modais centrados" }
+    }
+  },
+
+  "borders": {
+    "default": "1px solid #e5e7eb (gray-200)",
+    "subtle":  "1px solid #f3f4f6 (gray-100) — divisores internos",
+    "focus":   "ring-2 ring-emerald-500 + border-emerald-500",
+    "error":   "ring-2 ring-red-500 + border-red-500",
+    "rule":    "Inputs e cards têm borda hairline sempre. Em hover de elementos clicáveis (rows de tabela, items de sidebar), trocar fundo (bg-gray-50 ou bg-emerald-50) em vez de mexer na borda."
+  },
+
+  "iconography": {
+    "library": "Font Awesome 6 (Free) — class 'fas fa-*'",
+    "style": "Solid (preenchido) — consistente com o existente em todo o projeto",
+    "sizeScale": {
+      "xs": "w-3 h-3 (~12px)",
+      "sm": "w-4 h-4 (~16px) — padrão em sidebar nav e botões",
+      "md": "w-5 h-5 (~20px) — header e cabeçalhos de card",
+      "lg": "w-6 h-6 (~24px) — KPI cards",
+      "xl": "w-10 h-10 (~40px) — avatar/logo placeholder"
+    },
+    "semanticMap": {
+      "rule": "Cada conceito do domínio tem um ícone canónico. Reusar — não inventar.",
+      "items":              "fa-boxes-stacked",
+      "consumo":            "fa-prescription-bottle",
+      "patrimonial":        "fa-laptop-medical",
+      "entrada":            "fa-arrow-right-to-bracket",
+      "saida":              "fa-arrow-right-from-bracket",
+      "transferencia":      "fa-right-left",
+      "ajuste":             "fa-sliders",
+      "inventarioFisico":   "fa-list-check",
+      "deprecacao":         "fa-arrow-trend-down",
+      "relatorio":          "fa-chart-line",
+      "kardex":             "fa-clipboard-list",
+      "historico":          "fa-history",
+      "qrCode":             "fa-qrcode",
+      "localizacao":        "fa-map-marker-alt",
+      "categoria":          "fa-tags",
+      "fornecedor":         "fa-truck",
+      "unidade":            "fa-ruler",
+      "pesquisa":           "fa-search",
+      "alerta":             "fa-bell",
+      "info":               "fa-circle-info",
+      "warning":            "fa-triangle-exclamation",
+      "success":            "fa-circle-check",
+      "danger":             "fa-circle-xmark",
+      "visualizar":         "fa-eye",
+      "editar":             "fa-edit",
+      "remover":            "fa-trash",
+      "fechar":             "fa-times",
+      "guardar":            "fa-save",
+      "filtrar":            "fa-filter",
+      "exportarCsv":        "fa-file-csv",
+      "exportarExcel":      "fa-file-excel",
+      "exportarPdf":        "fa-file-pdf",
+      "imprimir":           "fa-print",
+      "logoMarca":          "fa-warehouse"
+    },
+    "iconBubble": {
+      "anatomy": "Ícone num círculo/quadrado pintado com a versão -100 da cor + ícone na versão -600 da cor",
+      "example": "<div class='w-10 h-10 rounded-lg bg-emerald-100 flex items-center justify-center text-emerald-600'><i class='fas fa-warehouse text-xl'></i></div>",
+      "use": "Brand mark em sidebar, ícones de KPI cards, ícones de tipo de relatório"
+    }
+  },
+
+  "motion": {
+    "easings": {
+      "default": "cubic-bezier(0.4, 0, 0.2, 1)",
+      "out":     "cubic-bezier(0, 0, 0.2, 1)"
+    },
+    "durations": {
+      "fast":   "150ms — hover de buttons, troca de cor",
+      "base":   "200ms — abertura de dropdown, fade de toast",
+      "slow":   "300ms — slide de painel lateral, transição de modal"
+    },
+    "rules": [
+      "Animar apenas opacity e transform. Evitar animar layout (width/height) para não causar reflow.",
+      "Estados de loading: spinner Tailwind (`animate-spin`) sobre fundo branco semi-transparente.",
+      "Toasts entram com slide-down 200ms; saem com opacity 300ms.",
+      "Nunca animar mais de 2 propriedades simultâneas num mesmo elemento."
+    ]
+  },
+
+  "layouts": {
+    "appShell": {
+      "description": "Layout principal de todas as telas operacionais. Implementado em public/inventory/_layout.js via renderInventoryLayout().",
+      "structure": "div.flex.h-screen.overflow-hidden { aside.sidebar (w-64) + main.flex-1.overflow-y-auto { header.sticky + div#pageContent.p-8 } }",
+      "sidebarWidth": "256px (w-64)",
+      "headerHeight": "auto (px-8 py-4) — tipicamente 72px",
+      "canvas": "Background gray-50 (teal-50 quando se quer ambiente de marca); padding 32px (p-8)"
+    },
+    "pageGrid": {
+      "kpiRow":      "grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8",
+      "twoColumn":   "grid-cols-1 lg:grid-cols-2 gap-6",
+      "threeColumn": "grid-cols-1 lg:grid-cols-3 gap-6",
+      "mainAside":   "grid-cols-1 lg:grid-cols-3 gap-6 — main span 2, aside span 1"
+    },
+    "breakpoints": {
+      "sm":  "640px",
+      "md":  "768px — sidebar colapsa em hamburger abaixo deste valor (futuro)",
+      "lg":  "1024px — grids de 2-3 colunas ativam aqui",
+      "xl":  "1280px",
+      "2xl": "1536px"
+    }
+  },
+
+  "components": {
+    "sidebar": {
+      "anatomy": "Logo + grupos de navegação + footer (Voltar ao Menu).",
+      "background": "white",
+      "width": "256px (w-64)",
+      "rightBorder": "1px solid gray-200",
+      "logoBlock": {
+        "padding": "p-6, border-b gray-100",
+        "iconBubble": "w-10 h-10 rounded-lg bg-emerald-100 text-emerald-600 (ver iconBubble em iconography)",
+        "title": "text-lg font-bold gray-800",
+        "subtitle": "text-xs gray-500"
+      },
+      "navGroup": {
+        "groupHeader": "text-[10px] uppercase font-bold gray-400 px-3 mt-4 mb-1",
+        "groupExamples": ["Operações", "Cadastros", "Administração"]
+      },
+      "navItem": {
+        "baseClass": "w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium rounded-lg transition-colors",
+        "default": "text-gray-600 hover:bg-gray-50",
+        "active": "text-emerald-600 bg-emerald-50",
+        "disabled": "text-gray-400 cursor-not-allowed",
+        "iconSize": "w-5 (icon class)",
+        "badgeOnRight": "ml-auto text-[10px] font-bold px-1.5 py-0.5 rounded bg-gray-200 text-gray-600"
+      }
+    },
+
+    "header": {
+      "anatomy": "Título da página (left) + busca global (center) + ações (alerts + user + logout).",
+      "padding": "px-8 py-4",
+      "sticky": true,
+      "background": "white",
+      "bottomBorder": "1px solid gray-200",
+      "titleBlock": {
+        "title": "text-xl font-bold gray-800",
+        "subtitle": "text-sm gray-500"
+      },
+      "globalSearch": {
+        "container": "relative flex-1 max-w-md mx-8",
+        "input": "w-full pl-8 pr-3 py-2 border border-gray-200 bg-gray-50 rounded-lg text-sm focus:bg-white focus:ring-2 focus:ring-emerald-500 focus:outline-none",
+        "leadingIcon": "fa-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs",
+        "behavior": "Debounce 250ms, Ctrl/Cmd+K para focar, Esc fecha"
+      },
+      "alertsBell": {
+        "button": "w-10 h-10 rounded-lg bg-gray-50 hover:bg-gray-100 border border-gray-200 flex items-center justify-center text-gray-600",
+        "badge": "absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center"
+      },
+      "userChip": {
+        "container": "flex items-center gap-3 px-4 py-2 bg-gray-50 rounded-lg border border-gray-200",
+        "avatar": "w-8 h-8 rounded-full bg-emerald-100 text-emerald-600 font-bold flex items-center justify-center",
+        "label": "text-sm gray-700"
+      }
+    },
+
+    "card": {
+      "base": "bg-white rounded-lg shadow p-6",
+      "denseVariant": "bg-white rounded-lg shadow p-4",
+      "heroVariant": "bg-white rounded-xl shadow p-8",
+      "headerInside": {
+        "container": "flex items-center justify-between mb-4",
+        "title": "font-bold text-gray-800 flex items-center gap-2",
+        "titleIcon": "small icon em cor temática (text-blue-600, text-red-500, etc.)"
+      }
+    },
+
+    "kpiCard": {
+      "purpose": "Mostrar um número (total, valor, contador) com contexto e tendência.",
+      "anatomy": "label small + valor large + delta (opcional) + icon bubble (right)",
+      "template": "<div class='bg-white rounded-lg shadow p-5'><div class='flex items-center justify-between'><div><p class='text-xs uppercase text-gray-500 font-medium'>{label}</p><p class='text-2xl font-bold text-gray-800 mt-1'>{prefix}{value}</p>{delta? <p class='text-xs text-emerald-600 mt-1'><i class='fas fa-arrow-up'></i> +12% vs período anterior</p>}</div><div class='w-10 h-10 rounded-lg bg-{color}-100 flex items-center justify-center text-{color}-600'><i class='fas fa-{icon}'></i></div></div></div>",
+      "colorMappingByMetric": {
+        "Total / Quantidade": "blue",
+        "Ativos / OK / Verde": "emerald",
+        "Atenção / Pendente": "amber",
+        "Crítico / Rutura": "red",
+        "Patrimonial / Asset": "purple",
+        "Valor financeiro": "emerald (prefix € ) ou purple",
+        "Cobertura / Tempo": "cyan",
+        "Vencendo": "orange"
+      },
+      "delta": {
+        "up":   "text-emerald-600 — fa-arrow-up (bom para Total, Ativos; ruim para Críticos!)",
+        "down": "text-red-600 — fa-arrow-down (bom para Críticos; ruim para Total)",
+        "neutral": "text-gray-500 — fa-minus"
+      }
+    },
+
+    "chartCard": {
+      "purpose": "Container para Chart.js / ApexCharts / SVG inline.",
+      "container": "bg-white rounded-lg shadow p-6",
+      "header": "flex items-center justify-between mb-4 — title (font-bold) + selector de período à direita (Month/Week/Year)",
+      "chartHeight": "280px (cobertura) a 360px (hero)",
+      "lineSeriesColors": ["chart.primary (#10b981)", "chart.secondary (#f43f5e)"],
+      "barSeriesColors": ["chart.primary", "chart.tertiary"],
+      "legendPosition": "topRight, pequeno, com bolinha colorida + label",
+      "tooltipStyle": "white background, shadow, rounded-md, padding 8 12, text-xs"
+    },
+
+    "button": {
+      "primary": {
+        "class": "px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-medium transition-colors",
+        "use": "Ação principal da tela (Guardar, Executar, Adicionar)"
+      },
+      "secondary": {
+        "class": "px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm font-medium",
+        "use": "Ações secundárias (Cancelar, Limpar)"
+      },
+      "ghost": {
+        "class": "px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg",
+        "use": "Cancelar em modais, navegação"
+      },
+      "danger": {
+        "class": "px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium",
+        "use": "Apagar, executar operação destrutiva (sempre após confirmação)"
+      },
+      "tonal": {
+        "patternByColor": "px-3 py-1.5 bg-{c}-100 hover:bg-{c}-200 text-{c}-800 rounded-lg text-xs font-medium",
+        "use": "CTAs secundárias com afinidade temática (ex: 'Etiqueta QR' em gray-100, 'Kardex' em teal-100)"
+      },
+      "iconOnly": {
+        "class": "p-2 rounded-lg text-gray-600 hover:text-blue-600 hover:bg-gray-50",
+        "use": "Ações em linhas de tabela (ver, editar, apagar)"
+      },
+      "withIcon": "Sempre usar <i class='fas fa-X'></i> antes do label, gap-2"
+    },
+
+    "input": {
+      "base": "w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none",
+      "withLeadingIcon": "Wrapper relative; ícone absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs; input com pl-8",
+      "label": "block text-xs text-gray-500 mb-1",
+      "hint": "text-[10px] text-gray-400 mt-1",
+      "error": "border-red-500 ring-red-500 + <p class='text-xs text-red-600 mt-1'>{msg}</p>",
+      "disabled": "bg-gray-100 cursor-not-allowed text-gray-500",
+      "checkbox": "type='checkbox' + label 'flex items-center gap-2 text-sm'",
+      "textarea": "rows='2' ou '3'; resto igual ao input"
+    },
+
+    "searchableSelect": {
+      "description": "Combobox que substitui <select> nativo quando há mais de ~15 opções. Implementado em public/inventory/_searchable-select.js — usar via makeSearchable('selectId', opts).",
+      "behavior": "Substring case-insensitive, ↑↓ navegam, Enter seleciona, Esc fecha, X limpa.",
+      "visuals": "Mesmo estilo do input base; dropdown com max-h-60 overflow-y-auto, items px-3 py-2, hover bg-emerald-50."
+    },
+
+    "modal": {
+      "overlay": "fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4",
+      "container": "bg-white rounded-lg shadow-xl max-w-md w-full mx-4 (modais simples) — max-w-4xl ou 5xl para formulários complexos com max-h-[90vh] overflow-y-auto",
+      "header": "flex justify-between items-center p-4 border-b — title + close button",
+      "body": "p-6 space-y-4",
+      "footer": "flex gap-3 justify-end border-t pt-4 p-6 — cancelar (ghost) + ação primária (primary)",
+      "rule": "Modais para formulários médios. Para formulários grandes usar página dedicada (ex: item-form.html). Para detalhes read-only usar showViewModal() helper."
+    },
+
+    "viewModal": {
+      "description": "Modal genérico read-only — helper em _layout.js como showViewModal({ title, sections: [{ title, rows: [[label, value, { mono?, bold? }]] }] })",
+      "useCase": "Visualizar entrada/saída/ajuste/transferência sem alterar — eye icon abre",
+      "anatomy": "Header com título + close; body com sections (overline header + linhas label/value separadas por borda)"
+    },
+
+    "sidePanel": {
+      "description": "Painel slide-in à direita para detalhes de uma entidade ou ações contextuais",
+      "anatomy": "div.absolute.right-0.top-0.bottom-0.w-96.bg-white.shadow-xl.overflow-y-auto",
+      "useCase": "Resultado da busca global → painel com 6 ações (Editar, Kardex, Etiqueta, Histórico, Nova entrada/saída)"
+    },
+
+    "table": {
+      "wrapper": "bg-white rounded-lg shadow overflow-hidden",
+      "table": "w-full text-sm",
+      "thead": "bg-gray-50 text-xs uppercase text-gray-600",
+      "th": "text-left p-3 (ou text-right para numéricos / text-center para ações)",
+      "tbody": "divide-y divide-gray-100",
+      "tr": "hover:bg-gray-50",
+      "td": "p-3 — texto secundário em text-xs text-gray-600 para metadados",
+      "emptyState": "tr única com colspan total: '<td class=\"p-6 text-center text-gray-400\">Nenhum registo.</td>'",
+      "columnsOrder": "[código mono · nome · categoria · estado · numéricos à direita · ações center]",
+      "actionsColumn": {
+        "width": "w-32 ou text-center whitespace-nowrap",
+        "icons": "olho (visualizar) → lápis (editar) → qr (etiqueta) → opcional (mais)"
+      },
+      "dense": "p-2 em td quando >8 colunas"
+    },
+
+    "filtersBar": {
+      "description": "Form horizontal acima da tabela com filtros + botões",
+      "container": "bg-white rounded-lg shadow p-4 mb-4",
+      "fieldGrid": "grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 items-end",
+      "actionsFooter": "flex justify-between gap-2 — esquerda: 'Aplicar' (primary) + 'Limpar' (secondary); direita: botões de export"
+    },
+
+    "badge": {
+      "base": "inline-flex items-center text-xs px-2 py-0.5 rounded font-medium",
+      "withDot": "<span class='w-1.5 h-1.5 rounded-full bg-{c}-500 mr-1.5'></span> texto",
+      "variants": {
+        "success":  "bg-emerald-100 text-emerald-800",
+        "info":     "bg-blue-100 text-blue-700",
+        "warning":  "bg-amber-100 text-amber-700",
+        "danger":   "bg-red-100 text-red-700",
+        "neutral":  "bg-gray-100 text-gray-600",
+        "consumo":  "bg-blue-100 text-blue-700",
+        "patrimonial": "bg-purple-100 text-purple-700"
+      },
+      "sizing": "px-2 py-0.5 padrão; px-1.5 py-0.5 em chips de tabela densa; px-3 py-1 em headers de seção"
+    },
+
+    "stat": {
+      "label": "text-xs uppercase text-gray-500 font-medium",
+      "value": "text-2xl font-bold text-gray-800",
+      "valueWithPrefix": "Prefixo € antes do número para valor financeiro",
+      "trend": {
+        "positiveContext": "text-emerald-600 (ex: receita subindo)",
+        "negativeContext": "text-red-600 (ex: rutura subindo)"
+      }
+    },
+
+    "avatar": {
+      "shape": "rounded-full",
+      "sizes": {
+        "sm": "w-6 h-6 text-[10px]",
+        "md": "w-8 h-8 text-xs",
+        "lg": "w-10 h-10 text-sm",
+        "xl": "w-16 h-16 text-lg"
+      },
+      "fallback": "Bg colorido (emerald-100 padrão; bg-blue-100 para info) + iniciais bold em cor escura match",
+      "withImage": "img object-cover; usar 'rounded-full' no img direto"
+    },
+
+    "toast": {
+      "container": "fixed top-6 right-6 z-50 px-5 py-3 rounded-lg text-white text-sm shadow-lg",
+      "variants": {
+        "success": "bg-emerald-500",
+        "error": "bg-red-500",
+        "info": "bg-blue-500",
+        "warn": "bg-amber-500"
+      },
+      "duration": "3 segundos; fade-out 300ms",
+      "helper": "Já implementado em _layout.js como toast(message, type)"
+    },
+
+    "emptyState": {
+      "pattern": "Centralizado, com ícone grande gray-300 + título gray-600 + sugestão de ação",
+      "example": "<div class='text-center py-12'><i class='fas fa-box text-4xl text-gray-300 mb-3'></i><p class='text-sm text-gray-600'>Nenhum item ainda.</p><a href='item-form.html' class='inline-block mt-3 text-emerald-600 text-sm font-medium'>Adicionar primeiro item →</a></div>"
+    },
+
+    "listEntry": {
+      "description": "Item de lista vertical (ex: críticos no dashboard, top resultados de busca)",
+      "container": "flex justify-between items-center py-2 border-b border-gray-100 last:border-0 px-2 hover:bg-gray-50 rounded",
+      "left": "label (text-gray-800) + sub (text-xs text-gray-400)",
+      "right": "valor / ação (text-xs)"
+    },
+
+    "form": {
+      "verticalForm": "space-y-4",
+      "fieldGrid": "grid grid-cols-1 md:grid-cols-2 gap-4 (ou md:grid-cols-3 quando >4 campos)",
+      "fieldset": "<fieldset class='space-y-3'><legend class='text-sm font-bold text-gray-700 mb-3'>{title}</legend>…</fieldset>",
+      "actions": "flex gap-3 justify-end border-t border-gray-100 pt-4 — cancelar (ghost) + primária (primary)"
+    },
+
+    "warningBanner": {
+      "patternByColor": {
+        "amber":  "border border-amber-300 bg-amber-50 text-amber-800 rounded-lg p-3 text-xs",
+        "red":    "border border-red-300 bg-red-50 text-red-800 rounded-lg p-3 text-xs",
+        "blue":   "border border-blue-200 bg-blue-50 text-blue-700 rounded-lg p-3 text-xs (informativo)"
+      },
+      "use": "Avisos contextuais (ex: 'Ajuste >5% requer Admin', 'Stock final ficará negativo')"
+    }
+  },
+
+  "patterns": {
+    "operationalPage": {
+      "description": "Template padrão de uma tela operacional (Itens, Entradas, Saídas, etc.)",
+      "structure": [
+        "1. renderInventoryLayout({ activePage, title, subtitle })",
+        "2. Filtros (filtersBar) — opcional",
+        "3. Botão 'Novo X' alinhado à direita do título da secção",
+        "4. Tabela (table) com colunas: identificador → nome → metadados → status → numéricos → ações (eye, edit, …)",
+        "5. Modal de criação/edição OU página dedicada *-form.html"
+      ]
+    },
+
+    "dashboardPage": {
+      "description": "Padrão do dashboard de cada módulo",
+      "structure": [
+        "1. KPI row (3-6 cards)",
+        "2. Grid 2x2 de cards: gráfico + tabela compacta + alertas + atividade recente",
+        "3. Sem ações destrutivas — só links de drill-down"
+      ]
+    },
+
+    "createOrEdit": {
+      "decision": "Form pequeno (até 6 campos) → modal. Form grande (item, entrada) → página dedicada.",
+      "editFlow": "Quando entra em modo edição, pular qualquer wizard/seletor inicial e mostrar direto o formulário preenchido."
+    },
+
+    "destructiveConfirm": {
+      "rule": "Operações irreversíveis (apagar, force-negative, executar depreciação, validar sessão de inventário) usam confirm() ou prompt() listando as consequências em bullets:\n• O que vai acontecer\n• Por que não pode ser desfeito\n• Quem mais é afetado",
+      "extremeCases": "Para 'apagar tudo', exigir digitar uma frase ('APAGAR TUDO') no prompt() para confirmar."
+    },
+
+    "tableActionsOrder": "Sempre nesta ordem: 👁 visualizar → ✏️ editar → 📎 secundárias específicas → 🗑 apagar (último, vermelho)",
+
+    "exportTrio": {
+      "description": "Padrão para listagens que suportam exportação",
+      "buttonsRight": "CSV (gray-100) + Excel (green-100) + PDF (red-100), tamanho xs",
+      "tooltip": "title='Exportar em CSV/Excel/PDF'",
+      "behavior": "Aplica os filtros atuais ao export"
+    }
+  },
+
+  "doAndDont": {
+    "do": [
+      "Usar emerald (verde-mint) como cor de marca em todos os elementos de identidade (logo, botões primários, links).",
+      "Reservar vermelho para criticidade real (rutura, erro 5xx, alerta).",
+      "Códigos sempre em font-mono cor cinza-500.",
+      "Cards com sombra suave + border hairline — nunca cards 'flutuando' sem nenhuma estrutura.",
+      "Toda tabela tem coluna de ações com pelo menos olho (visualizar)."
+    ],
+    "dont": [
+      "Não inserir referências à spec (§, RN0X, RF0X) em texto visível ao operador — só em comentários de código.",
+      "Não usar gradientes coloridos em buttons ou cards de dados.",
+      "Não usar mais de 3 cores semânticas na mesma vista (overload visual).",
+      "Não animar height ou width (reflow caro). Só opacity e transform.",
+      "Não usar emojis decorativos. Só semânticos (🟢🟡🔴⚠️) em alertas curtos.",
+      "Não criar modais aninhados (modal abre modal). Usar painel lateral ou página dedicada.",
+      "Não escrever botões com label genérico ('OK', 'Submeter'). Usar verbo específico.",
+      "Não centralizar tabelas em viewport (mantê-las edge-to-edge no canvas)."
+    ]
+  },
+
+  "applicationGuide": {
+    "currentProjectState": {
+      "stack": "Tailwind CDN + Inter (Google Fonts) + Font Awesome 6 + Vanilla JS — sem build step",
+      "sharedLayout": "public/inventory/_layout.js exporta renderInventoryLayout({ activePage, title, subtitle }) e injeta sidebar + header + #pageContent",
+      "sharedHelpers": "apiCall(), toast(), showViewModal(), makeSearchable() — já implementados",
+      "primaryColorMigration": "O projeto começou com 'blue' como cor de marca. Este design.json estabelece 'emerald' como a cor canónica. Migração progressiva: nas próximas alterações, trocar bg-blue-*/text-blue-*/border-blue-*/focus:ring-blue-* por emerald onde representam marca (logo, botões primários, sidebar active, focus rings). Manter blue como cor 'info' (badges, alertas informativos)."
+    },
+    "applyingToNewScreens": [
+      "1. Comece com <body class='bg-gray-50 font-inter'> (ou gradiente se a tela for hero/dashboard)",
+      "2. Inclua <script src='_layout.js'></script> e <script src='_searchable-select.js'></script> se usar combobox",
+      "3. Chame renderInventoryLayout({ activePage: '<id>', title: '...', subtitle: '...' }) no <script> da página",
+      "4. Coloque o conteúdo dentro de document.getElementById('pageContent').innerHTML = `...`",
+      "5. Use tokens deste arquivo (colors, spacing, components) — não inventar valores novos"
+    ],
+    "checklistBeforeCommit": [
+      "Tabela tem coluna de ações com olho (visualizar)?",
+      "Códigos (SKU, UUID) estão em font-mono gray-500?",
+      "Botão primário é emerald?",
+      "Nenhum texto visível ao operador cita § ou RN/RF?",
+      "Hover de rows clicáveis usa bg-gray-50 ou bg-emerald-50, nunca borda?",
+      "Ações destrutivas têm confirmação descrevendo consequências?"
+    ]
+  }
+}
