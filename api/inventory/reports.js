@@ -162,11 +162,34 @@ router.get('/kardex/:itemId', requirePermission('inventory', 'reports'), async (
             .order('occurred_at', { ascending: true });
         if (error) throw error;
 
+        // Localização que sofreu o efeito do movimento. Transferências
+        // têm from+to preenchidos em ambos os registros (saida e entrada
+        // compartilham origem↔destino); sem mapeamento por tipo, o
+        // fallback || cairia sempre em from_location e a entrada
+        // apareceria na localização errada.
+        const locationFor = (r) => {
+            switch (r.type) {
+                case 'entrada':
+                case 'transferencia_entrada':
+                    return r.to_location || r.from_location || '—';
+                case 'saida':
+                case 'transferencia_saida':
+                case 'depreciacao':
+                    return r.from_location || r.to_location || '—';
+                case 'ajuste':
+                case 'inventario':
+                    // fn_inv_adjust grava só um dos lados conforme sinal do delta
+                    return r.to_location || r.from_location || '—';
+                default:
+                    return r.from_location || r.to_location || '—';
+            }
+        };
+
         const rows = (data || []).map(r => ({
             occurred_at:     new Date(r.occurred_at).toLocaleString('pt-PT'),
             type:            r.type,
             subtype:         r.subtype,
-            location:        r.from_location || r.to_location || '—',
+            location:        locationFor(r),
             lot:             r.lot_number || '—',
             quantity:        parseFloat(r.quantity).toFixed(2),
             unit_cost:       r.unit_cost ? `€ ${parseFloat(r.unit_cost).toFixed(2)}` : '—',
