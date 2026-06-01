@@ -34,7 +34,12 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e
 
 ## [Unreleased]
 
-_Nenhuma alteração pendente. Próximas adições aparecem aqui antes de cortar uma versão._
+### Corrigido
+- **Entradas**: fator de conversão agora vem do cadastro do item (read-only) em vez de digitação manual — alinha com §7 da spec (conversão automática). ([entries.html](public/inventory/entries.html))
+- **Kardex**: coluna "Localização" mostra origem em saídas e destino em entradas; bug fazia transferências aparecerem com origem nos dois lados. ([reports.js:155-192](api/inventory/reports.js#L155-L192))
+
+### Alterado
+- **Módulo legado removido do dashboard**: nova migração [04-deactivate-old-inventory-module.sql](database/inventory-refactor/04-deactivate-old-inventory-module.sql) (**requer migração**) migra `role_module_access` / `user_module_access` do módulo antigo (`code='inventory'`, route `/inventory.html`) para o novo (`code='INVENTORY'`, route `/inventory/index.html`) e desativa o antigo. Dashboard passa a mostrar apenas o módulo refatorado.
 
 ---
 
