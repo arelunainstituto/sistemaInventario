@@ -35,6 +35,11 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e
 ## [Unreleased]
 
 ### Adicionado
+- **Fase 4.2 — Views e MV por localização + min efetivo em fn_inv_consume**: nova migração [51-fase4-views-by-location.sql](database/inventory-refactor/51-fase4-views-by-location.sql) (**requer migração**):
+  - 5 views novas: `vw_inv_total_stock_by_location`, `vw_inv_avg_daily_consumption_by_location`, `vw_inv_reorder_status_by_location`, `vw_inv_stock_coverage_by_location`, `vw_inv_kardex_by_location` — todas leem parâmetros via `vw_inv_item_effective_params`.
+  - `mvw_inv_consumption_trend_by_location` (16 meses, refresh diário via pg_cron `inv-refresh-mviews-daily` — comando atualizado para incluir a nova MV).
+  - `fn_inv_consume` agora lê `min_stock` efetivo da localização (override > item global > 0). Única mudança de comportamento: saídas no Cristal disparam `LOW_STOCK_CONFIRMATION_REQUIRED` baseado no mínimo do Cristal, não no mínimo global.
+  - Views agregadas existentes (`vw_inv_reorder_status`, `vw_inv_stock_coverage`, `vw_inv_kardex`, etc.) **permanecem inalteradas** para retro-compatibilidade — endpoints atuais continuam servindo agregados.
 - **Fase 4.1 — Parâmetros de stock por localização (schema)**: nova migração [50-fase4-item-location-params.sql](database/inventory-refactor/50-fase4-item-location-params.sql) (**requer migração**) cria:
   - Tabela `inv_item_location_params(item_id, location_id, min_stock, max_stock, lead_time_days, reorder_point, consumption_window_days, auto_calculated, last_calculated_at, notes, audit)` com UNIQUE parcial em (item, location) e CHECK max≥min.
   - Trigger `fn_inv_ilp_check_macro` que rejeita overrides para itens patrimoniais.
