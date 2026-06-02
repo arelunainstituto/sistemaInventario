@@ -287,4 +287,45 @@ async function handleQrCode(req, res) {
 router.get('/:id/qr',     requirePermission('inventory', 'read'), handleQrCode);
 router.get('/:id/qr.png', requirePermission('inventory', 'read'), handleQrCode);
 
+// Fase 4.4: janela de consumo efetiva para um par (item, localização).
+// Usado pelo Kardex e relatórios para popular o default do date range.
+// Resolução: location_override > category > 30. Devolve também o source.
+router.get('/:id/effective-window', requirePermission('inventory', 'read'), async (req, res) => {
+    try {
+        const { id }          = req.params;
+        const { location_id } = req.query;
+
+        if (location_id) {
+            const { data, error } = await supabaseAdmin
+                .from('vw_inv_item_effective_params')
+                .select('consumption_window_days, source_window_days')
+                .eq('item_id', id)
+                .eq('location_id', location_id)
+                .maybeSingle();
+            if (error) throw error;
+            if (data) return res.json({ success: true, data: { window_days: data.consumption_window_days, source: data.source_window_days } });
+            // Item é patrimonial ou location inativa — cai no fallback abaixo
+        }
+
+        // Sem location ou item patrimonial: lê da categoria via item
+        const { data: item, error: itemErr } = await supabaseAdmin
+            .from('inv_items')
+            .select('id, subcategory:inv_categories!subcategory_id(consumption_window_days)')
+            .eq('id', id)
+            .single();
+        if (itemErr) throw itemErr;
+        const catWindow = item?.subcategory?.consumption_window_days;
+        res.json({
+            success: true,
+            data: {
+                window_days: catWindow ?? 30,
+                source:      catWindow != null ? 'category' : 'default'
+            }
+        });
+    } catch (err) {
+        console.error('GET inv_items effective-window error:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
 module.exports = router;

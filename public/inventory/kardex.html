@@ -18,10 +18,47 @@ renderInventoryLayout({ activePage: 'reports', title: 'Ficha Kardex', subtitle: 
 
 document.getElementById('pageContent').innerHTML = `
     <div class="bg-white rounded-xl border border-gray-200/70 shadow-sm p-6 mb-4">
-        <label class="text-xs text-gray-500">Selecione o item</label>
-        <select id="itemSelect" class="w-full md:w-1/2 px-3 py-2 border border-gray-300 rounded-lg text-sm">
-            <option value="">— selecione —</option>
-        </select>
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
+            <div class="md:col-span-2">
+                <label class="text-[10px] uppercase tracking-wider text-gray-500 font-semibold">Item</label>
+                <select id="itemSelect" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm mt-1">
+                    <option value="">— selecione —</option>
+                </select>
+            </div>
+            <div>
+                <label class="text-[10px] uppercase tracking-wider text-gray-500 font-semibold">Localização</label>
+                <select id="locationFilter" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm mt-1">
+                    <option value="">Todas (saldo global)</option>
+                </select>
+            </div>
+            <div>
+                <label class="text-[10px] uppercase tracking-wider text-gray-500 font-semibold">Janela</label>
+                <select id="windowPreset" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm mt-1">
+                    <option value="">Padrão da categoria</option>
+                    <option value="7">Últimos 7 dias</option>
+                    <option value="30">Últimos 30 dias</option>
+                    <option value="60">Últimos 60 dias</option>
+                    <option value="90">Últimos 90 dias</option>
+                    <option value="180">Últimos 180 dias</option>
+                    <option value="365">Últimos 365 dias</option>
+                    <option value="custom">Personalizado…</option>
+                </select>
+            </div>
+        </div>
+        <div id="customDateRange" class="hidden grid grid-cols-1 md:grid-cols-4 gap-3 mt-3">
+            <div>
+                <label class="text-[10px] uppercase tracking-wider text-gray-500 font-semibold">De</label>
+                <input type="date" id="dateFrom" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm mt-1">
+            </div>
+            <div>
+                <label class="text-[10px] uppercase tracking-wider text-gray-500 font-semibold">Até</label>
+                <input type="date" id="dateTo" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm mt-1">
+            </div>
+            <div class="md:col-span-2 flex items-end">
+                <button id="applyCustom" class="px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-lg text-sm font-medium">Aplicar</button>
+            </div>
+        </div>
+        <p id="windowHint" class="text-[11px] text-gray-400 mt-3"></p>
     </div>
 
     <div id="kardexPanel" class="bg-white rounded-xl border border-gray-200/70 shadow-sm p-6 hidden">
@@ -40,41 +77,122 @@ document.getElementById('pageContent').innerHTML = `
     </div>
 `;
 
-let currentItemId = null;
+let currentItemId  = null;
+let currentLocationId = '';
+let currentDateFrom   = null;
+let currentDateTo     = null;
 
 async function bootstrap() {
     try {
-        const r = await apiCall('/api/inventory/items?limit=1000');
+        const [items, locs] = await Promise.all([
+            apiCall('/api/inventory/items?limit=1000'),
+            apiCall('/api/inventory/locations')
+        ]);
         document.getElementById('itemSelect').innerHTML = '<option value="">— selecione —</option>' +
-            r.data.map(i => `<option value="${i.id}">${escapeHtml(i.internal_code)} · ${escapeHtml(i.name)}</option>`).join('');
-        makeSearchable('itemSelect', { placeholder: 'Buscar item por nome ou SKU…' });
+            items.data.map(i => `<option value="${i.id}">${escapeHtml(i.internal_code)} · ${escapeHtml(i.name)}</option>`).join('');
+        document.getElementById('locationFilter').innerHTML = '<option value="">Todas (saldo global)</option>' +
+            (locs.data || []).filter(l => l.is_active)
+                .map(l => `<option value="${l.id}">${escapeHtml(l.unit?.name || '')} · ${escapeHtml(l.name)}</option>`).join('');
+        makeSearchable('itemSelect',     { placeholder: 'Buscar item por nome ou SKU…' });
+        makeSearchable('locationFilter', { placeholder: 'Buscar localização…' });
+
+        // Aceita ?item=<uuid> e ?location_id=<uuid> na URL (deep-link)
+        const params = new URLSearchParams(location.search);
+        const initialItem = params.get('item');
+        const initialLoc  = params.get('location_id');
+        if (initialItem) document.getElementById('itemSelect').value = initialItem;
+        if (initialLoc)  document.getElementById('locationFilter').value = initialLoc;
+        if (initialItem) {
+            currentItemId     = initialItem;
+            currentLocationId = initialLoc || '';
+            await loadKardex();
+        }
     } catch (err) { toast(err.message, 'error'); }
 }
 
-document.addEventListener('DOMContentLoaded', () => {
+function setupListeners() {
     document.getElementById('itemSelect').addEventListener('change', async e => {
         currentItemId = e.target.value;
         if (!currentItemId) { document.getElementById('kardexPanel').classList.add('hidden'); return; }
         await loadKardex();
     });
-});
-// fallback se DOMContentLoaded já tiver disparado
-document.getElementById('itemSelect').addEventListener('change', async e => {
-    currentItemId = e.target.value;
-    if (!currentItemId) { document.getElementById('kardexPanel').classList.add('hidden'); return; }
-    await loadKardex();
-});
+    document.getElementById('locationFilter').addEventListener('change', async e => {
+        currentLocationId = e.target.value;
+        if (currentItemId) await loadKardex();
+    });
+    document.getElementById('windowPreset').addEventListener('change', async e => {
+        const v = e.target.value;
+        const customRange = document.getElementById('customDateRange');
+        if (v === 'custom') {
+            customRange.classList.remove('hidden');
+            customRange.classList.add('grid');
+            return;
+        }
+        customRange.classList.add('hidden');
+        customRange.classList.remove('grid');
+        if (!v) {
+            // Default: usar janela efetiva via endpoint
+            currentDateFrom = null;
+            currentDateTo   = null;
+            if (currentItemId) {
+                const wRes = await apiCall(`/api/inventory/items/${currentItemId}/effective-window${currentLocationId ? '?location_id=' + currentLocationId : ''}`);
+                const days = wRes.data?.window_days || 30;
+                const to   = new Date();
+                const from = new Date(Date.now() - days * 86400000);
+                currentDateFrom = from.toISOString().slice(0, 10);
+                currentDateTo   = to.toISOString().slice(0, 10);
+                document.getElementById('windowHint').textContent =
+                    `Janela: últimos ${days} dias (${wRes.data?.source === 'location' ? 'override da localização' : wRes.data?.source === 'category' ? 'padrão da categoria' : 'default sistema'})`;
+            } else {
+                document.getElementById('windowHint').textContent = '';
+            }
+        } else {
+            const days = parseInt(v);
+            const to   = new Date();
+            const from = new Date(Date.now() - days * 86400000);
+            currentDateFrom = from.toISOString().slice(0, 10);
+            currentDateTo   = to.toISOString().slice(0, 10);
+            document.getElementById('windowHint').textContent = `Janela: últimos ${days} dias`;
+        }
+        if (currentItemId) await loadKardex();
+    });
+    document.getElementById('applyCustom').addEventListener('click', async () => {
+        currentDateFrom = document.getElementById('dateFrom').value || null;
+        currentDateTo   = document.getElementById('dateTo').value   || null;
+        if (!currentDateFrom && !currentDateTo) return toast('Defina ao menos uma data', 'warn');
+        document.getElementById('windowHint').textContent = `Janela personalizada: ${currentDateFrom || '—'} → ${currentDateTo || 'hoje'}`;
+        if (currentItemId) await loadKardex();
+    });
+}
+document.addEventListener('DOMContentLoaded', setupListeners);
+setupListeners(); // fallback se DOMContentLoaded já disparou
+
+function buildKardexQuery(format) {
+    const qs = new URLSearchParams();
+    if (currentLocationId) qs.set('location_id', currentLocationId);
+    if (currentDateFrom)   qs.set('from',        currentDateFrom);
+    if (currentDateTo)     qs.set('to',          currentDateTo);
+    if (format)            qs.set('format',      format);
+    const s = qs.toString();
+    return s ? `?${s}` : '';
+}
 
 async function loadKardex() {
     document.getElementById('kardexPanel').classList.remove('hidden');
     document.getElementById('kardexTable').innerHTML = '<p class="text-sm text-gray-400 p-4">Carregando…</p>';
     try {
-        const res = await apiCall(`/api/inventory/reports/kardex/${currentItemId}`);
+        const res = await apiCall(`/api/inventory/reports/kardex/${currentItemId}${buildKardexQuery()}`);
         const rows = res.data || [];
         const cols = res.columns || [];
         const itemOpt = document.getElementById('itemSelect').selectedOptions[0];
+        const locOpt  = document.getElementById('locationFilter').selectedOptions[0];
         document.getElementById('itemTitle').textContent = itemOpt.textContent;
-        document.getElementById('itemInfo').textContent = `${rows.length} movimentos`;
+        const subtitle = [
+            `${rows.length} movimentos`,
+            currentLocationId ? `em ${locOpt.textContent}` : 'todas as localizações',
+            (currentDateFrom || currentDateTo) ? `${currentDateFrom || '—'} → ${currentDateTo || 'hoje'}` : null
+        ].filter(Boolean).join(' · ');
+        document.getElementById('itemInfo').textContent = subtitle;
 
         if (!rows.length) {
             document.getElementById('kardexTable').innerHTML = '<p class="text-sm text-gray-400 p-6 text-center">Nenhum movimento registado.</p>';
@@ -83,10 +201,16 @@ async function loadKardex() {
         document.getElementById('kardexTable').innerHTML = `
             <table class="w-full text-xs">
                 <thead class="bg-gray-50/50 text-[10px] uppercase tracking-wider text-gray-500 sticky top-0 border-b border-gray-200">
-                    <tr>${cols.map(c => `<th class="text-left p-2">${escapeHtml(c.label || c.key)}</th>`).join('')}</tr>
+                    <tr>
+                        <th class="text-left p-2 w-10">#</th>
+                        ${cols.map(c => `<th class="text-left p-2">${escapeHtml(c.label || c.key)}</th>`).join('')}
+                    </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-50">
-                    ${rows.map(r => `<tr class="hover:bg-sky-50/30 transition">${cols.map(c => `<td class="p-2">${escapeHtml(String(r[c.key] ?? '—'))}</td>`).join('')}</tr>`).join('')}
+                    ${rows.map((r, idx) => `<tr class="hover:bg-sky-50/30 transition">
+                        <td class="p-2 text-gray-400 tabular-nums font-mono text-[11px]">${idx + 1}</td>
+                        ${cols.map(c => `<td class="p-2">${escapeHtml(String(r[c.key] ?? '—'))}</td>`).join('')}
+                    </tr>`).join('')}
                 </tbody>
             </table>`;
     } catch (err) {
@@ -98,7 +222,7 @@ async function downloadCurrent(format) {
     if (!currentItemId) return;
     const token = localStorage.getItem('access_token');
     try {
-        const res = await fetch(`/api/inventory/reports/kardex/${currentItemId}?format=${format}`, {
+        const res = await fetch(`/api/inventory/reports/kardex/${currentItemId}${buildKardexQuery(format)}`, {
             headers: { Authorization: 'Bearer ' + token }
         });
         if (!res.ok) throw new Error('Erro ao gerar arquivo');

@@ -80,16 +80,26 @@ router.get('/summary', requirePermission('inventory', 'read'), async (req, res) 
                 .sort((a, b) => b.below_min - a.below_min || a.location_name.localeCompare(b.location_name));
         }
 
-        // 3. Valor total (sempre global por enquanto — fase futura adiciona filtro)
-        const { data: valuation } = await supabaseAdmin
-            .from('vw_inv_valuation')
-            .select('line_value, location_name');
-        const filteredVal = location_id
-            // Sem location_id na view de valuation, filtramos por nome via breakdown.
-            // É melhor que nada; uma migração futura adiciona location_id na view.
-            ? (valuation || []).filter(v => byLocationBreakdown === null ? true : true)
-            : (valuation || []);
-        const totalValue = filteredVal.reduce((acc, r) => acc + parseFloat(r.line_value || 0), 0);
+        // 3. Valor total. Quando filtrado, soma direto de inv_stock × cmp do item
+        // (vw_inv_valuation não expõe location_id; uma migração futura pode
+        // adicioná-la para evitar este join no servidor).
+        let totalValue;
+        if (location_id) {
+            const { data: stockRows } = await supabaseAdmin
+                .from('inv_stock')
+                .select('quantity, item:inv_items!item_id(cmp)')
+                .eq('location_id', location_id)
+                .gt('quantity', 0);
+            totalValue = (stockRows || []).reduce(
+                (acc, r) => acc + (parseFloat(r.quantity) * parseFloat(r.item?.cmp || 0)),
+                0
+            );
+        } else {
+            const { data: valuation } = await supabaseAdmin
+                .from('vw_inv_valuation')
+                .select('line_value');
+            totalValue = (valuation || []).reduce((acc, r) => acc + parseFloat(r.line_value || 0), 0);
+        }
 
         // 4. Cobertura média (em dias)
         let coverage;
@@ -109,14 +119,37 @@ router.get('/summary', requirePermission('inventory', 'read'), async (req, res) 
         }
         const avgCoverage = coverage.length ? coverage.reduce((a, b) => a + b, 0) / coverage.length : null;
 
-        // 5. Lotes vencendo nos próximos 30 dias (sempre global — lote pertence ao item)
-        const { data: expiring } = await supabaseAdmin
-            .from('inv_lots')
-            .select('id, item_id, lot_number, expiry_date, item:inv_items!item_id(internal_code, name)')
-            .gte('expiry_date', new Date().toISOString().slice(0, 10))
-            .lte('expiry_date', new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10))
-            .order('expiry_date', { ascending: true })
-            .limit(20);
+        // 5. Lotes vencendo nos próximos 30 dias. Quando filtrado, restringe
+        // aos lotes que têm stock > 0 na localização escolhida (um lote pode
+        // estar zerado lá mas continuar existindo em outra localização).
+        let expiring;
+        const today        = new Date().toISOString().slice(0, 10);
+        const in30Days     = new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10);
+        if (location_id) {
+            const { data: stockedLots } = await supabaseAdmin
+                .from('inv_stock')
+                .select(`
+                    lot_id,
+                    lot:inv_lots!lot_id(id, item_id, lot_number, expiry_date, item:inv_items!item_id(internal_code, name))
+                `)
+                .eq('location_id', location_id)
+                .gt('quantity', 0)
+                .not('lot_id', 'is', null);
+            expiring = (stockedLots || [])
+                .map(s => s.lot)
+                .filter(l => l && l.expiry_date >= today && l.expiry_date <= in30Days)
+                .sort((a, b) => a.expiry_date.localeCompare(b.expiry_date))
+                .slice(0, 20);
+        } else {
+            const { data } = await supabaseAdmin
+                .from('inv_lots')
+                .select('id, item_id, lot_number, expiry_date, item:inv_items!item_id(internal_code, name)')
+                .gte('expiry_date', today)
+                .lte('expiry_date', in30Days)
+                .order('expiry_date', { ascending: true })
+                .limit(20);
+            expiring = data || [];
+        }
 
         res.json({
             success: true,
@@ -126,9 +159,9 @@ router.get('/summary', requirePermission('inventory', 'read'), async (req, res) 
                 below_min:      belowMin.length,
                 total_value:    Math.round(totalValue * 100) / 100,
                 avg_coverage:   avgCoverage !== null ? Math.round(avgCoverage * 10) / 10 : null,
-                expiring_count: (expiring || []).length,
+                expiring_count: expiring.length,
                 critical_items: criticalItems,
-                expiring_lots:  expiring || [],
+                expiring_lots:  expiring,
                 ...(byLocationBreakdown ? { by_location: byLocationBreakdown } : {}),
                 ...(location_id ? { filtered_by: { location_id } } : {})
             }

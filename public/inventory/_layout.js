@@ -294,8 +294,9 @@ function renderAlertsContent() {
     const el = document.getElementById('alertsContent');
     if (!el || !alertsCache) return;
 
-    const critical = alertsCache.critical_items || [];
-    const expiring = alertsCache.expiring_lots  || [];
+    const critical    = alertsCache.critical_items || [];
+    const expiring    = alertsCache.expiring_lots  || [];
+    const byLocation  = alertsCache.by_location     || [];
 
     let html = '';
 
@@ -308,12 +309,27 @@ function renderAlertsContent() {
             <p class="text-xs text-gray-500 mt-1">Sem alertas no momento.</p>
         </div>`;
     } else {
+        // Resumo por localização (F4.4) — quando o backend fornece breakdown
+        const withAlerts = byLocation.filter(g => g.below_min > 0);
+        if (withAlerts.length > 0) {
+            html += `<div class="mb-3 pb-3 border-b border-gray-100">
+                <p class="text-[10px] uppercase font-bold text-gray-500 tracking-wider mb-2">Por localização</p>
+                <div class="flex flex-col gap-1.5">
+                    ${withAlerts.map(g => `
+                        <a href="/inventory/index.html" class="flex justify-between items-center text-xs px-2 py-1.5 rounded border border-amber-100 bg-amber-50/50 hover:bg-amber-50 transition">
+                            <span class="text-gray-700 truncate">${escapeAlerts(g.unit_name || '')} · ${escapeAlerts(g.location_name)}</span>
+                            <span class="ml-2 font-bold text-amber-700 flex-shrink-0">${g.below_min}</span>
+                        </a>
+                    `).join('')}
+                </div>
+            </div>`;
+        }
         if (critical.length > 0) {
             html += `<div class="mb-3">
                 <p class="text-[10px] uppercase font-bold text-red-600 tracking-wider mb-2 flex items-center gap-1.5"><span class="w-1.5 h-1.5 rounded-full bg-red-500"></span> Stock abaixo do mínimo</p>
                 ${critical.slice(0, 5).map(i => `
                     <div class="flex justify-between py-1.5 border-b border-gray-50 last:border-0 text-xs">
-                        <span class="text-gray-800 truncate"><span class="font-mono text-gray-400">${escapeAlerts(i.internal_code)}</span> ${escapeAlerts(i.name)}</span>
+                        <span class="text-gray-800 truncate"><span class="font-mono text-gray-400">${escapeAlerts(i.internal_code)}</span> ${escapeAlerts(i.name)}${i.location_name ? ' <span class="text-gray-400">· ' + escapeAlerts(i.location_name) + '</span>' : ''}</span>
                         <span class="${i.stock === 0 ? 'text-red-600 font-bold' : 'text-amber-600'} ml-2 flex-shrink-0 tabular-nums">${parseFloat(i.stock).toFixed(0)} / ${parseFloat(i.min_stock).toFixed(0)}</span>
                     </div>`).join('')}
                 ${critical.length > 5 ? `<a href="/inventory/reports.html" class="text-xs text-sky-600 hover:text-sky-700 hover:underline mt-2 inline-flex items-center gap-1">+ ${critical.length - 5} mais <i class="fas fa-arrow-right text-[10px]"></i></a>` : ''}

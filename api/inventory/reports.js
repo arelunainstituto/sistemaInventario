@@ -15,6 +15,66 @@ async function fetchView(viewName, filters = {}) {
     return data || [];
 }
 
+// Calcula avisos por localização quando o relatório está em visão global.
+// Um item pode estar OK no agregado mas em rutura/abaixo do mínimo em uma
+// localização específica (override). Esse helper retorna o breakdown para
+// o frontend exibir um banner "Atenção: X localizações com itens críticos".
+async function computeLocationWarnings(criticalStatuses) {
+    const { data, error } = await supabaseAdmin
+        .from('vw_inv_reorder_status_by_location')
+        .select('location_id, location_name, unit_name, status');
+    if (error) return [];
+    const groups = new Map();
+    for (const r of (data || [])) {
+        if (!criticalStatuses.includes(r.status)) continue;
+        const key = r.location_id;
+        if (!groups.has(key)) {
+            groups.set(key, {
+                location_id:   r.location_id,
+                location_name: r.location_name,
+                unit_name:     r.unit_name,
+                critical_count: 0
+            });
+        }
+        groups.get(key).critical_count += 1;
+    }
+    return Array.from(groups.values())
+        .sort((a, b) => b.critical_count - a.critical_count);
+}
+
+// Soma colunas numéricas das linhas. Aceita strings com prefixo monetário
+// (ex: "€ 12.34") e numéricos puros. Retorna { key: number }.
+function sumColumns(rows, keys) {
+    const out = {};
+    for (const k of keys) {
+        out[k] = rows.reduce((acc, r) => {
+            const raw = r[k];
+            if (raw === null || raw === undefined) return acc;
+            const cleaned = String(raw).replace(/[^\d.,-]/g, '').replace(',', '.');
+            const n = parseFloat(cleaned);
+            return isNaN(n) ? acc : acc + n;
+        }, 0);
+    }
+    return out;
+}
+
+// Formata os totals como strings prontas para exibição, mantendo o estilo
+// usado nas linhas (€ prefix, fixed decimals, etc.).
+function formatTotals(totals, formats) {
+    const out = {};
+    for (const [k, v] of Object.entries(totals)) {
+        const f = formats[k];
+        if (!f)              { out[k] = String(v); continue; }
+        if (f === 'int')     { out[k] = Math.round(v).toString(); continue; }
+        if (f === 'num2')    { out[k] = v.toFixed(2); continue; }
+        if (f === 'num4')    { out[k] = v.toFixed(4); continue; }
+        if (f === 'eur2')    { out[k] = `€ ${v.toFixed(2)}`; continue; }
+        if (typeof f === 'function') { out[k] = f(v); continue; }
+        out[k] = String(v);
+    }
+    return out;
+}
+
 // Normaliza linhas da view *_by_location para o mesmo formato das views
 // agregadas — assim o frontend não precisa diferenciar.
 function normalizeByLocationRow(r) {
@@ -35,15 +95,25 @@ function normalizeByLocationRow(r) {
 router.get('/reorder', requirePermission('inventory', 'reports'), async (req, res) => {
     try {
         const { location_id } = req.query;
+        const critical = ['rutura','abaixo_minimo','abaixo_reposicao'];
         let rows;
+        let location_warnings = null;
         if (location_id) {
             rows = (await fetchView('vw_inv_reorder_status_by_location', { location_id }))
-                .filter(r => ['rutura','abaixo_minimo','abaixo_reposicao'].includes(r.status))
+                .filter(r => critical.includes(r.status))
                 .map(normalizeByLocationRow);
         } else {
             rows = (await fetchView('vw_inv_reorder_status'))
-                .filter(r => ['rutura','abaixo_minimo','abaixo_reposicao'].includes(r.status));
+                .filter(r => critical.includes(r.status));
+            // Visão global pode mascarar problemas locais: um item OK no agregado
+            // pode estar abaixo do mínimo em uma localização específica.
+            location_warnings = await computeLocationWarnings(critical);
         }
+        const totalKeys = ['current_stock','avg_daily_consumption','computed_reorder_point','min_stock'];
+        const totals = formatTotals(sumColumns(rows, totalKeys), {
+            current_stock: 'num2', avg_daily_consumption: 'num4',
+            computed_reorder_point: 'num2', min_stock: 'num2'
+        });
         sendReport(res, req.query.format, {
             title: 'Relatório de Ponto de Reposição',
             subtitle: location_id ? `Filtrado por localização` : 'Itens abaixo do mínimo ou do ponto de reposição',
@@ -58,7 +128,9 @@ router.get('/reorder', requirePermission('inventory', 'reports'), async (req, re
                 { key: 'min_stock',               label: 'Min',            width: 50 },
                 { key: 'status',                  label: 'Estado',         width: 65 }
             ],
-            rows
+            rows,
+            totals,
+            extras: location_warnings ? { location_warnings } : {}
         });
     } catch (err) { console.error('GET /reports/reorder', err); res.status(500).json({ error: err.message }); }
 });
@@ -67,11 +139,17 @@ router.get('/reorder', requirePermission('inventory', 'reports'), async (req, re
 router.get('/stock-min-max', requirePermission('inventory', 'reports'), async (req, res) => {
     try {
         const { location_id } = req.query;
+        const critical = ['rutura','abaixo_minimo','acima_maximo'];
         const view = location_id ? 'vw_inv_reorder_status_by_location' : 'vw_inv_reorder_status';
         const filters = location_id ? { location_id } : {};
         let rows = (await fetchView(view, filters))
-            .filter(r => ['rutura','abaixo_minimo','acima_maximo'].includes(r.status));
+            .filter(r => critical.includes(r.status));
         if (location_id) rows = rows.map(normalizeByLocationRow);
+        const location_warnings = location_id ? null : await computeLocationWarnings(critical);
+        const totals = formatTotals(
+            sumColumns(rows, ['current_stock','min_stock','max_stock']),
+            { current_stock: 'num2', min_stock: 'num2', max_stock: 'num2' }
+        );
         sendReport(res, req.query.format, {
             title: 'Itens abaixo do mínimo ou acima do máximo',
             subtitle: location_id ? 'Filtrado por localização' : 'Identifica ruturas e excessos',
@@ -84,7 +162,9 @@ router.get('/stock-min-max', requirePermission('inventory', 'reports'), async (r
                 { key: 'max_stock',     label: 'Max',         width: 50 },
                 { key: 'status',        label: 'Estado',      width: 80 }
             ],
-            rows
+            rows,
+            totals,
+            extras: location_warnings ? { location_warnings } : {}
         });
     } catch (err) { console.error('GET /reports/stock-min-max', err); res.status(500).json({ error: err.message }); }
 });
@@ -101,6 +181,14 @@ router.get('/coverage', requirePermission('inventory', 'reports'), async (req, r
             rows = await fetchView('vw_inv_stock_coverage');
         }
         rows = rows.sort((a, b) => (a.days_coverage ?? 99999) - (b.days_coverage ?? 99999));
+        // Para cobertura, "total" não faz sentido — usar média (apenas itens com avg > 0)
+        const sums = sumColumns(rows, ['current_stock','avg_daily_consumption']);
+        const coverageVals = rows.map(r => parseFloat(r.days_coverage)).filter(v => !isNaN(v));
+        const avgCoverage = coverageVals.length
+            ? coverageVals.reduce((a, b) => a + b, 0) / coverageVals.length
+            : null;
+        const totals = formatTotals(sums, { current_stock: 'num2', avg_daily_consumption: 'num4' });
+        if (avgCoverage !== null) totals.days_coverage = `~${avgCoverage.toFixed(1)} (média)`;
         sendReport(res, req.query.format, {
             title: 'Cobertura de Stock (dias)',
             subtitle: location_id ? 'Filtrado por localização' : 'Ordenado do menor para o maior',
@@ -112,7 +200,8 @@ router.get('/coverage', requirePermission('inventory', 'reports'), async (req, r
                 { key: 'avg_daily_consumption', label: 'Consumo médio',    width: 80 },
                 { key: 'days_coverage',         label: 'Cobertura (dias)', width: 80 }
             ],
-            rows
+            rows,
+            totals
         });
     } catch (err) { console.error('GET /reports/coverage', err); res.status(500).json({ error: err.message }); }
 });
@@ -121,10 +210,13 @@ router.get('/coverage', requirePermission('inventory', 'reports'), async (req, r
 router.get('/valuation', requirePermission('inventory', 'financial'), async (req, res) => {
     try {
         const rows = await fetchView('vw_inv_valuation');
-        const totalValue = rows.reduce((acc, r) => acc + parseFloat(r.line_value || 0), 0);
+        const totals = formatTotals(
+            sumColumns(rows, ['quantity','line_value']),
+            { quantity: 'num2', line_value: 'eur2' }
+        );
         sendReport(res, req.query.format, {
             title: 'Valorização de Stock',
-            subtitle: `Total: € ${totalValue.toFixed(2)}`,
+            subtitle: `Total: ${totals.line_value || '€ 0.00'}`,
             columns: [
                 { key: 'internal_code',  label: 'Código',         width: 60 },
                 { key: 'name',           label: 'Item',           width: 180 },
@@ -135,7 +227,8 @@ router.get('/valuation', requirePermission('inventory', 'financial'), async (req
                 { key: 'cmp',            label: 'CMP €',          width: 50 },
                 { key: 'line_value',     label: 'Total €',        width: 70 }
             ],
-            rows
+            rows,
+            totals
         });
     } catch (err) { console.error('GET /reports/valuation', err); res.status(500).json({ error: err.message }); }
 });
@@ -170,6 +263,10 @@ router.get('/inventory-sessions', requirePermission('inventory', 'reports'), asy
             }
         }
 
+        const totals = formatTotals(
+            sumColumns(rows, ['expected_qty','counted_qty','difference']),
+            { expected_qty: 'num2', counted_qty: 'num2', difference: 'num2' }
+        );
         sendReport(res, req.query.format, {
             title: 'Relatório de Inventário (Contagem)',
             subtitle: 'Diferenças apuradas em sessões de contagem',
@@ -184,7 +281,8 @@ router.get('/inventory-sessions', requirePermission('inventory', 'reports'), asy
                 { key: 'counted_qty',  label: 'Contado',      width: 50 },
                 { key: 'difference',   label: 'Δ',            width: 35 }
             ],
-            rows
+            rows,
+            totals
         });
     } catch (err) { console.error('GET /reports/inventory-sessions', err); res.status(500).json({ error: err.message }); }
 });
@@ -276,6 +374,7 @@ router.get('/consumption-trend', requirePermission('inventory', 'reports'), asyn
             qty:           parseFloat(r.total_qty ?? r.qty ?? 0).toFixed(2)
         }));
 
+        const totals = formatTotals(sumColumns(rows, ['qty']), { qty: 'num2' });
         sendReport(res, req.query.format, {
             title: 'Tendência de Consumo Mensal',
             subtitle: location_id ? 'Últimos 16 meses por localização' : 'Últimos 16 meses (4 correntes + 12 base para comparativo anual)',
@@ -286,7 +385,8 @@ router.get('/consumption-trend', requirePermission('inventory', 'reports'), asyn
                 { key: 'month',         label: 'Mês',    width: 80 },
                 { key: 'qty',           label: 'Consumo', width: 70 }
             ],
-            rows
+            rows,
+            totals
         });
     } catch (err) { console.error('GET /reports/consumption-trend', err); res.status(500).json({ error: err.message }); }
 });
@@ -310,6 +410,10 @@ router.get('/user-activity', requirePermission('inventory', 'reports'), async (r
             total_value:     `€ ${parseFloat(r.total_value || 0).toFixed(2)}`
         }));
 
+        const totals = formatTotals(
+            sumColumns(rows, ['movement_count','total_qty','total_value']),
+            { movement_count: 'int', total_qty: 'num2', total_value: 'eur2' }
+        );
         sendReport(res, req.query.format, {
             title: 'Movimentos por Utilizador',
             subtitle: 'Últimos 12 meses (atualizado diariamente)',
@@ -322,7 +426,8 @@ router.get('/user-activity', requirePermission('inventory', 'reports'), async (r
                 { key: 'total_qty',      label: 'Qtd total',   width: 70 },
                 { key: 'total_value',    label: 'Valor total', width: 80 }
             ],
-            rows
+            rows,
+            totals
         });
     } catch (err) { console.error('GET /reports/user-activity', err); res.status(500).json({ error: err.message }); }
 });

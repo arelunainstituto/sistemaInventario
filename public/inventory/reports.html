@@ -16,13 +16,13 @@
 renderInventoryLayout({ activePage: 'reports', title: 'Relatórios', subtitle: 'Indicadores e exportações' });
 
 const REPORTS = [
-    { key: 'reorder',            label: 'Ponto de Reposição',                  icon: 'fa-rotate',                color: 'red',     hint: 'Itens abaixo do ponto de reposição',      endpoint: '/reports/reorder' },
-    { key: 'stock-min-max',      label: 'Abaixo do Mínimo / Acima do Máximo',  icon: 'fa-triangle-exclamation',  color: 'orange',  hint: 'Identifica ruturas e excessos',           endpoint: '/reports/stock-min-max' },
-    { key: 'coverage',           label: 'Cobertura de Stock',                  icon: 'fa-clock',                 color: 'blue',    hint: 'Dias de cobertura por item',              endpoint: '/reports/coverage' },
-    { key: 'valuation',          label: 'Valorização de Stock',                icon: 'fa-euro-sign',             color: 'purple',  hint: 'Stock × CMP por item, categoria e local', endpoint: '/reports/valuation' },
-    { key: 'inventory-sessions', label: 'Inventário (Contagem)',               icon: 'fa-list-check',            color: 'indigo',  hint: 'Diferenças apuradas em sessões',          endpoint: '/reports/inventory-sessions' },
-    { key: 'consumption-trend',  label: 'Tendência de Consumo',                icon: 'fa-chart-line',            color: 'sky',   hint: 'Mensal com comparativo anual',            endpoint: '/reports/consumption-trend' },
-    { key: 'user-activity',      label: 'Movimentos por Utilizador',           icon: 'fa-user-clock',            color: 'gray',    hint: 'Auditoria de operações por utilizador',   endpoint: '/reports/user-activity' }
+    { key: 'reorder',            label: 'Ponto de Reposição',                  icon: 'fa-rotate',                color: 'red',     hint: 'Itens abaixo do ponto de reposição',      endpoint: '/reports/reorder',           supportsLocation: true  },
+    { key: 'stock-min-max',      label: 'Abaixo do Mínimo / Acima do Máximo',  icon: 'fa-triangle-exclamation',  color: 'orange',  hint: 'Identifica ruturas e excessos',           endpoint: '/reports/stock-min-max',     supportsLocation: true  },
+    { key: 'coverage',           label: 'Cobertura de Stock',                  icon: 'fa-clock',                 color: 'blue',    hint: 'Dias de cobertura por item',              endpoint: '/reports/coverage',          supportsLocation: true  },
+    { key: 'valuation',          label: 'Valorização de Stock',                icon: 'fa-euro-sign',             color: 'purple',  hint: 'Stock × CMP por item, categoria e local', endpoint: '/reports/valuation',         supportsLocation: false },
+    { key: 'inventory-sessions', label: 'Inventário (Contagem)',               icon: 'fa-list-check',            color: 'indigo',  hint: 'Diferenças apuradas em sessões',          endpoint: '/reports/inventory-sessions', supportsLocation: false },
+    { key: 'consumption-trend',  label: 'Tendência de Consumo',                icon: 'fa-chart-line',            color: 'sky',     hint: 'Mensal com comparativo anual',            endpoint: '/reports/consumption-trend', supportsLocation: true  },
+    { key: 'user-activity',      label: 'Movimentos por Utilizador',           icon: 'fa-user-clock',            color: 'gray',    hint: 'Auditoria de operações por utilizador',   endpoint: '/reports/user-activity',     supportsLocation: false }
 ];
 
 document.getElementById('pageContent').innerHTML = `
@@ -66,52 +66,162 @@ document.getElementById('pageContent').innerHTML = `
                 <button onclick="downloadCurrent('pdf')" class="px-2.5 py-1.5 bg-red-50 hover:bg-red-100 text-red-700 border border-red-100 rounded-lg text-xs font-medium transition"><i class="fas fa-file-pdf"></i> PDF</button>
             </div>
         </div>
+        <div id="reportFilters" class="hidden px-5 py-3 border-b border-gray-100 bg-gray-50/40 flex flex-wrap items-end gap-3">
+            <div class="flex-1 min-w-[200px]">
+                <label class="text-[10px] uppercase tracking-wider text-gray-500 font-semibold">Localização</label>
+                <select id="filterLocation" class="w-full px-3 py-1.5 border border-gray-300 rounded-lg text-sm mt-1">
+                    <option value="">Todas (visão global)</option>
+                </select>
+            </div>
+            <div>
+                <button id="applyFilters" class="px-4 py-1.5 bg-sky-600 hover:bg-sky-700 text-white rounded-lg text-sm font-medium">Aplicar</button>
+            </div>
+        </div>
         <div id="reportTable" class="overflow-x-auto max-h-[600px] overflow-y-auto"></div>
     </div>
 `;
 
-let currentReport = null;
+let currentReport   = null;
+let currentLocation = '';
+let locationsCache  = null;
+
+async function loadLocations() {
+    if (locationsCache) return locationsCache;
+    const r = await apiCall('/api/inventory/locations');
+    locationsCache = (r.data || []).filter(l => l.is_active);
+    return locationsCache;
+}
+
+function buildQuery(includeFormat) {
+    const qs = new URLSearchParams();
+    if (currentLocation) qs.set('location_id', currentLocation);
+    if (includeFormat)   qs.set('format', includeFormat);
+    return qs.toString() ? `?${qs.toString()}` : '';
+}
 
 async function openReport(key) {
     const r = REPORTS.find(x => x.key === key);
     if (!r) return;
-    currentReport = r;
+    currentReport   = r;
+    currentLocation = ''; // reset ao trocar de relatório
     document.getElementById('reportPanel').classList.remove('hidden');
     document.getElementById('reportTitle').textContent = r.label;
     document.getElementById('reportSubtitle').textContent = r.hint;
     document.getElementById('reportTable').innerHTML = '<p class="text-sm text-gray-400 p-4">Carregando…</p>';
+
+    // Mostra/esconde a barra de filtros conforme o relatório
+    const filtersBar = document.getElementById('reportFilters');
+    if (r.supportsLocation) {
+        filtersBar.classList.remove('hidden');
+        filtersBar.classList.add('flex');
+        const locs = await loadLocations();
+        document.getElementById('filterLocation').innerHTML = '<option value="">Todas (visão global)</option>' +
+            locs.map(l => `<option value="${l.id}">${escapeHtml(l.unit?.name || '')} · ${escapeHtml(l.name)}</option>`).join('');
+        document.getElementById('filterLocation').value = '';
+    } else {
+        filtersBar.classList.add('hidden');
+        filtersBar.classList.remove('flex');
+    }
+
+    await fetchReportData();
+}
+
+async function fetchReportData() {
+    const r = currentReport;
+    if (!r) return;
+    document.getElementById('reportTable').innerHTML = '<p class="text-sm text-gray-400 p-4">Carregando…</p>';
     try {
-        const res = await apiCall(`/api/inventory${r.endpoint}`);
+        const res = await apiCall(`/api/inventory${r.endpoint}${buildQuery()}`);
         const rows = res.data || [];
         const columns = res.columns || [];
-        if (!rows.length) {
+        const warnings = res.location_warnings || [];
+        // Banner de avisos por localização — quando o relatório está em visão
+        // global mas existem localizações com itens críticos que ficam mascarados
+        // pelo total agregado.
+        const warningsHtml = warnings.length > 0 ? `
+            <div class="mx-3 mt-3 p-3 rounded-lg border border-amber-200 bg-amber-50">
+                <div class="flex items-start gap-2">
+                    <i class="fas fa-triangle-exclamation text-amber-600 mt-0.5"></i>
+                    <div class="flex-1 min-w-0">
+                        <p class="text-sm font-semibold text-amber-900">Atenção: localizações com itens críticos</p>
+                        <p class="text-xs text-amber-700 mt-0.5">Os totais globais podem estar OK, mas filtre pelas localizações abaixo para ver os itens críticos individualmente.</p>
+                        <div class="mt-2 flex flex-col gap-1">
+                            ${warnings.map(w => `
+                                <button class="warning-loc text-xs text-left flex justify-between items-center px-2 py-1 rounded bg-white border border-amber-100 hover:border-amber-300 transition" data-loc="${w.location_id}">
+                                    <span class="text-gray-800 truncate">${escapeHtml(w.unit_name || '')} · ${escapeHtml(w.location_name)}</span>
+                                    <span class="ml-2 font-bold text-amber-700 flex-shrink-0">${w.critical_count} ${w.critical_count === 1 ? 'item' : 'itens'}</span>
+                                </button>
+                            `).join('')}
+                        </div>
+                    </div>
+                </div>
+            </div>` : '';
+
+        if (!rows.length && !warnings.length) {
             document.getElementById('reportTable').innerHTML = '<p class="text-sm text-gray-400 p-6 text-center">Sem dados para este relatório.</p>';
             return;
         }
-        const html = `
+        const totals = res.totals || null;
+        const totalsRow = totals && Object.keys(totals).length ? `
+            <tfoot class="border-t-2 border-gray-300 bg-gray-100/70 sticky bottom-0">
+                <tr>
+                    <td class="px-3 py-2 text-[10px] uppercase tracking-wider text-gray-700 font-bold">Total</td>
+                    ${columns.map((c, i) => {
+                        if (i === 0) return ''; // a primeira coluna serve o label "Total" acima (sai depois do #)
+                        const v = totals[c.key];
+                        return `<td class="px-3 py-2 text-gray-900 tabular-nums font-bold">${v === undefined || v === null ? '' : escapeHtml(String(v))}</td>`;
+                    }).filter(s => s).join('')}
+                </tr>
+            </tfoot>` : '';
+        const tableHtml = rows.length ? `
             <table class="w-full text-xs">
                 <thead class="bg-gray-50/50 text-[10px] uppercase tracking-wider text-gray-500 sticky top-0 border-b border-gray-200">
-                    <tr>${columns.map(c => `<th class="text-left px-3 py-2.5 font-semibold">${escapeHtml(c.label || c.key)}</th>`).join('')}</tr>
+                    <tr>
+                        <th class="text-left px-3 py-2.5 font-semibold w-10">#</th>
+                        ${columns.map(c => `<th class="text-left px-3 py-2.5 font-semibold">${escapeHtml(c.label || c.key)}</th>`).join('')}
+                    </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-50">
-                    ${rows.map(row => `<tr class="hover:bg-sky-50/30 transition">${columns.map(c => {
-                        const v = row[c.key];
-                        return `<td class="px-3 py-2 text-gray-700 tabular-nums">${v === null || v === undefined ? '<span class="text-gray-300">—</span>' : escapeHtml(String(v))}</td>`;
-                    }).join('')}</tr>`).join('')}
+                    ${rows.map((row, idx) => `<tr class="hover:bg-sky-50/30 transition">
+                        <td class="px-3 py-2 text-gray-400 tabular-nums font-mono text-[11px]">${idx + 1}</td>
+                        ${columns.map(c => {
+                            const v = row[c.key];
+                            return `<td class="px-3 py-2 text-gray-700 tabular-nums">${v === null || v === undefined ? '<span class="text-gray-300">—</span>' : escapeHtml(String(v))}</td>`;
+                        }).join('')}
+                    </tr>`).join('')}
                 </tbody>
-            </table>`;
-        document.getElementById('reportTable').innerHTML = html;
-        document.getElementById('reportSubtitle').textContent = `${r.hint} · ${rows.length} registos`;
+                ${totalsRow}
+            </table>` : (warnings.length ? '' : '<p class="text-sm text-gray-400 p-6 text-center">Sem dados na visão global.</p>');
+        document.getElementById('reportTable').innerHTML = warningsHtml + tableHtml;
+        // Atalho: clicar num aviso filtra direto por essa localização
+        document.querySelectorAll('.warning-loc').forEach(b => {
+            b.addEventListener('click', () => {
+                document.getElementById('filterLocation').value = b.dataset.loc;
+                currentLocation = b.dataset.loc;
+                fetchReportData();
+            });
+        });
+        const locLabel = currentLocation
+            ? ` · ${document.getElementById('filterLocation').selectedOptions[0]?.textContent || '?'}`
+            : '';
+        document.getElementById('reportSubtitle').textContent = `${r.hint} · ${rows.length} registos${locLabel}`;
     } catch (err) {
         document.getElementById('reportTable').innerHTML = `<p class="text-sm text-red-500 p-4">${escapeHtml(err.message)}</p>`;
     }
 }
 
+document.addEventListener('click', (e) => {
+    if (e.target?.id === 'applyFilters') {
+        currentLocation = document.getElementById('filterLocation').value || '';
+        fetchReportData();
+    }
+});
+
 async function downloadCurrent(format) {
     if (!currentReport) return;
     const token = localStorage.getItem('access_token');
     try {
-        const res = await fetch(`/api/inventory${currentReport.endpoint}?format=${format}`, {
+        const res = await fetch(`/api/inventory${currentReport.endpoint}${buildQuery(format)}`, {
             headers: { Authorization: 'Bearer ' + token }
         });
         if (!res.ok) throw new Error('Erro ao gerar arquivo');

@@ -35,8 +35,20 @@
     ];
 
     document.getElementById('pageContent').innerHTML = `
+        <div id="locationTabs" class="flex flex-wrap gap-2 mb-4">
+            <button data-loc="" class="loc-tab active px-3 py-1.5 rounded-lg text-sm font-medium border border-sky-200 bg-sky-50 text-sky-700">
+                <i class="fas fa-globe text-[10px] mr-1"></i> Todas as unidades
+            </button>
+            <!-- Tabs por unidade injetadas em bootstrap -->
+        </div>
+
         <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
             ${CARDS_CONFIG.map(c => kpiCard(c)).join('')}
+        </div>
+
+        <div id="byLocationSection" class="hidden mb-6">
+            <p class="text-[10px] uppercase tracking-wider font-bold text-gray-500 mb-2">Itens abaixo do mínimo por localização</p>
+            <div id="byLocationGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3"></div>
         </div>
 
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
@@ -46,6 +58,9 @@
             ${section('recentTransfers',  'Últimas transferências', 'fa-right-left',            'indigo',  'movimentos internos')}
         </div>
     `;
+
+    let currentLoc = '';   // '' = todas
+    let locationsByUnit = {};
 
     function kpiCard({ key, label, icon, color, prefix }) {
         return `<div class="group bg-white rounded-xl border border-gray-200/70 shadow-sm hover:shadow hover:border-gray-300 transition-all p-4">
@@ -77,10 +92,13 @@
         </section>`;
     }
 
-    (async function loadDashboard() {
+    async function loadDashboard() {
         try {
+            // Stats são afetadas pelo filtro de localização; as listas de
+            // entradas/saídas/transferências hoje não filtram (próxima fase).
+            const qs = currentLoc ? `?location_id=${currentLoc}` : '';
             const [stats, entries, exits, transfers] = await Promise.all([
-                apiCall('/api/inventory/stats/summary'),
+                apiCall(`/api/inventory/stats/summary${qs}`),
                 apiCall('/api/inventory/entries?limit=5'),
                 apiCall('/api/inventory/exits?limit=5'),
                 apiCall('/api/inventory/transfers?limit=5')
@@ -93,12 +111,41 @@
             setCard('avg_coverage',   stats.data.avg_coverage !== null ? stats.data.avg_coverage : '—');
             setCard('expiring_count', stats.data.expiring_count);
 
+            // Tabs de unidade (apenas no primeiro load)
+            if (stats.data.by_location && !document.querySelector('.loc-tab[data-loc]:not([data-loc=""])')) {
+                renderLocationTabs(stats.data.by_location);
+            }
+
+            // Breakdown by_location é mostrado apenas na visão "Todas"
+            const byLocSection = document.getElementById('byLocationSection');
+            if (!currentLoc && stats.data.by_location) {
+                byLocSection.classList.remove('hidden');
+                document.getElementById('byLocationGrid').innerHTML = stats.data.by_location.map(g => `
+                    <button data-loc="${g.location_id}" class="loc-card text-left bg-white rounded-xl border border-gray-200/70 hover:border-sky-300 shadow-sm hover:shadow p-4 transition-all">
+                        <p class="text-[10px] uppercase tracking-wider font-semibold text-gray-500 truncate">${escapeHtml(g.unit_name || '')} · ${escapeHtml(g.location_name)}</p>
+                        <div class="flex items-end justify-between mt-2 gap-2">
+                            <div>
+                                <p class="text-2xl font-bold ${g.below_min > 0 ? 'text-amber-600' : 'text-gray-900'} tabular-nums">${g.below_min}</p>
+                                <p class="text-[10px] text-gray-400">abaixo do mín. (de ${g.items_total})</p>
+                            </div>
+                            <i class="fas fa-arrow-right text-gray-300"></i>
+                        </div>
+                    </button>
+                `).join('');
+                // delegação de click → vira filtro
+                document.querySelectorAll('#byLocationGrid .loc-card').forEach(b => {
+                    b.addEventListener('click', () => switchLoc(b.dataset.loc));
+                });
+            } else {
+                byLocSection.classList.add('hidden');
+            }
+
             document.getElementById('criticalItems').innerHTML = stats.data.critical_items.length
                 ? stats.data.critical_items.map(i => `
                     <div class="flex justify-between items-center py-2.5 border-b border-gray-50 last:border-0">
                         <div class="min-w-0 flex-1 mr-3">
                             <p class="text-sm text-gray-800 truncate font-medium">${escapeHtml(i.name)}</p>
-                            <p class="text-[11px] font-mono text-gray-400">${escapeHtml(i.internal_code)}</p>
+                            <p class="text-[11px] font-mono text-gray-400">${escapeHtml(i.internal_code)}${i.location_name ? ' · ' + escapeHtml(i.location_name) : ''}</p>
                         </div>
                         <span class="text-xs ${i.stock === 0 ? 'text-red-600 font-bold' : 'text-amber-600'} tabular-nums flex-shrink-0">${i.stock.toFixed(0)} / ${i.min_stock.toFixed(0)}</span>
                     </div>`).join('')
@@ -136,7 +183,54 @@
         } catch (err) {
             toast(err.message, 'error');
         }
-    })();
+    }
+
+    function renderLocationTabs(byLoc) {
+        const tabsBar = document.getElementById('locationTabs');
+        // Agrupa por unit_name para tabs hierárquicas (apenas unidades, sem sublocais)
+        const byUnit = new Map();
+        for (const g of byLoc) {
+            if (!byUnit.has(g.unit_name)) byUnit.set(g.unit_name, []);
+            byUnit.get(g.unit_name).push(g);
+        }
+        // Render tabs por unidade — clicar exibe as sublocs como sub-tabs (opção simples: lista plana)
+        let html = `<button data-loc="" class="loc-tab ${currentLoc === '' ? 'active border-sky-300 bg-sky-50 text-sky-700' : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'} px-3 py-1.5 rounded-lg text-sm font-medium border">
+            <i class="fas fa-globe text-[10px] mr-1"></i> Todas as unidades
+        </button>`;
+        for (const g of byLoc) {
+            const isActive = currentLoc === g.location_id;
+            const stateClass = isActive
+                ? 'active border-sky-300 bg-sky-50 text-sky-700'
+                : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50';
+            html += `<button data-loc="${g.location_id}" class="loc-tab ${stateClass} px-3 py-1.5 rounded-lg text-sm font-medium border">
+                <i class="fas fa-map-marker-alt text-[10px] mr-1"></i> ${escapeHtml(g.unit_name || '')} · ${escapeHtml(g.location_name)}
+                ${g.below_min > 0 ? `<span class="ml-1 inline-flex items-center justify-center px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 text-[10px] font-bold">${g.below_min}</span>` : ''}
+            </button>`;
+        }
+        tabsBar.innerHTML = html;
+        tabsBar.querySelectorAll('.loc-tab').forEach(b => {
+            b.addEventListener('click', () => switchLoc(b.dataset.loc));
+        });
+    }
+
+    function switchLoc(loc) {
+        currentLoc = loc;
+        // Atualiza visual das tabs
+        document.querySelectorAll('.loc-tab').forEach(b => {
+            const isActive = b.dataset.loc === loc;
+            b.classList.toggle('active', isActive);
+            b.classList.toggle('border-sky-300', isActive);
+            b.classList.toggle('bg-sky-50', isActive);
+            b.classList.toggle('text-sky-700', isActive);
+            b.classList.toggle('border-gray-200', !isActive);
+            b.classList.toggle('bg-white', !isActive);
+            b.classList.toggle('text-gray-600', !isActive);
+            b.classList.toggle('hover:bg-gray-50', !isActive);
+        });
+        loadDashboard();
+    }
+
+    loadDashboard();
 
     function emptyState(icon, color, msg) {
         return `<div class="py-8 text-center">

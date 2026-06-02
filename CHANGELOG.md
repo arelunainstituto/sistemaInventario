@@ -35,6 +35,12 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e
 ## [Unreleased]
 
 ### Adicionado
+- **Fase 4.4 — Filtros de UI por localização + dashboard segmentado**:
+  - Novo endpoint `GET /api/inventory/items/:id/effective-window?location_id=` ([items.js](api/inventory/items.js)) — devolve a janela efetiva (override > category > 30) para popular default do Kardex.
+  - [kardex.html](public/inventory/kardex.html): seletor de localização + presets de janela (7/30/60/90/180/365) + intervalo personalizado. URL aceita deep-link `?item=&location_id=`.
+  - [reports.html](public/inventory/reports.html): barra de filtros condicional (aparece nos relatórios com `supportsLocation`). Filtros aplicam ao gerar e exportar; reset ao trocar de relatório.
+  - [index.html](public/inventory/index.html) (dashboard): tabs por unidade com contadores de alerta por localização + cards `by_location` clicáveis. Selecionar uma localização filtra KPIs em tempo real.
+  - [_layout.js](public/inventory/_layout.js): badge de alertas global segmenta o painel por localização (uso do `by_location` da F4.3), mostrando contadores agrupados por unidade.
 - **Fase 4.3 — API + UI de overrides por localização**:
   - Novo endpoint [api/inventory/item-location-params.js](api/inventory/item-location-params.js) montado em `/api/inventory/items/:itemId/location-params`:
     - `GET /` — devolve params efetivos por localização (1 linha por location ativa, com `is_override` e `source_<campo>`)
