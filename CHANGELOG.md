@@ -34,6 +34,14 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e
 
 ## [Unreleased]
 
+### Adicionado
+- **Fase 4.1 — Parâmetros de stock por localização (schema)**: nova migração [50-fase4-item-location-params.sql](database/inventory-refactor/50-fase4-item-location-params.sql) (**requer migração**) cria:
+  - Tabela `inv_item_location_params(item_id, location_id, min_stock, max_stock, lead_time_days, reorder_point, consumption_window_days, auto_calculated, last_calculated_at, notes, audit)` com UNIQUE parcial em (item, location) e CHECK max≥min.
+  - Trigger `fn_inv_ilp_check_macro` que rejeita overrides para itens patrimoniais.
+  - RLS endurecida via `fn_inv_user_can_access()` (compartilhada com a migração 03).
+  - View `vw_inv_item_effective_params` com resolução por COALESCE — `location_override → item_global → category_default`. Devolve também `source_<campo>` indicando a origem de cada valor para auditoria.
+  - **Aditiva pura**: sistema continua usando `inv_items.*` (sem mudança de comportamento). As fases 4.2-4.4 farão views/funções/API/UI passarem a ler dessa nova camada.
+
 ### Corrigido
 - **Entradas**: fator de conversão agora vem do cadastro do item (read-only) em vez de digitação manual — alinha com §7 da spec (conversão automática). ([entries.html](public/inventory/entries.html))
 - **Kardex**: coluna "Localização" mostra origem em saídas e destino em entradas; bug fazia transferências aparecerem com origem nos dois lados. ([reports.js:155-192](api/inventory/reports.js#L155-L192))
