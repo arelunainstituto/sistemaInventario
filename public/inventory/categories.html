@@ -2,7 +2,7 @@
 <html lang="pt-PT">
 <head>
     <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Inventário · Subcategorias</title>
+    <title>Inventário · Categorias</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -13,11 +13,18 @@
 <div id="layoutRoot"></div>
 <script src="_layout.js"></script>
 <script>
-renderInventoryLayout({ activePage: 'categories', title: 'Subcategorias', subtitle: 'Agrupamento livre por macro (Consumo/Patrimonial)' });
+renderInventoryLayout({
+    activePage: 'categories',
+    title: 'Categorias',
+    subtitle: 'Hierarquia por tipo de cadastro (Consumo até 2 níveis, Patrimonial multinível)'
+});
+
+// Profundidade máxima por macro — espelha a validação do API
+const MAX_DEPTH = { consumo: 2, patrimonial: 10 };
 
 document.getElementById('pageContent').innerHTML = `
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        ${groupCard('consumo', 'Consumo', 'blue')}
+        ${groupCard('consumo', 'Consumo', 'sky')}
         ${groupCard('patrimonial', 'Patrimonial', 'purple')}
     </div>
     <div id="modal" class="hidden fixed inset-0 bg-gray-900/40 backdrop-blur-[2px] z-50 flex items-center justify-center">
@@ -34,41 +41,76 @@ document.getElementById('pageContent').innerHTML = `
 function groupCard(macro, label, color) {
     return `<section class="bg-white rounded-xl border border-gray-200/70 shadow-sm p-6">
         <div class="flex justify-between items-center mb-4">
-            <h3 class="font-bold text-gray-800"><i class="fas fa-tags text-${color}-600"></i> ${label}</h3>
-            <button onclick="openForm(null, '${macro}')" class="text-sm bg-${color}-600 text-white px-3 py-1.5 rounded-lg"><i class="fas fa-plus"></i> Nova</button>
+            <div>
+                <h3 class="font-bold text-gray-800 flex items-center gap-2"><i class="fas fa-tags text-${color}-600"></i> ${label}</h3>
+                <p class="text-[11px] text-gray-500">Máx ${MAX_DEPTH[macro]} ${MAX_DEPTH[macro] === 1 ? 'nível' : 'níveis'}</p>
+            </div>
+            <button onclick="openForm(null, '${macro}', null)" class="text-sm bg-${color}-600 hover:bg-${color}-700 text-white px-3 py-1.5 rounded-lg"><i class="fas fa-plus"></i> Nova categoria</button>
         </div>
-        <ul id="list-${macro}" class="divide-y divide-gray-50"></ul>
+        <ul id="list-${macro}" class="space-y-0.5"></ul>
     </section>`;
 }
 
+let treeCache = { consumo: [], patrimonial: [] };
+
 async function load() {
     try {
-        const r = await apiCall('/api/inventory/categories?include_inactive=1');
-        const byMacro = { consumo: [], patrimonial: [] };
-        r.data.forEach(c => byMacro[c.parent_macro]?.push(c));
+        const [r1, r2] = await Promise.all([
+            apiCall('/api/inventory/categories/tree?parent_macro=consumo&include_inactive=1'),
+            apiCall('/api/inventory/categories/tree?parent_macro=patrimonial&include_inactive=1')
+        ]);
+        treeCache.consumo     = r1.data || [];
+        treeCache.patrimonial = r2.data || [];
         for (const m of ['consumo','patrimonial']) {
-            document.getElementById('list-'+m).innerHTML = byMacro[m].map(c => {
-                const win = c.consumption_window_days || 30;
-                const winColor = win === 30 ? 'text-gray-400' : 'text-orange-600 font-medium';
-                return `
-                <li class="flex justify-between items-center py-2 px-2 hover:bg-gray-50 rounded">
-                    <div class="flex-1">
-                        <p class="text-sm ${c.is_active ? 'text-gray-800' : 'text-gray-400 line-through'}">${escapeHtml(c.name)}</p>
-                        <p class="text-[10px] ${winColor}">Janela consumo médio: ${win} dias${win !== 30 ? ' (sazonal)' : ''}</p>
-                    </div>
-                    <button onclick='openForm(${JSON.stringify(c)}, "${m}")' class="text-sky-600 hover:text-sky-700"><i class="fas fa-edit"></i></button>
-                </li>`;
-            }).join('') || '<li class="text-sm text-gray-400 p-3">Nenhuma.</li>';
+            const html = renderTree(treeCache[m], m, 0);
+            document.getElementById('list-'+m).innerHTML = html || '<li class="text-sm text-gray-400 p-3 italic">Nenhuma categoria.</li>';
         }
     } catch (err) { toast(err.message, 'error'); }
 }
 
-function openForm(cat, macro) {
-    document.getElementById('modalTitle').textContent = cat ? 'Editar Subcategoria' : `Nova Subcategoria (${macro})`;
+function renderTree(nodes, macro, depth) {
+    if (!nodes || !nodes.length) return '';
+    return nodes.map(n => {
+        const canAddChild = (depth + 1) < MAX_DEPTH[macro];
+        const win = n.consumption_window_days || 30;
+        const winLabel = macro === 'consumo' && depth === 0
+            ? `<span class="text-[10px] ${win !== 30 ? 'text-orange-600 font-medium' : 'text-gray-400'}">· janela ${win}d</span>`
+            : '';
+        const itemsBadge = n.items_count > 0
+            ? `<span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] bg-gray-100 text-gray-600">${n.items_count} ${n.items_count === 1 ? 'item' : 'itens'}</span>`
+            : '';
+        return `
+        <li>
+            <div class="flex justify-between items-center py-1.5 px-2 hover:bg-gray-50 rounded group" style="padding-left:${8 + depth * 22}px">
+                <div class="flex-1 flex items-center gap-2 min-w-0">
+                    ${depth > 0 ? '<i class="fas fa-angle-right text-gray-300 text-[10px]"></i>' : ''}
+                    <span class="text-sm ${n.is_active ? 'text-gray-800' : 'text-gray-400 line-through'} truncate">${escapeHtml(n.name)}</span>
+                    ${winLabel}
+                    ${itemsBadge}
+                </div>
+                <div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition">
+                    ${canAddChild ? `<button onclick='openForm(null, "${macro}", ${JSON.stringify(n.id)})' class="text-xs text-sky-600 hover:text-sky-700 px-2 py-1" title="Adicionar subcategoria"><i class="fas fa-plus"></i></button>` : ''}
+                    <button onclick='openForm(${JSON.stringify(n)}, "${macro}", ${JSON.stringify(n.parent_id)})' class="text-xs text-gray-500 hover:text-gray-700 px-2 py-1" title="Editar"><i class="fas fa-edit"></i></button>
+                    <button onclick='removeCategory(${JSON.stringify(n.id)}, ${JSON.stringify(n.name)})' class="text-xs text-red-500 hover:text-red-700 px-2 py-1" title="Remover"><i class="fas fa-trash"></i></button>
+                </div>
+            </div>
+            ${n.children && n.children.length ? `<ul>${renderTree(n.children, macro, depth + 1)}</ul>` : ''}
+        </li>`;
+    }).join('');
+}
+
+function openForm(cat, macro, parent_id) {
+    document.getElementById('modalTitle').textContent = cat
+        ? `Editar — ${cat.name}`
+        : (parent_id ? 'Nova subcategoria' : `Nova categoria (${macro})`);
     const win = cat?.consumption_window_days || 30;
+    const isRootLevel = !parent_id;
     document.getElementById('modalForm').innerHTML = `
-        <div><label class="text-xs text-gray-500">Nome *</label><input name="name" required value="${cat?.name || ''}" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"></div>
-        ${macro === 'consumo' ? `
+        <div>
+            <label class="text-xs text-gray-500">Nome *</label>
+            <input name="name" required value="${escapeAttr(cat?.name || '')}" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+        </div>
+        ${macro === 'consumo' && isRootLevel ? `
         <div>
             <label class="text-xs text-gray-500">Janela de consumo médio (dias)</label>
             <select name="consumption_window_days" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
@@ -81,23 +123,41 @@ function openForm(cat, macro) {
             <p class="text-[10px] text-gray-500 mt-1">Usado em ponto de reposição, cobertura e relatórios.</p>
         </div>` : ''}
         <label class="flex items-center gap-2 text-sm"><input type="checkbox" name="is_active" ${(!cat || cat.is_active) ? 'checked' : ''}> Ativa</label>
-        <button type="submit" class="w-full bg-sky-600 hover:bg-sky-700 text-white py-2.5 rounded-lg text-sm font-medium shadow-sm shadow-sky-500/20 transition">Salvar</button>`;
+        <button type="submit" class="w-full bg-sky-600 hover:bg-sky-700 text-white py-2.5 rounded-lg text-sm font-medium shadow-sm shadow-sky-500/20 transition">Salvar</button>
+    `;
     document.getElementById('modalForm').onsubmit = async e => {
         e.preventDefault();
         const fd = Object.fromEntries(new FormData(e.target));
-        const payload = { ...fd, parent_macro: macro, is_active: !!fd.is_active };
+        const payload = {
+            ...fd,
+            parent_macro: macro,
+            parent_id:    cat ? cat.parent_id : (parent_id || null),
+            is_active:    !!fd.is_active
+        };
         if (fd.consumption_window_days) payload.consumption_window_days = parseInt(fd.consumption_window_days);
         try {
-            if (cat) await apiCall(`/api/inventory/categories/${cat.id}`, { method:'PUT', body: JSON.stringify(payload) });
-            else     await apiCall('/api/inventory/categories', { method:'POST', body: JSON.stringify(payload) });
-            closeModal(); toast('Subcategoria salva'); load();
+            if (cat) await apiCall(`/api/inventory/categories/${cat.id}`, { method: 'PUT', body: JSON.stringify(payload) });
+            else     await apiCall('/api/inventory/categories',           { method: 'POST', body: JSON.stringify(payload) });
+            closeModal();
+            toast('Categoria salva');
+            load();
         } catch (err) { toast(err.message, 'error'); }
     };
     document.getElementById('modal').classList.remove('hidden');
 }
 
+async function removeCategory(id, name) {
+    if (!confirm(`Remover a categoria "${name}"?`)) return;
+    try {
+        await apiCall(`/api/inventory/categories/${id}`, { method: 'DELETE' });
+        toast('Categoria removida');
+        load();
+    } catch (err) { toast(err.message, 'error'); }
+}
+
 function closeModal() { document.getElementById('modal').classList.add('hidden'); }
 function escapeHtml(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function escapeAttr(s) { return String(s ?? '').replace(/"/g, '&quot;'); }
 
 load();
 </script>

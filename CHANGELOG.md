@@ -35,6 +35,22 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e
 ## [Unreleased]
 
 ### Adicionado
+- **Fase 5.1 — Hierarquia de categorias (N níveis)**: nova migração [52-fase5-categories-hierarchy.sql](database/inventory-refactor/52-fase5-categories-hierarchy.sql) (**requer migração**):
+  - Adiciona `inv_categories.parent_id UUID REFERENCES inv_categories(id) ON DELETE RESTRICT` + índice parcial.
+  - Trigger `fn_inv_categories_check_parent`: filhos herdam `parent_macro` do pai; bloqueia auto-referência e ciclos (até 100 ancestrais).
+  - View `vw_inv_categories_tree`: recursive CTE com `path`, `depth`, `ancestors_ids`, `ancestors_names`.
+  - View `vw_inv_categories_with_counts`: agrega `children_count` e `items_count` por nó (UI exibe badges).
+  - Aditiva pura: categorias atuais ficam como raízes (parent_id = NULL).
+- **API categories ([categories.js](api/inventory/categories.js))**:
+  - `GET /` agora lê da `vw_inv_categories_tree` (devolve path + depth).
+  - Novo `GET /tree?parent_macro=…` — árvore aninhada com `children`, `items_count`, `children_count`.
+  - `POST` e `PUT` aceitam `parent_id`; valida profundidade máxima por macro (consumo=2, patrimonial=10).
+  - `DELETE` bloqueia categorias com filhos ativos ou itens vinculados (mensagens amigáveis).
+- **UI categories ([categories.html](public/inventory/categories.html))**:
+  - Árvore expansível com indentação por nível.
+  - Botão "+" por nó (visível apenas se profundidade permitir mais filhos).
+  - Badges de items_count.
+  - Janela de consumo configurável apenas em categorias raiz (nível 1) — subcategorias herdam.
 - **Fase 4.4 — Filtros de UI por localização + dashboard segmentado**:
   - Novo endpoint `GET /api/inventory/items/:id/effective-window?location_id=` ([items.js](api/inventory/items.js)) — devolve a janela efetiva (override > category > 30) para popular default do Kardex.
   - [kardex.html](public/inventory/kardex.html): seletor de localização + presets de janela (7/30/60/90/180/365) + intervalo personalizado. URL aceita deep-link `?item=&location_id=`.
