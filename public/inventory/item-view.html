@@ -125,6 +125,46 @@ function render(it) {
                 ${infoRow('Estado patrimonial', it.asset_status)}
             </div>` : ''}
 
+            ${!isPatrimonial && (it.location_params || []).length ? `
+            <!-- Parâmetros por localização (apenas consumo) -->
+            <div class="bg-white rounded-xl border border-gray-200/70 shadow-sm p-6 lg:col-span-3">
+                <h3 class="font-bold text-gray-900 mb-3 text-sm flex items-center gap-2">
+                    <i class="fas fa-sliders text-sky-600"></i> Parâmetros por localização
+                    <span class="text-xs text-gray-500 font-normal">(${(it.location_params || []).filter(p => p.is_override).length} override${(it.location_params || []).filter(p => p.is_override).length === 1 ? '' : 's'} · ${(it.location_params || []).length} localizações)</span>
+                </h3>
+                <div class="overflow-x-auto -mx-6 -mb-6">
+                <table class="w-full text-sm">
+                    <thead class="bg-gray-50/50 text-[10px] uppercase tracking-wider text-gray-500 border-y border-gray-200">
+                        <tr>
+                            <th class="text-left px-6 py-2.5 font-semibold">Localização</th>
+                            <th class="text-right px-3 py-2.5 font-semibold">Min</th>
+                            <th class="text-right px-3 py-2.5 font-semibold">Max</th>
+                            <th class="text-right px-3 py-2.5 font-semibold">Lead time</th>
+                            <th class="text-right px-3 py-2.5 font-semibold">Janela cons.</th>
+                            <th class="text-center px-6 py-2.5 font-semibold">Estado</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-50">
+                        ${(it.location_params || []).map(p => `
+                            <tr class="hover:bg-sky-50/30 transition">
+                                <td class="px-6 py-2.5 text-gray-800"><span class="text-gray-400 text-xs">${escapeHtml(p.unit_name || '')} ·</span> ${escapeHtml(p.location_name)}</td>
+                                <td class="px-3 py-2.5 text-right tabular-nums ${p.source_min_stock === 'location' ? 'font-bold text-sky-700' : 'text-gray-500'}">${parseFloat(p.min_stock).toFixed(2)}</td>
+                                <td class="px-3 py-2.5 text-right tabular-nums ${p.source_max_stock === 'location' ? 'font-bold text-sky-700' : 'text-gray-500'}">${p.max_stock != null ? parseFloat(p.max_stock).toFixed(2) : '—'}</td>
+                                <td class="px-3 py-2.5 text-right tabular-nums ${p.source_lead_time_days === 'location' ? 'font-bold text-sky-700' : 'text-gray-500'}">${p.lead_time_days}d</td>
+                                <td class="px-3 py-2.5 text-right tabular-nums ${p.source_window_days === 'location' ? 'font-bold text-sky-700' : 'text-gray-500'}">${p.consumption_window_days}d</td>
+                                <td class="px-6 py-2.5 text-center">
+                                    ${p.is_override
+                                        ? '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-sky-100 text-sky-700 text-[10px] font-medium">Override</span>'
+                                        : '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 text-[10px]">Herda</span>'
+                                    }
+                                </td>
+                            </tr>`).join('')}
+                    </tbody>
+                </table>
+                </div>
+            </div>
+            ` : ''}
+
             <!-- Stock por localização -->
             <div class="bg-white rounded-xl border border-gray-200/70 shadow-sm p-6 ${isPatrimonial ? 'lg:col-span-2' : 'lg:col-span-3'}">
                 <h3 class="font-bold text-gray-900 mb-3 text-sm flex items-center gap-2"><i class="fas fa-map-marker-alt text-sky-600"></i> Stock por localização <span class="text-xs text-gray-500 font-normal">(total: ${totalStock.toFixed(2)})</span></h3>

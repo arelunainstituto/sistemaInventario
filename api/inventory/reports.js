@@ -15,18 +15,43 @@ async function fetchView(viewName, filters = {}) {
     return data || [];
 }
 
-// 12.1 — Ponto de reposição
+// Normaliza linhas da view *_by_location para o mesmo formato das views
+// agregadas — assim o frontend não precisa diferenciar.
+function normalizeByLocationRow(r) {
+    return {
+        ...r,
+        // mapeamento de nomes diferentes entre as views by_location e agregadas
+        name:                   r.item_name || r.name,
+        avg_daily_consumption:  r.avg_daily ?? r.avg_daily_consumption,
+        computed_reorder_point: r.reorder_point ?? r.computed_reorder_point,
+        days_coverage:          r.coverage_days ?? r.days_coverage,
+        subcategory:            r.subcategory ?? null,
+        location_name:          r.location_name,
+        location_id:            r.location_id
+    };
+}
+
+// 12.1 — Ponto de reposição. Aceita ?location_id= opcional.
 router.get('/reorder', requirePermission('inventory', 'reports'), async (req, res) => {
     try {
-        const rows = (await fetchView('vw_inv_reorder_status'))
-            .filter(r => ['rutura','abaixo_minimo','abaixo_reposicao'].includes(r.status));
+        const { location_id } = req.query;
+        let rows;
+        if (location_id) {
+            rows = (await fetchView('vw_inv_reorder_status_by_location', { location_id }))
+                .filter(r => ['rutura','abaixo_minimo','abaixo_reposicao'].includes(r.status))
+                .map(normalizeByLocationRow);
+        } else {
+            rows = (await fetchView('vw_inv_reorder_status'))
+                .filter(r => ['rutura','abaixo_minimo','abaixo_reposicao'].includes(r.status));
+        }
         sendReport(res, req.query.format, {
             title: 'Relatório de Ponto de Reposição',
-            subtitle: 'Itens abaixo do mínimo ou do ponto de reposição',
+            subtitle: location_id ? `Filtrado por localização` : 'Itens abaixo do mínimo ou do ponto de reposição',
             columns: [
                 { key: 'internal_code',           label: 'Código',         width: 60 },
-                { key: 'name',                    label: 'Item',           width: 170 },
-                { key: 'subcategory',             label: 'Subcategoria',   width: 90 },
+                { key: 'name',                    label: 'Item',           width: 150 },
+                ...(location_id ? [] : [{ key: 'subcategory', label: 'Subcategoria', width: 80 }]),
+                ...(location_id ? [{ key: 'location_name', label: 'Localização', width: 90 }] : []),
                 { key: 'current_stock',           label: 'Stock atual',    width: 60 },
                 { key: 'avg_daily_consumption',   label: 'Consumo/dia',    width: 60 },
                 { key: 'computed_reorder_point',  label: 'Reposição',      width: 60 },
@@ -38,17 +63,22 @@ router.get('/reorder', requirePermission('inventory', 'reports'), async (req, re
     } catch (err) { console.error('GET /reports/reorder', err); res.status(500).json({ error: err.message }); }
 });
 
-// 12.2 — Abaixo do mínimo / acima do máximo
+// 12.2 — Abaixo do mínimo / acima do máximo. Aceita ?location_id= opcional.
 router.get('/stock-min-max', requirePermission('inventory', 'reports'), async (req, res) => {
     try {
-        const rows = (await fetchView('vw_inv_reorder_status'))
+        const { location_id } = req.query;
+        const view = location_id ? 'vw_inv_reorder_status_by_location' : 'vw_inv_reorder_status';
+        const filters = location_id ? { location_id } : {};
+        let rows = (await fetchView(view, filters))
             .filter(r => ['rutura','abaixo_minimo','acima_maximo'].includes(r.status));
+        if (location_id) rows = rows.map(normalizeByLocationRow);
         sendReport(res, req.query.format, {
             title: 'Itens abaixo do mínimo ou acima do máximo',
-            subtitle: 'Identifica ruturas e excessos',
+            subtitle: location_id ? 'Filtrado por localização' : 'Identifica ruturas e excessos',
             columns: [
                 { key: 'internal_code', label: 'Código',      width: 60 },
-                { key: 'name',          label: 'Item',        width: 200 },
+                { key: 'name',          label: 'Item',        width: 180 },
+                ...(location_id ? [{ key: 'location_name', label: 'Localização', width: 90 }] : []),
                 { key: 'current_stock', label: 'Stock',       width: 60 },
                 { key: 'min_stock',     label: 'Min',         width: 50 },
                 { key: 'max_stock',     label: 'Max',         width: 50 },
@@ -59,17 +89,25 @@ router.get('/stock-min-max', requirePermission('inventory', 'reports'), async (r
     } catch (err) { console.error('GET /reports/stock-min-max', err); res.status(500).json({ error: err.message }); }
 });
 
-// 12.3 — Cobertura de stock
+// 12.3 — Cobertura de stock. Aceita ?location_id= opcional.
 router.get('/coverage', requirePermission('inventory', 'reports'), async (req, res) => {
     try {
-        const rows = (await fetchView('vw_inv_stock_coverage'))
-            .sort((a, b) => (a.days_coverage ?? 99999) - (b.days_coverage ?? 99999));
+        const { location_id } = req.query;
+        let rows;
+        if (location_id) {
+            rows = (await fetchView('vw_inv_stock_coverage_by_location', { location_id }))
+                .map(normalizeByLocationRow);
+        } else {
+            rows = await fetchView('vw_inv_stock_coverage');
+        }
+        rows = rows.sort((a, b) => (a.days_coverage ?? 99999) - (b.days_coverage ?? 99999));
         sendReport(res, req.query.format, {
             title: 'Cobertura de Stock (dias)',
-            subtitle: 'Ordenado do menor para o maior',
+            subtitle: location_id ? 'Filtrado por localização' : 'Ordenado do menor para o maior',
             columns: [
                 { key: 'internal_code',         label: 'Código',           width: 60 },
-                { key: 'name',                  label: 'Item',             width: 210 },
+                { key: 'name',                  label: 'Item',             width: 190 },
+                ...(location_id ? [{ key: 'location_name', label: 'Localização', width: 90 }] : []),
                 { key: 'current_stock',         label: 'Stock atual',      width: 70 },
                 { key: 'avg_daily_consumption', label: 'Consumo médio',    width: 80 },
                 { key: 'days_coverage',         label: 'Cobertura (dias)', width: 80 }
@@ -151,22 +189,22 @@ router.get('/inventory-sessions', requirePermission('inventory', 'reports'), asy
     } catch (err) { console.error('GET /reports/inventory-sessions', err); res.status(500).json({ error: err.message }); }
 });
 
-// 12.6 — Kardex por item (precisa item_id)
+// 12.6 — Kardex por item. Aceita ?location_id= (usa vw_inv_kardex_by_location
+// com running_balance particionado por localização), ?from= e ?to= (datas ISO).
 router.get('/kardex/:itemId', requirePermission('inventory', 'reports'), async (req, res) => {
     try {
         const { itemId } = req.params;
-        const { data, error } = await supabaseAdmin
-            .from('vw_inv_kardex')
-            .select('*')
-            .eq('item_id', itemId)
-            .order('occurred_at', { ascending: true });
+        const { location_id, from, to } = req.query;
+
+        const viewName = location_id ? 'vw_inv_kardex_by_location' : 'vw_inv_kardex';
+        let q = supabaseAdmin.from(viewName).select('*').eq('item_id', itemId);
+        if (location_id) q = q.eq('location_id', location_id);
+        if (from) q = q.gte('occurred_at', from);
+        if (to)   q = q.lte('occurred_at', to);
+        const { data, error } = await q.order('occurred_at', { ascending: true });
         if (error) throw error;
 
-        // Localização que sofreu o efeito do movimento. Transferências
-        // têm from+to preenchidos em ambos os registros (saida e entrada
-        // compartilham origem↔destino); sem mapeamento por tipo, o
-        // fallback || cairia sempre em from_location e a entrada
-        // apareceria na localização errada.
+        // Localização que sofreu o efeito do movimento (mesma lógica da view by_location)
         const locationFor = (r) => {
             switch (r.type) {
                 case 'entrada':
@@ -178,7 +216,6 @@ router.get('/kardex/:itemId', requirePermission('inventory', 'reports'), async (
                     return r.from_location || r.to_location || '—';
                 case 'ajuste':
                 case 'inventario':
-                    // fn_inv_adjust grava só um dos lados conforme sinal do delta
                     return r.to_location || r.from_location || '—';
                 default:
                     return r.from_location || r.to_location || '—';
@@ -193,12 +230,16 @@ router.get('/kardex/:itemId', requirePermission('inventory', 'reports'), async (
             lot:             r.lot_number || '—',
             quantity:        parseFloat(r.quantity).toFixed(2),
             unit_cost:       r.unit_cost ? `€ ${parseFloat(r.unit_cost).toFixed(2)}` : '—',
-            running_balance: parseFloat(r.running_balance).toFixed(2)
+            running_balance: parseFloat(location_id ? r.running_balance_at_location : r.running_balance).toFixed(2)
         }));
+
+        const subtitleParts = ['Movimentos cronológicos'];
+        if (location_id) subtitleParts.push('saldo por localização');
+        if (from || to) subtitleParts.push(`de ${from || '—'} a ${to || 'hoje'}`);
 
         sendReport(res, req.query.format, {
             title: `Kardex — ${data?.[0]?.internal_code || 'item'}`,
-            subtitle: 'Movimentos cronológicos com saldo acumulado',
+            subtitle: subtitleParts.join(' · '),
             columns: [
                 { key: 'occurred_at',     label: 'Data/hora',  width: 110 },
                 { key: 'type',            label: 'Tipo',        width: 90 },
@@ -214,28 +255,34 @@ router.get('/kardex/:itemId', requirePermission('inventory', 'reports'), async (
     } catch (err) { console.error('GET /reports/kardex', err); res.status(500).json({ error: err.message }); }
 });
 
-// 12.7 — Tendência de consumo (4 meses + YoY)
+// 12.7 — Tendência de consumo. Aceita ?item_id= e ?location_id= opcionais.
 router.get('/consumption-trend', requirePermission('inventory', 'reports'), async (req, res) => {
     try {
-        const { item_id } = req.query;
-        let q = supabaseAdmin.from('mvw_inv_consumption_trend').select('*');
-        if (item_id) q = q.eq('item_id', item_id);
-        const { data, error } = await q.order('month', { ascending: true });
+        const { item_id, location_id } = req.query;
+
+        const viewName = location_id ? 'mvw_inv_consumption_trend_by_location' : 'mvw_inv_consumption_trend';
+        const orderCol = location_id ? 'month_start' : 'month';
+        let q = supabaseAdmin.from(viewName).select('*');
+        if (item_id)     q = q.eq('item_id', item_id);
+        if (location_id) q = q.eq('location_id', location_id);
+        const { data, error } = await q.order(orderCol, { ascending: true });
         if (error) throw error;
 
         const rows = (data || []).map(r => ({
             internal_code: r.internal_code,
-            name:          r.name,
-            month:         r.month,
-            qty:           parseFloat(r.qty || 0).toFixed(2)
+            name:          r.item_name || r.name,
+            location:      r.location_name || '—',
+            month:         r.month_start || r.month,
+            qty:           parseFloat(r.total_qty ?? r.qty ?? 0).toFixed(2)
         }));
 
         sendReport(res, req.query.format, {
             title: 'Tendência de Consumo Mensal',
-            subtitle: 'Últimos 16 meses (4 correntes + 12 base para comparativo anual)',
+            subtitle: location_id ? 'Últimos 16 meses por localização' : 'Últimos 16 meses (4 correntes + 12 base para comparativo anual)',
             columns: [
                 { key: 'internal_code', label: 'Código', width: 60 },
-                { key: 'name',          label: 'Item',   width: 200 },
+                { key: 'name',          label: 'Item',   width: 180 },
+                ...(location_id ? [{ key: 'location', label: 'Localização', width: 100 }] : []),
                 { key: 'month',         label: 'Mês',    width: 80 },
                 { key: 'qty',           label: 'Consumo', width: 70 }
             ],

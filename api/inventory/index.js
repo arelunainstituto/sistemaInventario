@@ -15,6 +15,9 @@ router.use('/locations',  require('./locations'));
 router.use('/categories', require('./categories'));
 router.use('/suppliers',  require('./suppliers'));
 router.use('/uoms',       require('./uoms'));
+// Fase 4.3: overrides de parâmetros por localização. Montado como sub-rota
+// de /items/:itemId/ para o mergeParams pegar o itemId no router child.
+router.use('/items/:itemId/location-params', require('./item-location-params'));
 router.use('/items',      require('./items'));
 router.use('/entries',    require('./entries'));
 router.use('/scan',       require('./scan'));

@@ -35,6 +35,17 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e
 ## [Unreleased]
 
 ### Adicionado
+- **Fase 4.3 — API + UI de overrides por localização**:
+  - Novo endpoint [api/inventory/item-location-params.js](api/inventory/item-location-params.js) montado em `/api/inventory/items/:itemId/location-params`:
+    - `GET /` — devolve params efetivos por localização (1 linha por location ativa, com `is_override` e `source_<campo>`)
+    - `PUT /:locationId` — upsert override (qualquer campo omitido ou null = herda)
+    - `DELETE /:locationId` — soft-delete do override (volta a herdar)
+  - `GET /items/:id` agora inclui `location_params: [...]` no payload (apenas para consumo).
+  - Filtro `?location_id=` em `/reports/{reorder,stock-min-max,coverage,kardex,consumption-trend}` — quando presente, usam as views `*_by_location` da F4.2.
+  - Filtros `?from=` e `?to=` em `/reports/kardex/:itemId` para janela temporal customizável; saldo passa a usar `running_balance_at_location` quando `location_id` presente.
+  - `/stats/summary` aceita `?location_id=` (KPIs filtrados) e devolve `by_location: [{location_id, name, items_total, below_min, ...}]` quando sem filtro — pronto para dashboard segmentado em F4.4.
+  - UI [item-form.html](public/inventory/item-form.html): nova seção "Parâmetros por localização" (apenas consumo, modo edit) com tabela de min/max/lead_time/janela por localização. Vazio = herda do global. Override = bold sky. Botão para reverter ao default.
+  - UI [item-view.html](public/inventory/item-view.html): tabela read-only de parâmetros efetivos com badges "Override"/"Herda" e indicação visual do valor sobrescrito.
 - **Fase 4.2 — Views e MV por localização + min efetivo em fn_inv_consume**: nova migração [51-fase4-views-by-location.sql](database/inventory-refactor/51-fase4-views-by-location.sql) (**requer migração**):
   - 5 views novas: `vw_inv_total_stock_by_location`, `vw_inv_avg_daily_consumption_by_location`, `vw_inv_reorder_status_by_location`, `vw_inv_stock_coverage_by_location`, `vw_inv_kardex_by_location` — todas leem parâmetros via `vw_inv_item_effective_params`.
   - `mvw_inv_consumption_trend_by_location` (16 meses, refresh diário via pg_cron `inv-refresh-mviews-daily` — comando atualizado para incluir a nova MV).

@@ -137,7 +137,7 @@ document.getElementById('pageContent').innerHTML = `
             </section>
 
             <section id="stockFieldset">
-                <h4 class="text-[10px] uppercase tracking-wider font-bold text-gray-500 mb-3">Parâmetros de stock</h4>
+                <h4 class="text-[10px] uppercase tracking-wider font-bold text-gray-500 mb-3">Parâmetros de stock (padrão global)</h4>
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
                         <label class="field-label">Stock mínimo</label>
@@ -151,6 +151,20 @@ document.getElementById('pageContent').innerHTML = `
                         <label class="field-label">Tempo de reposição (dias)</label>
                         <input name="lead_time_days" type="number" value="0" class="field-input">
                     </div>
+                </div>
+                <p class="text-[11px] text-gray-500 bg-sky-50/50 border border-sky-100 rounded-lg px-3 py-2 mt-3 flex items-start gap-2">
+                    <i class="fas fa-circle-info text-sky-500 mt-0.5"></i>
+                    <span>Estes valores valem para <strong>todas as localizações</strong> que não tiverem override personalizado abaixo.</span>
+                </p>
+            </section>
+
+            <section id="locationParamsFieldset" class="hidden">
+                <h4 class="text-[10px] uppercase tracking-wider font-bold text-gray-500 mb-3">Parâmetros por localização</h4>
+                <p class="text-[11px] text-gray-500 mb-3">
+                    Deixe os campos vazios para herdar do padrão global. Útil quando o consumo difere entre as unidades.
+                </p>
+                <div id="locationParamsRows" class="space-y-2">
+                    <p class="text-xs text-gray-400 italic">Salve o item primeiro para gerenciar parâmetros por localização.</p>
                 </div>
             </section>
 
@@ -211,15 +225,18 @@ document.getElementById('btnChangeType').addEventListener('click', () => {
 
 let categoriesAll = [];
 let uomsAll = [];
+let locationsAll = [];
 
 async function bootstrap() {
     try {
-        const [cats, uoms] = await Promise.all([
+        const [cats, uoms, locs] = await Promise.all([
             apiCall('/api/inventory/categories'),
-            apiCall('/api/inventory/uoms')
+            apiCall('/api/inventory/uoms'),
+            apiCall('/api/inventory/locations')
         ]);
         categoriesAll = cats.data;
-        uomsAll = uoms.data;
+        uomsAll       = uoms.data;
+        locationsAll  = (locs.data || []).filter(l => l.is_active);
         for (const id of ['baseUomSelect','purchaseUomSelect','consumptionUomSelect']) {
             const sel = document.getElementById(id);
             sel.innerHTML = (id === 'baseUomSelect' ? '' : '<option value="">—</option>')
@@ -239,8 +256,106 @@ function activateMacro(macro) {
         categoriesAll.filter(c => c.parent_macro === macro)
                      .map(c => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('');
     patrimonyFieldset.classList.toggle('hidden', macro !== 'patrimonial');
+    // Overrides por localização só fazem sentido para consumo
+    document.getElementById('locationParamsFieldset').classList.toggle('hidden', !isConsumo);
     step1.classList.add('hidden');
     step2.classList.remove('hidden');
+}
+
+// Renderiza a tabela de overrides por localização (apenas no modo edit)
+function renderLocationParams(effectiveParams) {
+    const container = document.getElementById('locationParamsRows');
+    if (!editingId) {
+        container.innerHTML = '<p class="text-xs text-gray-400 italic">Salve o item primeiro para gerenciar parâmetros por localização.</p>';
+        return;
+    }
+    const byLoc = new Map();
+    for (const ep of (effectiveParams || [])) byLoc.set(ep.location_id, ep);
+
+    container.innerHTML = `
+        <div class="overflow-x-auto">
+        <table class="w-full text-xs">
+            <thead class="bg-gray-50/60 text-[10px] uppercase tracking-wider text-gray-500">
+                <tr>
+                    <th class="text-left p-2">Localização</th>
+                    <th class="text-right p-2">Min</th>
+                    <th class="text-right p-2">Max</th>
+                    <th class="text-right p-2">Lead time (d)</th>
+                    <th class="text-right p-2">Janela cons. (d)</th>
+                    <th class="text-center p-2">Estado</th>
+                    <th class="text-center p-2"></th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100">
+                ${locationsAll.map(l => {
+                    const ep = byLoc.get(l.id) || {};
+                    return `
+                    <tr data-location-id="${l.id}" class="hover:bg-sky-50/30">
+                        <td class="p-2">
+                            <div class="font-medium text-gray-900">${escapeHtml(l.name)}</div>
+                            <div class="text-[10px] text-gray-500">${escapeHtml(l.unit?.name || '')}</div>
+                        </td>
+                        <td class="p-2"><input type="number" step="0.0001" class="lp-min w-24 px-2 py-1 border border-gray-200 rounded text-right text-xs" placeholder="${ep.source_min_stock === 'item' ? ep.min_stock : '—'}" value="${ep.source_min_stock === 'location' ? ep.min_stock : ''}"></td>
+                        <td class="p-2"><input type="number" step="0.0001" class="lp-max w-24 px-2 py-1 border border-gray-200 rounded text-right text-xs" placeholder="${ep.source_max_stock === 'item' && ep.max_stock != null ? ep.max_stock : '—'}" value="${ep.source_max_stock === 'location' ? ep.max_stock : ''}"></td>
+                        <td class="p-2"><input type="number" step="1" class="lp-lead w-24 px-2 py-1 border border-gray-200 rounded text-right text-xs" placeholder="${ep.source_lead_time_days === 'item' ? ep.lead_time_days : '—'}" value="${ep.source_lead_time_days === 'location' ? ep.lead_time_days : ''}"></td>
+                        <td class="p-2">
+                            <select class="lp-window w-28 px-2 py-1 border border-gray-200 rounded text-right text-xs">
+                                <option value="">herda (${ep.consumption_window_days}d)</option>
+                                <option value="30"  ${ep.source_window_days === 'location' && ep.consumption_window_days == 30  ? 'selected' : ''}>30 dias</option>
+                                <option value="60"  ${ep.source_window_days === 'location' && ep.consumption_window_days == 60  ? 'selected' : ''}>60 dias</option>
+                                <option value="90"  ${ep.source_window_days === 'location' && ep.consumption_window_days == 90  ? 'selected' : ''}>90 dias</option>
+                                <option value="180" ${ep.source_window_days === 'location' && ep.consumption_window_days == 180 ? 'selected' : ''}>180 dias</option>
+                                <option value="365" ${ep.source_window_days === 'location' && ep.consumption_window_days == 365 ? 'selected' : ''}>365 dias</option>
+                            </select>
+                        </td>
+                        <td class="p-2 text-center">
+                            ${ep.is_override
+                                ? '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-sky-100 text-sky-700 text-[10px] font-medium">Override</span>'
+                                : '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 text-[10px]">Herda</span>'
+                            }
+                        </td>
+                        <td class="p-2 text-center">
+                            ${ep.is_override
+                                ? `<button type="button" onclick="removeOverride('${l.id}')" class="text-red-500 hover:text-red-700" title="Voltar a herdar do padrão"><i class="fas fa-undo text-[11px]"></i></button>`
+                                : ''
+                            }
+                        </td>
+                    </tr>
+                    `;
+                }).join('')}
+            </tbody>
+        </table>
+        </div>
+    `;
+}
+
+async function removeOverride(locationId) {
+    if (!confirm('Voltar a herdar do padrão global para esta localização?')) return;
+    try {
+        await apiCall(`/api/inventory/items/${editingId}/location-params/${locationId}`, { method: 'DELETE' });
+        toast('Override removido');
+        await loadForEdit();
+    } catch (err) { toast(err.message, 'error'); }
+}
+
+// Lê inputs da tabela e devolve apenas as linhas que têm pelo menos 1 valor
+function collectLocationOverrides() {
+    const out = [];
+    document.querySelectorAll('#locationParamsRows tr[data-location-id]').forEach(tr => {
+        const min   = tr.querySelector('.lp-min').value;
+        const max   = tr.querySelector('.lp-max').value;
+        const lead  = tr.querySelector('.lp-lead').value;
+        const win   = tr.querySelector('.lp-window').value;
+        if (min === '' && max === '' && lead === '' && win === '') return;
+        out.push({
+            location_id:             tr.dataset.locationId,
+            min_stock:               min  !== '' ? parseFloat(min)  : null,
+            max_stock:               max  !== '' ? parseFloat(max)  : null,
+            lead_time_days:          lead !== '' ? parseInt(lead)   : null,
+            consumption_window_days: win  !== '' ? parseInt(win)    : null
+        });
+    });
+    return out;
 }
 
 async function loadForEdit() {
@@ -256,6 +371,10 @@ async function loadForEdit() {
         if (it.image_url) {
             document.getElementById('imagePreview').innerHTML =
                 `<img src="${it.image_url}" class="h-24 rounded-lg border border-gray-200 object-cover">`;
+        }
+        // Fase 4.3: tabela de parâmetros por localização (apenas consumo)
+        if (it.macro_category === 'consumo') {
+            renderLocationParams(it.location_params || []);
         }
     } catch (err) { toast(err.message, 'error'); }
 }
@@ -290,6 +409,22 @@ document.getElementById('itemForm').addEventListener('submit', async (e) => {
             const fd = new FormData();
             fd.append('image', file);
             await apiCall(`/api/inventory/items/${saved.id}/image`, { method: 'POST', body: fd });
+        }
+        // Fase 4.3: salva overrides por localização (apenas consumo + modo edit)
+        if (editingId && payload.macro_category === 'consumo') {
+            const overrides = collectLocationOverrides();
+            for (const ov of overrides) {
+                const { location_id, ...body } = ov;
+                try {
+                    await apiCall(`/api/inventory/items/${saved.id}/location-params/${location_id}`, {
+                        method: 'PUT',
+                        body: JSON.stringify(body)
+                    });
+                } catch (err) {
+                    console.error('Falha ao salvar override', location_id, err);
+                    toast(`Override para localização falhou: ${err.message}`, 'error');
+                }
+            }
         }
         toast('Item guardado com sucesso');
         setTimeout(() => location.href = 'items.html', 800);

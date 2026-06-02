@@ -111,7 +111,20 @@ router.get('/:id', requirePermission('inventory', 'read'), async (req, res) => {
             .select('quantity, lot:inv_lots(id, lot_number, expiry_date), location:inv_locations(id, name, unit:inv_units(id, name))')
             .eq('item_id', id);
 
-        res.json({ success: true, data: { ...item, stock: stock || [] } });
+        // Fase 4.3: parâmetros efetivos por localização (apenas consumo).
+        // Devolve sempre a lista completa (1 linha por location ativa) com
+        // is_override + source_* para a UI poder distinguir herança vs override.
+        let location_params = [];
+        if (item.macro_category === 'consumo') {
+            const { data: ep } = await supabaseAdmin
+                .from('vw_inv_item_effective_params')
+                .select('*')
+                .eq('item_id', id)
+                .order('location_name', { ascending: true });
+            location_params = ep || [];
+        }
+
+        res.json({ success: true, data: { ...item, stock: stock || [], location_params } });
     } catch (err) {
         console.error('GET inv_items/:id error:', err);
         res.status(500).json({ error: err.message || 'Erro ao obter item' });
