@@ -119,24 +119,49 @@ const ACTION_VERBS = {
 };
 const ENTITY_LABELS = {
     items: 'item', suppliers: 'fornecedor', locations: 'localização',
-    categories: 'subcategoria', uoms: 'unidade de medida', units: 'unidade',
+    categories: 'categoria', uoms: 'unidade de medida', units: 'unidade',
     entries: 'entrada', exits: 'saída', transfers: 'transferência',
     adjustments: 'ajuste', 'inventory-sessions': 'sessão de inventário',
     'adjustment-reasons': 'motivo de ajuste', depreciation: 'depreciação',
     reports: 'relatório', stats: 'estatística', search: 'busca',
     'access-log': 'log de acesso', scan: 'leitura QR', movements: 'movimento'
 };
+// Sub-rotas conhecidas: cada chave casa com um trecho do path que aparece
+// APÓS o UUID do recurso pai (ex.: /items/<id>/location-params/<id>).
+// Retorna um texto que substitui o nome da entidade-pai na descrição.
+const SUB_RESOURCES = [
+    { match: '/location-params', label: 'parâmetros por localização do item' },
+    { match: '/image',           label: 'imagem do item' },
+    { match: '/pdf',             label: 'PDF do item' },
+    { match: '/qr',              label: 'QR Code do item' },
+    { match: '/effective-window',label: 'janela efetiva do item' },
+    { match: '/counts',          label: 'contagens da sessão' },
+    { match: '/validate',        label: 'sessão de inventário (validou)' },
+    { match: '/cancel',          label: 'sessão de inventário (cancelou)' }
+];
+
+function detectSubResource(path) {
+    for (const s of SUB_RESOURCES) {
+        if (path.includes(s.match)) return s.label;
+    }
+    return null;
+}
+
 function describeAction(l) {
     const verb = ACTION_VERBS[l.method] || l.method;
-    const entity = ENTITY_LABELS[l.entity_type] || l.entity_type || '';
-    if (!entity) return verb;
-    // Casos especiais: ações típicas
-    if (l.path.endsWith('/validate'))  return 'Validou sessão de inventário';
-    if (l.path.endsWith('/cancel'))    return 'Cancelou sessão de inventário';
+
+    // Casos especiais primeiro (independem do entity_type)
     if (l.path.endsWith('/purge'))     return 'Purgou log de acesso';
     if (l.path.endsWith('/run'))       return 'Executou depreciação anual';
     if (l.path.endsWith('/settings'))  return `${verb} configurações`;
     if (l.path.endsWith('/summary'))   return 'Carregou painel';
+
+    // Sub-recurso (DELETE/PUT/POST em /items/<id>/location-params/<id>, etc.)
+    const sub = detectSubResource(l.path);
+    if (sub) return `${verb} ${sub}`;
+
+    const entity = ENTITY_LABELS[l.entity_type] || l.entity_type || '';
+    if (!entity) return verb;
     return `${verb} ${entity}`;
 }
 

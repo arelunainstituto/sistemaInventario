@@ -48,18 +48,44 @@ router.put('/settings', requireRole(ADMIN_ROLES), async (req, res) => {
     }
 });
 
-// Helper: enriquece registos de log com display_name/email do user_profiles.
-// Faz isso em 2 etapas porque inv_access_log.user_id aponta para auth.users,
-// não diretamente para user_profiles (PostgREST não detecta a relação).
+// Helper: enriquece registos de log com nome/email do utilizador.
+// inv_access_log.user_id aponta para auth.users.id. Schema de user_profiles
+// (verificado em api/rh/employees.js:96 e migrations): user_id (FK auth.users),
+// display_name, first_name, tenant_id, is_active. Email vive em auth.users.
+// Estratégia:
+//   1) Resolve display_name/first_name por user_profiles.
+//   2) Para user_ids sem nome resolvido, busca email em auth.users via admin API.
 async function attachUserProfiles(rows) {
     const userIds = [...new Set(rows.map(r => r.user_id).filter(Boolean))];
     if (!userIds.length) return rows;
-    const { data: profiles } = await supabaseAdmin
+
+    const { data: profiles, error: profErr } = await supabaseAdmin
         .from('user_profiles')
-        .select('id, display_name, email')
-        .in('id', userIds);
-    const byId = new Map((profiles || []).map(p => [p.id, p]));
-    return rows.map(r => ({ ...r, user: r.user_id ? (byId.get(r.user_id) || null) : null }));
+        .select('user_id, display_name, first_name')
+        .in('user_id', userIds);
+    if (profErr) console.error('[access-log] user_profiles fetch error:', profErr.message);
+
+    const byUserId = new Map();
+    for (const p of (profiles || [])) {
+        const name = p.display_name || p.first_name || null;
+        byUserId.set(p.user_id, { ...p, display_name: name });
+    }
+
+    // Para user_ids sem nome em user_profiles, busca email em auth.users
+    // (paralelo, mas limitado para não estourar rate limit).
+    const missing = userIds.filter(uid => !byUserId.get(uid)?.display_name);
+    if (missing.length) {
+        await Promise.all(missing.slice(0, 50).map(async uid => {
+            try {
+                const { data, error } = await supabaseAdmin.auth.admin.getUserById(uid);
+                if (error || !data?.user) return;
+                const existing = byUserId.get(uid) || {};
+                byUserId.set(uid, { ...existing, email: data.user.email, display_name: existing.display_name || data.user.email });
+            } catch (e) { /* swallow */ }
+        }));
+    }
+
+    return rows.map(r => ({ ...r, user: r.user_id ? (byUserId.get(r.user_id) || null) : null }));
 }
 
 // Resolve entity_id (UUID nu) para uma label amigável por tipo de entidade.
