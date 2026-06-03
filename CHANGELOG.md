@@ -34,7 +34,30 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e
 
 ## [Unreleased]
 
-_Nenhuma alteração pendente._
+### Alterado
+- **Relatórios — filtros aplicados ANTES da consulta** ([reports.html](public/inventory/reports.html)): clicar no card abre painel de filtros vazio; usuário escolhe localização/datas e clica "Aplicar consulta" para disparar o fetch. Botões CSV/Excel/PDF só aparecem após a primeira consulta. Adicionado filtro de data (`from`/`to`) nos relatórios temporais (inventory-sessions, consumption-trend, user-activity) com default últimos 30 dias.
+- **Valoração dos Stocks (antes "Valorização de Stock")** ([reports.js](api/inventory/reports.js)): agregada por (item, localização) somando todos os lotes — não detalha lote por linha. Aceita `?location_id=` para filtrar; quando filtrado, agrega só por item (todos os lotes da localização). Lógica reescrita usando `inv_stock` direto em vez de `vw_inv_valuation` para suportar o filtro.
+- **"Depreciação (patrimonial)" → "Ajuste contábil"** ([adjustments.html](public/inventory/adjustments.html)): apenas label da opção no modal de Saída administrativa — subtype `depreciacao` no DB inalterado (mantém compat com fluxo de depreciação anual).
+
+### Adicionado
+- **Saída administrativa na tela de Ajustes** ([adjustments.html](public/inventory/adjustments.html)): Admin tem 2 botões na tela de Ajustes:
+  - **Novo ajuste** — fluxo existente (movimento type=ajuste com motivo)
+  - **Saída administrativa** — novo modal para avaria/extravio/perda/quebra/depreciação. Gera um movimento **type=saida** (não ajuste) via `POST /api/inventory/exits` com o subtype administrativo. Aparece no histórico de Saídas, não de Ajustes.
+  - Rationale: esses tipos são tecnicamente saídas (consomem stock), mas o lançamento fica restrito a Admin via UI. Operador comum continua sem acesso à tela e o endpoint `/exits` continua bloqueando subtypes administrativos para roles não-admin.
+- **Comprovante de entrada/saída/ajuste para impressão Brother QL-810W** ([print-receipt.html](public/inventory/print-receipt.html)):
+  - Nova página `/inventory/print-receipt.html?type=entry|exit&id=<uuid>` com layout otimizado para impressão térmica em mm (mesma estratégia da etiqueta QR — `@page` sem cabeçalho/rodapé, seletor de rolo DK).
+  - Endpoint `GET /api/inventory/movements/:id` adicionado em [movements.js](api/inventory/movements.js) para alimentar o comprovante de saída/ajuste.
+  - `showViewModal` em [_layout.js](public/inventory/_layout.js) ganha parâmetro `actions: [{label, icon, href|onclick}]` — botões na barra superior do modal.
+  - Botão "Imprimir comprovante" adicionado nos modais de view em [entries.html](public/inventory/entries.html), [exits.html](public/inventory/exits.html) e [adjustments.html](public/inventory/adjustments.html). Impressão sob demanda — não automática ao lançar.
+  - Formato do comprovante: cabeçalho institucional, dados do documento (entrada) ou movimento, item(s), quantidade(s), custos e justificação quando aplicável.
+
+### Alterado
+- **QR escaneado vai direto para a ficha do item** ([items.js](api/inventory/items.js), [item-view.html](public/inventory/item-view.html), [scan.html](public/inventory/scan.html)):
+  - Payload do QR mudou de `/inventory/scan.html?code=<uuid>` para `/inventory/item-view.html?qr=<uuid>` — escanear a etiqueta abre a ficha imediatamente.
+  - `item-view.html` aceita `?qr=<uuid>` e resolve via `/api/inventory/scan/:qrCode` antes de carregar.
+  - `scan.html` simplificado: serve apenas de leitor por câmera (sem preview card); ao escanear, redireciona para `item-view.html?qr=`.
+  - Retrocompat: URL antiga `scan.html?code=` faz redirect 302-equivalente client-side para `item-view.html?qr=`.
+  - **Etiquetas impressas com QR antigo precisam ser reimpressas** para apontar para a nova URL diretamente (eliminar o redirect intermediário).
 
 ---
 
