@@ -206,41 +206,95 @@ router.get('/coverage', requirePermission('inventory', 'reports'), async (req, r
     } catch (err) { console.error('GET /reports/coverage', err); res.status(500).json({ error: err.message }); }
 });
 
-// 12.4 — Valorização de stock
+// 12.4 — Valoração dos Stocks. Acumula lotes por (item, location) somando
+// qty × Custo Médio. Quando ?location_id= for fornecido, agrega só por item
+// (todos os lotes da localização escolhida). Visão de gestor: "quanto tenho
+// acumulado de cada item naquela loja", sem detalhar por lote.
 router.get('/valuation', requirePermission('inventory', 'financial'), async (req, res) => {
     try {
-        const rows = await fetchView('vw_inv_valuation');
+        const { location_id } = req.query;
+        let q = supabaseAdmin
+            .from('inv_stock')
+            .select(`
+                quantity, location_id,
+                item:inv_items!item_id(id, internal_code, name, cmp,
+                    subcategory:inv_categories!subcategory_id(name),
+                    base_uom:inv_units_of_measure!base_uom_id(name, code)),
+                location:inv_locations!location_id(id, name, unit:inv_units!unit_id(name))
+            `)
+            .gt('quantity', 0);
+        if (location_id) q = q.eq('location_id', location_id);
+        const { data, error } = await q;
+        if (error) throw error;
+
+        // Agrega: chave = item_id (quando filtrado por location) OR item_id:location_id
+        const agg = new Map();
+        for (const s of (data || [])) {
+            if (!s.item) continue;
+            const key = location_id ? s.item.id : `${s.item.id}:${s.location_id}`;
+            if (!agg.has(key)) {
+                agg.set(key, {
+                    internal_code: s.item.internal_code,
+                    name:          s.item.name,
+                    subcategory:   s.item.subcategory?.name || '',
+                    unit_name:     s.item.base_uom ? `${s.item.base_uom.name} (${s.item.base_uom.code})` : '',
+                    location_name: location_id ? null : `${s.location?.unit?.name || ''} · ${s.location?.name || ''}`,
+                    quantity:      0,
+                    cmp:           parseFloat(s.item.cmp || 0),
+                    line_value:    0
+                });
+            }
+            const row = agg.get(key);
+            const qty = parseFloat(s.quantity);
+            row.quantity   += qty;
+            row.line_value += qty * parseFloat(s.item.cmp || 0);
+        }
+        const rows = Array.from(agg.values()).map(r => ({
+            ...r,
+            quantity:   r.quantity.toFixed(2),
+            cmp:        r.cmp.toFixed(4),
+            line_value: r.line_value.toFixed(2)
+        })).sort((a, b) => a.name.localeCompare(b.name));
+
         const totals = formatTotals(
             sumColumns(rows, ['quantity','line_value']),
             { quantity: 'num2', line_value: 'eur2' }
         );
+
+        const columns = [
+            { key: 'internal_code',  label: 'Código',         width: 60 },
+            { key: 'name',           label: 'Item',           width: 200 },
+            { key: 'subcategory',    label: 'Subcategoria',   width: 90 },
+            { key: 'unit_name',      label: 'Unidade',        width: 80 },
+            ...(location_id ? [] : [{ key: 'location_name', label: 'Localização', width: 100 }]),
+            { key: 'quantity',       label: 'Qtd total',      width: 65 },
+            { key: 'cmp',            label: 'Custo M. €',     width: 70 },
+            { key: 'line_value',     label: 'Valor €',        width: 85 }
+        ];
+
         sendReport(res, req.query.format, {
-            title: 'Valorização de Stock',
-            subtitle: `Total: ${totals.line_value || '€ 0.00'}`,
-            columns: [
-                { key: 'internal_code',  label: 'Código',         width: 60 },
-                { key: 'name',           label: 'Item',           width: 180 },
-                { key: 'subcategory',    label: 'Subcategoria',   width: 80 },
-                { key: 'unit_name',      label: 'Unidade',        width: 70 },
-                { key: 'location_name',  label: 'Localização',    width: 80 },
-                { key: 'quantity',       label: 'Qtd',            width: 50 },
-                { key: 'cmp',            label: 'Custo M. €',     width: 60 },
-                { key: 'line_value',     label: 'Total €',        width: 70 }
-            ],
+            title: 'Valoração dos Stocks',
+            subtitle: `Total: ${totals.line_value || '€ 0.00'}${location_id ? ' · filtrado por localização' : ''}`,
+            columns,
             rows,
             totals
         });
     } catch (err) { console.error('GET /reports/valuation', err); res.status(500).json({ error: err.message }); }
 });
 
-// 12.5 — Relatório de inventário (última sessão por localização)
+// 12.5 — Relatório de inventário. Aceita ?location_id=, ?from=, ?to= (opened_at)
 router.get('/inventory-sessions', requirePermission('inventory', 'reports'), async (req, res) => {
     try {
-        const { data, error } = await supabaseAdmin
+        const { location_id, from, to } = req.query;
+        let q = supabaseAdmin
             .from('inv_inventory_sessions')
             .select('*, location:inv_locations!location_id(name, unit:inv_units!unit_id(name)), counts:inv_inventory_counts(item:inv_items!item_id(internal_code, name), expected_qty, counted_qty, difference)')
             .order('opened_at', { ascending: false })
-            .limit(50);
+            .limit(200);
+        if (location_id) q = q.eq('location_id', location_id);
+        if (from) q = q.gte('opened_at', from);
+        if (to)   q = q.lte('opened_at', to);
+        const { data, error } = await q;
         if (error) throw error;
 
         // Achata para tabela de relatório
@@ -353,17 +407,19 @@ router.get('/kardex/:itemId', requirePermission('inventory', 'reports'), async (
     } catch (err) { console.error('GET /reports/kardex', err); res.status(500).json({ error: err.message }); }
 });
 
-// 12.7 — Tendência de consumo. Aceita ?item_id= e ?location_id= opcionais.
+// 12.7 — Tendência de consumo. Aceita ?item_id, ?location_id, ?from, ?to.
 router.get('/consumption-trend', requirePermission('inventory', 'reports'), async (req, res) => {
     try {
-        const { item_id, location_id } = req.query;
+        const { item_id, location_id, from, to } = req.query;
 
         const viewName = location_id ? 'mvw_inv_consumption_trend_by_location' : 'mvw_inv_consumption_trend';
-        const orderCol = location_id ? 'month_start' : 'month';
+        const monthCol = location_id ? 'month_start' : 'month';
         let q = supabaseAdmin.from(viewName).select('*');
         if (item_id)     q = q.eq('item_id', item_id);
         if (location_id) q = q.eq('location_id', location_id);
-        const { data, error } = await q.order(orderCol, { ascending: true });
+        if (from) q = q.gte(monthCol, from);
+        if (to)   q = q.lte(monthCol, to);
+        const { data, error } = await q.order(monthCol, { ascending: true });
         if (error) throw error;
 
         const rows = (data || []).map(r => ({
@@ -391,13 +447,17 @@ router.get('/consumption-trend', requirePermission('inventory', 'reports'), asyn
     } catch (err) { console.error('GET /reports/consumption-trend', err); res.status(500).json({ error: err.message }); }
 });
 
-// 12.8 — Atividade por utilizador
+// 12.8 — Atividade por utilizador. Aceita ?from=, ?to= (dia).
 router.get('/user-activity', requirePermission('inventory', 'reports'), async (req, res) => {
     try {
-        const { data, error } = await supabaseAdmin
+        const { from, to } = req.query;
+        let q = supabaseAdmin
             .from('mvw_inv_user_activity')
             .select('*')
             .order('day', { ascending: false });
+        if (from) q = q.gte('day', from);
+        if (to)   q = q.lte('day', to);
+        const { data, error } = await q;
         if (error) throw error;
 
         const rows = (data || []).map(r => ({

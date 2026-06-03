@@ -15,14 +15,17 @@
 <script>
 renderInventoryLayout({ activePage: 'reports', title: 'Relatórios', subtitle: 'Indicadores e exportações' });
 
+// supportsLocation/supportsDateRange determinam quais filtros aparecem antes
+// de gerar a consulta. Relatórios "snapshot do agora" (reorder, coverage,
+// min-max, valoração) não filtram por data — só por localização.
 const REPORTS = [
-    { key: 'reorder',            label: 'Ponto de Reposição',                  icon: 'fa-rotate',                color: 'red',     hint: 'Itens abaixo do ponto de reposição',      endpoint: '/reports/reorder',           supportsLocation: true  },
-    { key: 'stock-min-max',      label: 'Abaixo do Mínimo / Acima do Máximo',  icon: 'fa-triangle-exclamation',  color: 'orange',  hint: 'Identifica ruturas e excessos',           endpoint: '/reports/stock-min-max',     supportsLocation: true  },
-    { key: 'coverage',           label: 'Cobertura de Stock',                  icon: 'fa-clock',                 color: 'blue',    hint: 'Dias de cobertura por item',              endpoint: '/reports/coverage',          supportsLocation: true  },
-    { key: 'valuation',          label: 'Valorização de Stock',                icon: 'fa-euro-sign',             color: 'purple',  hint: 'Stock × Custo Médio por item, categoria e local', endpoint: '/reports/valuation',         supportsLocation: false },
-    { key: 'inventory-sessions', label: 'Inventário (Contagem)',               icon: 'fa-list-check',            color: 'indigo',  hint: 'Diferenças apuradas em sessões',          endpoint: '/reports/inventory-sessions', supportsLocation: false },
-    { key: 'consumption-trend',  label: 'Tendência de Consumo',                icon: 'fa-chart-line',            color: 'sky',     hint: 'Mensal com comparativo anual',            endpoint: '/reports/consumption-trend', supportsLocation: true  },
-    { key: 'user-activity',      label: 'Movimentos por Utilizador',           icon: 'fa-user-clock',            color: 'gray',    hint: 'Auditoria de operações por utilizador',   endpoint: '/reports/user-activity',     supportsLocation: false }
+    { key: 'reorder',            label: 'Ponto de Reposição',                  icon: 'fa-rotate',                color: 'red',     hint: 'Itens abaixo do ponto de reposição',      endpoint: '/reports/reorder',            supportsLocation: true,  supportsDateRange: false },
+    { key: 'stock-min-max',      label: 'Abaixo do Mínimo / Acima do Máximo',  icon: 'fa-triangle-exclamation',  color: 'orange',  hint: 'Identifica ruturas e excessos',           endpoint: '/reports/stock-min-max',      supportsLocation: true,  supportsDateRange: false },
+    { key: 'coverage',           label: 'Cobertura de Stock',                  icon: 'fa-clock',                 color: 'blue',    hint: 'Dias de cobertura por item',              endpoint: '/reports/coverage',           supportsLocation: true,  supportsDateRange: false },
+    { key: 'valuation',          label: 'Valoração dos Stocks',                icon: 'fa-euro-sign',             color: 'purple',  hint: 'Soma de Stock × Custo Médio por item',    endpoint: '/reports/valuation',          supportsLocation: true,  supportsDateRange: false },
+    { key: 'inventory-sessions', label: 'Inventário (Contagem)',               icon: 'fa-list-check',            color: 'indigo',  hint: 'Diferenças apuradas em sessões',          endpoint: '/reports/inventory-sessions', supportsLocation: true,  supportsDateRange: true  },
+    { key: 'consumption-trend',  label: 'Tendência de Consumo',                icon: 'fa-chart-line',            color: 'sky',     hint: 'Mensal com comparativo anual',            endpoint: '/reports/consumption-trend',  supportsLocation: true,  supportsDateRange: true  },
+    { key: 'user-activity',      label: 'Movimentos por Utilizador',           icon: 'fa-user-clock',            color: 'gray',    hint: 'Auditoria de operações por utilizador',   endpoint: '/reports/user-activity',      supportsLocation: false, supportsDateRange: true  }
 ];
 
 document.getElementById('pageContent').innerHTML = `
@@ -60,29 +63,46 @@ document.getElementById('pageContent').innerHTML = `
                 <h3 id="reportTitle" class="text-base font-bold text-gray-900">—</h3>
                 <p id="reportSubtitle" class="text-xs text-gray-500 mt-0.5"></p>
             </div>
-            <div class="flex gap-2 flex-shrink-0">
+            <div id="reportExportActions" class="hidden flex gap-2 flex-shrink-0">
                 <button onclick="downloadCurrent('csv')" class="px-2.5 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-xs font-medium transition"><i class="fas fa-file-csv"></i> CSV</button>
                 <button onclick="downloadCurrent('xlsx')" class="px-2.5 py-1.5 bg-sky-50 hover:bg-sky-100 text-sky-700 border border-sky-100 rounded-lg text-xs font-medium transition"><i class="fas fa-file-excel"></i> Excel</button>
                 <button onclick="downloadCurrent('pdf')" class="px-2.5 py-1.5 bg-red-50 hover:bg-red-100 text-red-700 border border-red-100 rounded-lg text-xs font-medium transition"><i class="fas fa-file-pdf"></i> PDF</button>
             </div>
         </div>
-        <div id="reportFilters" class="hidden px-5 py-3 border-b border-gray-100 bg-gray-50/40 flex flex-wrap items-end gap-3">
-            <div class="flex-1 min-w-[200px]">
+        <!-- Filtros: aplicados ANTES da consulta. Usuário escolhe e clica
+             "Aplicar consulta" para disparar o fetch. -->
+        <div id="reportFilters" class="px-5 py-4 border-b border-gray-100 bg-gray-50/40 grid grid-cols-1 md:grid-cols-4 gap-3 items-end">
+            <div id="filterLocationWrap" class="md:col-span-2">
                 <label class="text-[10px] uppercase tracking-wider text-gray-500 font-semibold">Localização</label>
                 <select id="filterLocation" class="w-full px-3 py-1.5 border border-gray-300 rounded-lg text-sm mt-1">
                     <option value="">Todas (visão global)</option>
                 </select>
             </div>
-            <div>
-                <button id="applyFilters" class="px-4 py-1.5 bg-sky-600 hover:bg-sky-700 text-white rounded-lg text-sm font-medium">Aplicar</button>
+            <div id="filterFromWrap" class="hidden">
+                <label class="text-[10px] uppercase tracking-wider text-gray-500 font-semibold">De</label>
+                <input type="date" id="filterFrom" class="w-full px-3 py-1.5 border border-gray-300 rounded-lg text-sm mt-1">
+            </div>
+            <div id="filterToWrap" class="hidden">
+                <label class="text-[10px] uppercase tracking-wider text-gray-500 font-semibold">Até</label>
+                <input type="date" id="filterTo" class="w-full px-3 py-1.5 border border-gray-300 rounded-lg text-sm mt-1">
+            </div>
+            <div class="md:col-span-4 flex justify-end gap-2 border-t border-gray-200 pt-3">
+                <button id="resetFilters" class="px-4 py-1.5 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">Limpar</button>
+                <button id="applyFilters" class="px-5 py-1.5 bg-sky-600 hover:bg-sky-700 text-white rounded-lg text-sm font-medium flex items-center gap-2">
+                    <i class="fas fa-magnifying-glass text-xs"></i> Aplicar consulta
+                </button>
             </div>
         </div>
-        <div id="reportTable" class="overflow-x-auto max-h-[600px] overflow-y-auto"></div>
+        <div id="reportTable" class="overflow-x-auto max-h-[600px] overflow-y-auto">
+            <p class="text-sm text-gray-400 p-6 text-center">Aplique os filtros para gerar a consulta.</p>
+        </div>
     </div>
 `;
 
 let currentReport   = null;
 let currentLocation = '';
+let currentFrom     = '';
+let currentTo       = '';
 let locationsCache  = null;
 
 async function loadLocations() {
@@ -95,41 +115,56 @@ async function loadLocations() {
 function buildQuery(includeFormat) {
     const qs = new URLSearchParams();
     if (currentLocation) qs.set('location_id', currentLocation);
+    if (currentFrom)     qs.set('from', currentFrom);
+    if (currentTo)       qs.set('to', currentTo);
     if (includeFormat)   qs.set('format', includeFormat);
     return qs.toString() ? `?${qs.toString()}` : '';
 }
 
+// Ao clicar num card, abre o painel com os filtros aplicáveis ao relatório.
+// O fetch só dispara quando o usuário clica em "Aplicar consulta".
 async function openReport(key) {
     const r = REPORTS.find(x => x.key === key);
     if (!r) return;
     currentReport   = r;
-    currentLocation = ''; // reset ao trocar de relatório
+    currentLocation = '';
+    currentFrom     = '';
+    currentTo       = '';
     document.getElementById('reportPanel').classList.remove('hidden');
+    document.getElementById('reportPanel').scrollIntoView({ behavior: 'smooth', block: 'start' });
     document.getElementById('reportTitle').textContent = r.label;
     document.getElementById('reportSubtitle').textContent = r.hint;
-    document.getElementById('reportTable').innerHTML = '<p class="text-sm text-gray-400 p-4">Carregando…</p>';
+    document.getElementById('reportTable').innerHTML = '<p class="text-sm text-gray-400 p-6 text-center">Aplique os filtros para gerar a consulta.</p>';
+    document.getElementById('reportExportActions').classList.add('hidden');
 
-    // Mostra/esconde a barra de filtros conforme o relatório
-    const filtersBar = document.getElementById('reportFilters');
+    // Toggle dos filtros suportados
+    document.getElementById('filterLocationWrap').classList.toggle('hidden', !r.supportsLocation);
+    document.getElementById('filterFromWrap').classList.toggle('hidden', !r.supportsDateRange);
+    document.getElementById('filterToWrap').classList.toggle('hidden', !r.supportsDateRange);
+
     if (r.supportsLocation) {
-        filtersBar.classList.remove('hidden');
-        filtersBar.classList.add('flex');
         const locs = await loadLocations();
         document.getElementById('filterLocation').innerHTML = '<option value="">Todas (visão global)</option>' +
             locs.map(l => `<option value="${l.id}">${escapeHtml(l.unit?.name || '')} · ${escapeHtml(l.name)}</option>`).join('');
         document.getElementById('filterLocation').value = '';
-    } else {
-        filtersBar.classList.add('hidden');
-        filtersBar.classList.remove('flex');
     }
-
-    await fetchReportData();
+    if (r.supportsDateRange) {
+        // Default: últimos 30 dias
+        const to = new Date();
+        const from = new Date(Date.now() - 30 * 86400000);
+        document.getElementById('filterFrom').value = from.toISOString().slice(0, 10);
+        document.getElementById('filterTo').value   = to.toISOString().slice(0, 10);
+    } else {
+        document.getElementById('filterFrom').value = '';
+        document.getElementById('filterTo').value   = '';
+    }
 }
 
 async function fetchReportData() {
     const r = currentReport;
     if (!r) return;
     document.getElementById('reportTable').innerHTML = '<p class="text-sm text-gray-400 p-4">Carregando…</p>';
+    document.getElementById('reportExportActions').classList.remove('hidden');
     try {
         const res = await apiCall(`/api/inventory${r.endpoint}${buildQuery()}`);
         const rows = res.data || [];
@@ -165,12 +200,14 @@ async function fetchReportData() {
         const totalsRow = totals && Object.keys(totals).length ? `
             <tfoot class="border-t-2 border-gray-300 bg-gray-100/70 sticky bottom-0">
                 <tr>
-                    <td class="px-3 py-2 text-[10px] uppercase tracking-wider text-gray-700 font-bold">Total</td>
-                    ${columns.map((c, i) => {
-                        if (i === 0) return ''; // a primeira coluna serve o label "Total" acima (sai depois do #)
+                    <!-- "Total" cobre as 2 primeiras colunas (# + Código). Cada
+                         coluna seguinte renderiza explicitamente sua célula para
+                         manter o alinhamento com o thead. -->
+                    <td colspan="2" class="px-3 py-2 text-[10px] uppercase tracking-wider text-gray-700 font-bold">Total</td>
+                    ${columns.slice(1).map(c => {
                         const v = totals[c.key];
                         return `<td class="px-3 py-2 text-gray-900 tabular-nums font-bold">${v === undefined || v === null ? '' : escapeHtml(String(v))}</td>`;
-                    }).filter(s => s).join('')}
+                    }).join('')}
                 </tr>
             </tfoot>` : '';
         const tableHtml = rows.length ? `
@@ -211,9 +248,21 @@ async function fetchReportData() {
 }
 
 document.addEventListener('click', (e) => {
-    if (e.target?.id === 'applyFilters') {
+    const target = e.target.closest('button');
+    if (!target) return;
+    if (target.id === 'applyFilters') {
         currentLocation = document.getElementById('filterLocation').value || '';
+        currentFrom     = currentReport?.supportsDateRange ? (document.getElementById('filterFrom').value || '') : '';
+        currentTo       = currentReport?.supportsDateRange ? (document.getElementById('filterTo').value   || '') : '';
         fetchReportData();
+    } else if (target.id === 'resetFilters') {
+        if (currentReport?.supportsLocation) document.getElementById('filterLocation').value = '';
+        if (currentReport?.supportsDateRange) {
+            const to = new Date();
+            const from = new Date(Date.now() - 30 * 86400000);
+            document.getElementById('filterFrom').value = from.toISOString().slice(0, 10);
+            document.getElementById('filterTo').value   = to.toISOString().slice(0, 10);
+        }
     }
 });
 
