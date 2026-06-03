@@ -38,7 +38,6 @@
                 margin: 0 !important;
                 padding: 0 !important;
                 width: var(--label-w);
-                height: var(--label-h);
                 background: white !important;
             }
             .no-print { display: none !important; }
@@ -49,9 +48,12 @@
                 border: none !important;
                 border-radius: 0 !important;
                 margin: 0 !important;
-                page-break-after: always;
+                /* page-break-after: always causaria uma segunda página em branco
+                   quando há apenas uma etiqueta. Para imprimir várias em sequência,
+                   usar javascript: window.print() em loop ou ?qty=N (futuro). */
+                page-break-after: auto;
+                page-break-inside: avoid;
             }
-            /* Remove qualquer fundo decorativo herdado */
             body * { background: white; }
         }
     </style>

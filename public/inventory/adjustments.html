@@ -14,13 +14,20 @@
 <script src="_layout.js"></script>
 <script src="_searchable-select.js"></script>
 <script>
-renderInventoryLayout({ activePage: 'adjustments', title: 'Ajustes Manuais', subtitle: 'Correções +/-: sobras, quebras não registadas, desvios' });
+renderInventoryLayout({ activePage: 'adjustments', title: 'Ajustes (Admin)', subtitle: 'Ajustes manuais (+/-) e saídas administrativas (avaria/extravio/perda/quebra/depreciação)' });
 
 document.getElementById('pageContent').innerHTML = `
-    <div class="flex justify-between items-center mb-4">
+    <div class="flex justify-between items-center mb-4 flex-wrap gap-2">
         <h3 class="text-base font-bold text-gray-900">Histórico de ajustes</h3>
-        <button onclick="openModal()" class="bg-amber-500 hover:bg-amber-600 text-white px-4 py-2 rounded-lg text-sm font-medium shadow-sm shadow-amber-500/20 transition flex items-center gap-2"><i class="fas fa-sliders"></i> Novo ajuste</button>
+        <div class="flex gap-2">
+            <button onclick="openAdminExitModal()" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm font-medium shadow-sm shadow-red-500/20 transition flex items-center gap-2"><i class="fas fa-arrow-right-from-bracket"></i> Saída administrativa</button>
+            <button onclick="openModal()" class="bg-amber-500 hover:bg-amber-600 text-white px-4 py-2 rounded-lg text-sm font-medium shadow-sm shadow-amber-500/20 transition flex items-center gap-2"><i class="fas fa-sliders"></i> Novo ajuste</button>
+        </div>
     </div>
+    <p class="text-[11px] text-gray-500 mb-4 -mt-2 flex items-start gap-1.5">
+        <i class="fas fa-circle-info text-sky-500 mt-0.5"></i>
+        <span>Saídas administrativas são registadas como movimentos de <b>saída</b> e aparecem em <a href="exits.html" class="text-sky-600 hover:underline">Saídas</a>. Esta tela permite o lançamento por estar restrita a Admin.</span>
+    </p>
     <div class="bg-white rounded-xl border border-gray-200/70 shadow-sm overflow-hidden">
         <table class="w-full text-sm">
             <thead class="bg-gray-50/50 text-[10px] uppercase tracking-wider text-gray-500 border-b border-gray-200">
@@ -100,6 +107,67 @@ document.getElementById('pageContent').innerHTML = `
                 <div class="flex justify-end gap-2 border-t pt-4">
                     <button type="button" onclick="closeModal()" class="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">Cancelar</button>
                     <button type="submit" class="px-5 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-sm font-medium shadow-sm shadow-amber-500/20 transition flex items-center gap-2"><i class="fas fa-save"></i> Aplicar ajuste</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal: Saída administrativa (avaria/extravio/perda/quebra/depreciacao).
+         Registra como movimento type=saida via POST /api/inventory/exits.
+         Disponível só nesta tela porque a tela é restrita a Admin. -->
+    <div id="adminExitModal" class="hidden fixed inset-0 bg-gray-900/40 backdrop-blur-[2px] z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-xl border border-gray-200 shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
+            <div class="flex justify-between items-center p-4 border-b">
+                <h3 class="font-bold text-gray-800">Saída administrativa</h3>
+                <button onclick="closeAdminExitModal()" class="text-gray-400 hover:text-gray-600"><i class="fas fa-times"></i></button>
+            </div>
+            <form id="adminExitForm" class="p-6 space-y-4">
+                <div class="bg-red-50 border border-red-200 rounded-lg p-3 text-xs text-red-700">
+                    <i class="fas fa-circle-exclamation"></i>
+                    Esta operação grava um <strong>movimento de saída</strong> com motivo administrativo. Aparecerá em <a href="exits.html" class="underline">Saídas</a>.
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="text-xs text-gray-500">Motivo *</label>
+                        <select name="subtype" required class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                            <option value="avaria">Avaria</option>
+                            <option value="extravio">Extravio</option>
+                            <option value="perda">Perda</option>
+                            <option value="quebra">Quebra</option>
+                            <option value="depreciacao">Ajuste contábil</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="text-xs text-gray-500">Item *</label>
+                        <select name="item_id" id="adminExitItem" required onchange="onAdminExitItemChange()" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                            <option value="">— selecione —</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="text-xs text-gray-500">Localização de origem *</label>
+                        <select name="location_id" id="adminExitLocation" required onchange="onAdminExitLocationChange()" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                            <option value="">—</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="text-xs text-gray-500">Lote</label>
+                        <select name="lot_id" id="adminExitLot" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                            <option value="">— Sugestão FEFO automática —</option>
+                        </select>
+                        <p id="adminExitLotHint" class="text-[10px] text-blue-600 mt-1"></p>
+                    </div>
+                    <div>
+                        <label class="text-xs text-gray-500">Quantidade *</label>
+                        <input name="quantity" type="number" step="0.0001" min="0.0001" required class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                    </div>
+                </div>
+                <div>
+                    <label class="text-xs text-gray-500">Justificação *</label>
+                    <textarea name="justification" required rows="3" placeholder="Descreva as circunstâncias (obrigatória para tipos administrativos)" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"></textarea>
+                </div>
+                <div class="flex justify-end gap-2 border-t pt-4">
+                    <button type="button" onclick="closeAdminExitModal()" class="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">Cancelar</button>
+                    <button type="submit" class="px-5 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium shadow-sm shadow-red-500/20 transition flex items-center gap-2"><i class="fas fa-save"></i> Registar saída</button>
                 </div>
             </form>
         </div>
@@ -284,6 +352,92 @@ document.getElementById('form').addEventListener('submit', async e => {
     }
 });
 
+// =====================================================
+// Modal: Saída administrativa (POST /api/inventory/exits com subtype admin)
+// =====================================================
+let adminExitStock = [];
+
+function openAdminExitModal() {
+    document.getElementById('adminExitForm').reset();
+    document.getElementById('adminExitItem').innerHTML = '<option value="">— selecione —</option>' +
+        items.map(i => `<option value="${i.id}" data-controls-lot="${i.controls_lot}">${escapeHtml(i.internal_code)} · ${escapeHtml(i.name)}${i.subcategory?.name ? ' · ' + escapeHtml(i.subcategory.name) : ''}</option>`).join('');
+    document.getElementById('adminExitLocation').innerHTML = '<option value="">—</option>';
+    document.getElementById('adminExitLot').innerHTML = '<option value="">— Sugestão FEFO automática —</option>';
+    document.getElementById('adminExitLotHint').textContent = '';
+    document.getElementById('adminExitModal').classList.remove('hidden');
+    makeSearchable('adminExitItem',     { placeholder: 'Buscar item por nome, SKU ou categoria…' });
+    makeSearchable('adminExitLocation', { placeholder: 'Buscar localização…' });
+}
+
+function closeAdminExitModal() { document.getElementById('adminExitModal').classList.add('hidden'); }
+
+async function onAdminExitItemChange() {
+    const itemId = document.getElementById('adminExitItem').value;
+    if (!itemId) return;
+    try {
+        const r = await apiCall(`/api/inventory/exits/stock-by-item/${itemId}`);
+        adminExitStock = r.data || [];
+        const locMap = new Map();
+        adminExitStock.forEach(s => {
+            if (s.location?.can_send !== false) locMap.set(s.location_id, s.location);
+        });
+        document.getElementById('adminExitLocation').innerHTML = '<option value="">—</option>' +
+            Array.from(locMap.values()).map(l => `<option value="${l.id}">${escapeHtml(l.unit?.name || '')} · ${escapeHtml(l.name)}</option>`).join('');
+        makeSearchable('adminExitLocation', { placeholder: 'Buscar localização…' });
+    } catch (err) { toast(err.message, 'error'); }
+}
+
+function onAdminExitLocationChange() {
+    const itemOpt = document.getElementById('adminExitItem').selectedOptions[0];
+    const controlsLot = itemOpt?.dataset?.controlsLot === 'true';
+    const locId = document.getElementById('adminExitLocation').value;
+    const lotsHere = adminExitStock.filter(s => s.location_id === locId);
+    if (controlsLot) {
+        // Ordena FEFO (validade ascendente, sem validade no fim)
+        const sorted = lotsHere.filter(s => s.lot)
+            .sort((a, b) => (a.lot.expiry_date || '9999').localeCompare(b.lot.expiry_date || '9999'));
+        document.getElementById('adminExitLot').innerHTML =
+            '<option value="">— Sugestão FEFO automática —</option>' +
+            sorted.map((s, idx) => `<option value="${s.lot.id}">${escapeHtml(s.lot.lot_number)} · qty ${parseFloat(s.quantity).toFixed(2)} · val ${s.lot.expiry_date || 'sem'}${idx === 0 ? ' 🟢 FEFO' : ''}</option>`).join('');
+        document.getElementById('adminExitLotHint').textContent = sorted.length
+            ? `🟢 = Sugestão FEFO (validade mais próxima: ${sorted[0].lot.expiry_date || 'sem'})`
+            : '';
+    } else {
+        document.getElementById('adminExitLot').innerHTML = '<option value="">— item não controla lote —</option>';
+        document.getElementById('adminExitLotHint').textContent = '';
+    }
+}
+
+document.getElementById('adminExitForm').addEventListener('submit', async e => {
+    e.preventDefault();
+    const f = e.target;
+    const payload = {
+        item_id:     f.item_id.value,
+        location_id: f.location_id.value,
+        quantity:    parseFloat(f.quantity.value),
+        lot_id:      f.lot_id.value || null,
+        subtype:     f.subtype.value,
+        justification: f.justification.value
+    };
+    try {
+        await apiCall('/api/inventory/exits', { method: 'POST', body: JSON.stringify(payload) });
+        toast('Saída administrativa registada — ver em Saídas');
+        closeAdminExitModal();
+    } catch (err) {
+        if (err.message && err.message.includes('LOW_STOCK_CONFIRMATION_REQUIRED')) {
+            const c1 = confirm('⚠️ Esta saída deixará o stock abaixo do mínimo. Continuar?');
+            if (!c1) return;
+            try {
+                await apiCall('/api/inventory/exits', { method: 'POST', body: JSON.stringify({ ...payload, confirmed_low_stock: true }) });
+                toast('Saída administrativa registada (stock abaixo do mínimo)', 'warn');
+                closeAdminExitModal();
+            } catch (e2) { toast(e2.message, 'error'); }
+            return;
+        }
+        toast(err.message, 'error');
+    }
+});
+
 function escapeHtml(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
 function viewAdjustment(m) {
@@ -305,6 +459,9 @@ function viewAdjustment(m) {
             { title: 'Justificação', rows: [
                 ['Texto', m.justification]
             ]}
+        ],
+        actions: [
+            { label: 'Imprimir comprovante', icon: 'fa-print', href: `print-receipt.html?type=exit&id=${m.id}` }
         ]
     });
 }

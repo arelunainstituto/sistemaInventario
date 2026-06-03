@@ -103,4 +103,21 @@ router.get('/', requirePermission('inventory', 'read'), async (req, res) => {
     }
 });
 
+// GET /:id — detalhe de um movimento (usado pelo comprovante de impressão)
+router.get('/:id', requirePermission('inventory', 'read'), async (req, res) => {
+    try {
+        const { data, error } = await supabaseAdmin
+            .from('inv_movements')
+            .select(MOVEMENT_SELECT)
+            .eq('id', req.params.id)
+            .single();
+        if (error) throw error;
+        if (!data) return res.status(404).json({ error: 'Movimento não encontrado' });
+        res.json({ success: true, data });
+    } catch (err) {
+        console.error('GET movement/:id error:', err);
+        res.status(500).json({ error: err.message || 'Erro ao obter movimento' });
+    }
+});
+
 module.exports = router;

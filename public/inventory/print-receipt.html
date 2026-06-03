@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Comprovante</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script>if (!localStorage.getItem('access_token')) { const r = encodeURIComponent(location.pathname + location.search); window.location.href = '/login.html?redirect=' + r; }</script>
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+
+        /* ===== Tamanho do papel para Brother QL-810W =====
+           Padrão DK-2205 (62 mm contínuo) com altura suficiente para
+           o comprovante (~110 mm). Trocar via seletor.
+           Tamanhos suportados:
+             DK-2205 62 × 110 mm  (comprovante padrão)
+             DK-1202 62 × 100 mm  (caso falte rolo contínuo)
+             DK-2205 62 × 150 mm  (entradas com muitas linhas) */
+        :root {
+            --label-w: 62mm;
+            --label-h: 110mm;
+        }
+        .receipt-preview {
+            width: var(--label-w);
+            min-height: var(--label-h);
+        }
+        @page {
+            size: var(--label-w) var(--label-h);
+            margin: 0;
+        }
+        @media print {
+            html, body {
+                margin: 0 !important; padding: 0 !important;
+                width: var(--label-w);
+                background: white !important;
+            }
+            .no-print { display: none !important; }
+            .receipt-preview {
+                width: var(--label-w) !important;
+                /* Sem min-height nem page-break-after no print: ambos provocam
+                   uma segunda página em branco quando o conteúdo cabe folgado
+                   no rolo. O navegador já corta no @page size. */
+                min-height: 0 !important;
+                box-shadow: none !important;
+                border: none !important;
+                border-radius: 0 !important;
+                margin: 0 !important;
+                padding: 3mm !important;
+                page-break-after: auto;
+                page-break-inside: avoid;
+            }
+            body * { background: white; }
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-b from-sky-50/40 via-blue-50/20 to-white min-h-screen p-6">
+
+<!-- Barra superior (somente na tela) -->
+<div class="no-print max-w-4xl mx-auto">
+    <div class="flex justify-between items-start mb-4 gap-4">
+        <button onclick="goBack()" class="inline-flex items-center gap-2 text-sky-600 hover:text-sky-700 text-sm font-medium">
+            <i class="fas fa-arrow-left text-xs"></i> Voltar
+        </button>
+        <div class="flex items-end gap-3">
+            <div>
+                <label class="block text-[10px] uppercase tracking-wider text-gray-500 font-semibold">Formato Brother DK</label>
+                <select id="rollSize" class="px-3 py-1.5 border border-gray-300 rounded-lg text-sm bg-white mt-1">
+                    <option value="62,110">DK-2205 — 62 × 110 mm (padrão)</option>
+                    <option value="62,100">DK-1202 — 62 × 100 mm</option>
+                    <option value="62,150">DK-2205 — 62 × 150 mm (entradas longas)</option>
+                </select>
+            </div>
+            <button onclick="window.print()" class="bg-sky-600 hover:bg-sky-700 text-white px-5 py-2 rounded-lg text-sm font-medium shadow-sm shadow-sky-500/20 transition flex items-center gap-2">
+                <i class="fas fa-print text-xs"></i> Imprimir
+            </button>
+        </div>
+    </div>
+    <div class="bg-amber-50 border border-amber-200 rounded-lg p-3 text-[11px] text-amber-800 mb-4">
+        <i class="fas fa-circle-info"></i>
+        No diálogo de impressão, ative <b>Margens: Nenhuma</b> e desative <b>Cabeçalhos e rodapés</b>.
+        Selecione a impressora <b>Brother QL-810W</b>.
+    </div>
+</div>
+
+<div class="flex justify-center">
+    <div id="receiptContainer" class="text-center text-gray-400 py-12">Carregando…</div>
+</div>
+
+<script>
+const params = new URLSearchParams(location.search);
+const type   = params.get('type');  // 'entry' | 'exit'
+const id     = params.get('id');
+const token  = localStorage.getItem('access_token');
+
+// A página é normalmente aberta em nova aba (target=_blank no modal), então
+// não há history.back() utilizável. Tenta fechar a aba primeiro; se o browser
+// recusar (regra: só fecha abas abertas via window.open), navega para a tela
+// de origem.
+function goBack() {
+    const dest = type === 'entry'
+        ? 'entries.html'
+        : type === 'exit'
+            ? (document.referrer.includes('adjustments.html') ? 'adjustments.html' : 'exits.html')
+            : 'items.html';
+    window.close();
+    // Se ainda visível após 80ms, o close foi bloqueado — navega
+    setTimeout(() => { if (!document.hidden) window.location.href = dest; }, 80);
+}
+
+document.getElementById('rollSize').addEventListener('change', (e) => {
+    const [w, h] = e.target.value.split(',').map(n => `${n}mm`);
+    document.documentElement.style.setProperty('--label-w', w);
+    document.documentElement.style.setProperty('--label-h', h);
+});
+
+async function load() {
+    if (!type || !id) {
+        document.getElementById('receiptContainer').innerHTML = '<p class="text-red-500">Parâmetros faltando (?type=entry|exit&id=&lt;uuid&gt;).</p>';
+        return;
+    }
+    try {
+        if (type === 'entry') {
+            const r = await fetch(`/api/inventory/entries/${id}`, { headers: { Authorization: 'Bearer ' + token } });
+            const j = await r.json();
+            if (!r.ok) throw new Error(j.error || 'Erro');
+            renderEntry(j.data);
+        } else if (type === 'exit') {
+            const r = await fetch(`/api/inventory/movements/${id}`, { headers: { Authorization: 'Bearer ' + token } });
+            const j = await r.json();
+            if (!r.ok) throw new Error(j.error || 'Erro');
+            renderExit(j.data);
+        } else {
+            throw new Error(`Tipo inválido: ${type}`);
+        }
+    } catch (err) {
+        document.getElementById('receiptContainer').innerHTML = `<p class="text-red-500">${escapeHtml(err.message)}</p>`;
+    }
+}
+
+// Header reutilizável — etiqueta institucional
+function headerHtml(title, subtitle) {
+    return `
+        <div style="text-align: center; padding-bottom: 2mm; border-bottom: 1px solid #ccc; margin-bottom: 2mm;">
+            <p style="font-size: 2mm; color: #555; letter-spacing: 0.5mm; font-weight: 700;">INSTITUTO ARELUNA</p>
+            <p style="font-size: 3mm; font-weight: 800; color: #111; margin-top: 1mm;">${escapeHtml(title)}</p>
+            ${subtitle ? `<p style="font-size: 2.2mm; color: #666; margin-top: 0.5mm;">${escapeHtml(subtitle)}</p>` : ''}
+        </div>`;
+}
+
+function row(label, value, bold = false) {
+    if (value === null || value === undefined || value === '') return '';
+    return `<p style="font-size: 2.4mm; line-height: 1.45; ${bold ? 'font-weight: 700;' : ''} display: flex; justify-content: space-between; gap: 2mm;">
+        <span style="color: #666;">${escapeHtml(label)}</span>
+        <span style="color: #111; text-align: right;">${escapeHtml(String(value))}</span>
+    </p>`;
+}
+
+function renderEntry(e) {
+    const lines = e.lines || [];
+    const linesHtml = lines.map((l, idx) => `
+        <div style="border-top: 1px dashed #ccc; padding-top: 1.5mm; margin-top: 1.5mm;">
+            <p style="font-size: 2.4mm; font-weight: 700; color: #111;">
+                ${lines.length > 1 ? `${idx + 1}. ` : ''}${escapeHtml(l.item?.internal_code || '')} · ${escapeHtml(l.item?.name || '')}
+            </p>
+            ${row('Quantidade', parseFloat(l.consumption_qty ?? l.purchase_qty ?? 0).toFixed(2))}
+            ${row('Custo unit.', `€ ${parseFloat(l.unit_cost || 0).toFixed(4)}`)}
+            ${row('Total linha', `€ ${parseFloat(l.total_cost || 0).toFixed(2)}`, true)}
+            ${l.lot_number ? row('Lote', l.lot_number) : ''}
+            ${l.expiry_date ? row('Validade', l.expiry_date) : ''}
+            ${l.location?.name ? row('Localização', l.location.name) : ''}
+        </div>
+    `).join('');
+
+    document.getElementById('receiptContainer').innerHTML = `
+        <div class="receipt-preview bg-white border border-gray-200 shadow-sm text-left" style="padding: 3mm;">
+            ${headerHtml('COMPROVANTE DE ENTRADA', new Date().toLocaleString('pt-PT'))}
+            ${row('Documento', `${e.document_type || ''} · ${e.document_number || ''}`)}
+            ${row('Data doc.', e.document_date)}
+            ${row('Fornecedor', e.supplier?.name)}
+            ${row('NIF', e.supplier?.tax_id)}
+            ${linesHtml}
+            <div style="border-top: 1px solid #111; padding-top: 1.5mm; margin-top: 2mm;">
+                ${row('VALOR TOTAL', `€ ${parseFloat(e.total_value || 0).toFixed(2)}`, true)}
+                ${e.notes ? row('Notas', e.notes) : ''}
+            </div>
+        </div>`;
+}
+
+function renderExit(m) {
+    const isAjuste = m.type === 'ajuste';
+    const title = isAjuste ? 'COMPROVANTE DE AJUSTE' : 'COMPROVANTE DE SAÍDA';
+    const sign = (isAjuste && m.from_location && !m.to_location) ? '−'
+               : (isAjuste && m.to_location && !m.from_location) ? '+'
+               : '−';
+    document.getElementById('receiptContainer').innerHTML = `
+        <div class="receipt-preview bg-white border border-gray-200 shadow-sm text-left" style="padding: 3mm;">
+            ${headerHtml(title, new Date(m.occurred_at).toLocaleString('pt-PT'))}
+            ${row('Tipo', m.type)}
+            ${row('Subtipo', m.subtype)}
+            <div style="border-top: 1px dashed #ccc; padding-top: 1.5mm; margin-top: 1.5mm;">
+                <p style="font-size: 2.4mm; font-weight: 700; color: #111;">
+                    ${escapeHtml(m.item?.internal_code || '')} · ${escapeHtml(m.item?.name || '')}
+                </p>
+                ${row('Quantidade', `${sign}${parseFloat(m.quantity).toFixed(2)}`, true)}
+                ${m.lot?.lot_number ? row('Lote', m.lot.lot_number) : ''}
+                ${m.lot?.expiry_date ? row('Validade', m.lot.expiry_date) : ''}
+                ${m.from_location?.name ? row('Origem', `${m.from_location.unit?.name || ''} · ${m.from_location.name}`) : ''}
+                ${m.to_location?.name ? row('Destino', `${m.to_location.unit?.name || ''} · ${m.to_location.name}`) : ''}
+            </div>
+            <div style="border-top: 1px solid #ccc; padding-top: 1.5mm; margin-top: 2mm;">
+                ${row('Custo Médio', `€ ${parseFloat(m.cmp_at_moment || 0).toFixed(4)}`)}
+                ${m.total_cost ? row('Total', `€ ${parseFloat(m.total_cost).toFixed(2)}`, true) : ''}
+                ${m.justification ? `<p style="font-size: 2.2mm; color: #444; margin-top: 1.5mm;"><b>Justificação:</b> ${escapeHtml(m.justification)}</p>` : ''}
+            </div>
+        </div>`;
+}
+
+function escapeHtml(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+load();
+</script>
+</body>
+</html>

@@ -250,7 +250,13 @@ function viewEntry(e) {
             ]
         });
     });
-    showViewModal({ title: `Entrada · ${e.document_number}`, sections });
+    showViewModal({
+        title: `Entrada · ${e.document_number}`,
+        sections,
+        actions: [
+            { label: 'Imprimir comprovante', icon: 'fa-print', href: `print-receipt.html?type=entry&id=${e.id}` }
+        ]
+    });
 }
 
 (async () => { await bootstrap(); await load(); })();

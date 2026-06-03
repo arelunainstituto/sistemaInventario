@@ -592,7 +592,8 @@ function closeActionPanel() {
 // =====================================================
 // Uso: showViewModal({ title, sections: [{ title, rows: [[label, value], …] }, …] })
 
-function showViewModal({ title, sections = [] }) {
+// actions: [{ label, icon, href?, onclick? }] — botões na barra superior do modal
+function showViewModal({ title, sections = [], actions = [] }) {
     let modal = document.getElementById('genericViewModal');
     if (!modal) {
         modal = document.createElement('div');
@@ -600,8 +601,9 @@ function showViewModal({ title, sections = [] }) {
         modal.className = 'hidden fixed inset-0 bg-gray-900/40 backdrop-blur-[2px] z-50 flex items-center justify-center p-4';
         modal.innerHTML = `
             <div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto border border-gray-200">
-                <div class="flex justify-between items-start p-5 border-b border-gray-100 sticky top-0 bg-white z-10">
-                    <h3 id="genericViewTitle" class="font-bold text-gray-900 text-base">—</h3>
+                <div class="flex justify-between items-start p-5 border-b border-gray-100 sticky top-0 bg-white z-10 gap-3">
+                    <h3 id="genericViewTitle" class="font-bold text-gray-900 text-base flex-1 min-w-0">—</h3>
+                    <div id="genericViewActions" class="flex items-center gap-2 flex-shrink-0"></div>
                     <button onclick="closeViewModal()" class="text-gray-400 hover:text-gray-600 w-7 h-7 flex items-center justify-center rounded hover:bg-gray-100 flex-shrink-0"><i class="fas fa-times text-xs"></i></button>
                 </div>
                 <div id="genericViewBody" class="p-6"></div>
@@ -609,6 +611,20 @@ function showViewModal({ title, sections = [] }) {
         document.body.appendChild(modal);
     }
     document.getElementById('genericViewTitle').textContent = title;
+    document.getElementById('genericViewActions').innerHTML = actions.map((a, idx) => {
+        const cls = 'inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition bg-sky-50 hover:bg-sky-100 text-sky-700 border border-sky-100';
+        if (a.href) {
+            return `<a href="${a.href}" target="${a.target || '_blank'}" rel="noopener" class="${cls}"><i class="fas ${a.icon || 'fa-arrow-up-right-from-square'} text-[10px]"></i> ${escapeAlerts(a.label)}</a>`;
+        }
+        return `<button data-view-action="${idx}" class="${cls}"><i class="fas ${a.icon || 'fa-bolt'} text-[10px]"></i> ${escapeAlerts(a.label)}</button>`;
+    }).join('');
+    // Liga handlers para ações com onclick (já que innerHTML não preserva closures)
+    actions.forEach((a, idx) => {
+        if (typeof a.onclick === 'function') {
+            const btn = document.querySelector(`#genericViewActions [data-view-action="${idx}"]`);
+            if (btn) btn.addEventListener('click', a.onclick);
+        }
+    });
     document.getElementById('genericViewBody').innerHTML = sections.map(sec => `
         <div class="mb-5 last:mb-0">
             ${sec.title ? `<h4 class="text-[10px] uppercase font-bold text-gray-400 tracking-wider mb-2">${escapeAlerts(sec.title)}</h4>` : ''}
