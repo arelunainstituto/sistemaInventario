@@ -171,6 +171,10 @@ async function populateUserHeader() {
         // F5.4: revela itens marcados como adminOnly se a role for de admin
         const roles  = Array.isArray(data.roles) ? data.roles : [];
         const isAdmin = roles.some(r => ['Inventory_Admin','Admin','admin'].includes(r));
+        window.isInventoryAdmin = isAdmin;
+        // Notifica páginas que dependem da flag (ex.: botões de cancelar
+        // movimento que aparecem após o auth/me resolver).
+        document.dispatchEvent(new CustomEvent('inventory:admin-resolved', { detail: { isAdmin } }));
         if (isAdmin) {
             document.querySelectorAll('[data-admin-only]').forEach(el => { el.style.display = ''; });
         }
@@ -637,6 +641,25 @@ function showViewModal({ title, sections = [], actions = [] }) {
             </div>
         </div>`).join('');
     modal.classList.remove('hidden');
+}
+
+// Helper compartilhado para fluxo de inativação (cancelamento de movimento).
+// Pede confirmação dupla + motivo (>= 5 caracteres). Devolve a string do motivo
+// ou null se o usuário cancelar.
+async function confirmCancelMovement(label = 'movimento') {
+    if (!confirm(`⚠️ Inativar este ${label}?\n\nEsta ação gera um estorno espelho e reverte os efeitos no stock. Não é revertível por operadores — apenas Admin pode desfazer manualmente.`)) {
+        return null;
+    }
+    const reason = prompt(`Motivo da inativação (mínimo 5 caracteres):`);
+    if (reason === null) return null;
+    if (String(reason).trim().length < 5) {
+        toast('Motivo deve ter no mínimo 5 caracteres', 'error');
+        return null;
+    }
+    if (!confirm(`Confirmação final: inativar este ${label} com o motivo "${reason}"?`)) {
+        return null;
+    }
+    return reason.trim();
 }
 
 function closeViewModal() {

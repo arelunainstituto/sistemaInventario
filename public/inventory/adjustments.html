@@ -200,12 +200,18 @@ async function load() {
             // (Conferimos pelo objeto aninhado porque o SELECT não traz os _id crus.)
             const sign = m.from_location ? -1 : 1;
             const loc = m.from_location || m.to_location;
-            return `<tr class="hover:bg-sky-50/30 transition">
+            const cancelBadge = m.is_cancelled
+                ? '<span class="ml-1 inline-flex items-center px-1.5 py-0.5 rounded text-[9px] uppercase font-bold bg-red-100 text-red-700" title="Foi cancelado por um estorno">Estornado</span>'
+                : m.is_reversal
+                    ? '<span class="ml-1 inline-flex items-center px-1.5 py-0.5 rounded text-[9px] uppercase font-bold bg-amber-100 text-amber-700" title="Movimento de estorno">Estorno</span>'
+                    : '';
+            const rowCls = m.is_cancelled ? 'opacity-60 line-through' : '';
+            return `<tr class="hover:bg-sky-50/30 transition ${rowCls}">
                 <td class="p-3 text-xs">${new Date(m.occurred_at).toLocaleString('pt-PT')}</td>
                 <td class="p-3 font-medium">${escapeHtml(m.item?.name || '')}<br><span class="text-[10px] text-gray-400 font-mono">${escapeHtml(m.item?.internal_code || '')}</span></td>
                 <td class="p-3 text-xs text-gray-600">${escapeHtml(loc?.unit?.name || '')} · ${escapeHtml(loc?.name || '')}</td>
                 <td class="p-3 text-right font-bold ${sign > 0 ? 'text-sky-600' : 'text-red-600'}">${sign > 0 ? '+' : '−'}${parseFloat(m.quantity).toFixed(2)}</td>
-                <td class="p-3 text-xs">${escapeHtml(m.subtype || '—')}</td>
+                <td class="p-3 text-xs">${escapeHtml(m.subtype || '—')}${cancelBadge}</td>
                 <td class="p-3 text-xs text-gray-600 max-w-[200px] truncate" title="${escapeHtml(m.justification || '')}">${escapeHtml(m.justification || '—')}</td>
                 <td class="p-3 text-center">
                     <button onclick='viewAdjustment(${JSON.stringify({...m, _sign: sign}).replace(/'/g, "&#39;")})' class="text-gray-600 hover:text-blue-600" title="Visualizar"><i class="fas fa-eye"></i></button>
@@ -460,9 +466,30 @@ function viewAdjustment(m) {
                 ['Texto', m.justification]
             ]}
         ],
-        actions: [
-            { label: 'Imprimir comprovante', icon: 'fa-print', href: `print-receipt.html?type=exit&id=${m.id}` }
-        ]
+        actions: (() => {
+            const a = [
+                { label: 'Imprimir comprovante', icon: 'fa-print', href: `print-receipt.html?type=exit&id=${m.id}` }
+            ];
+            // Tela já é admin-only — mas conferimos a flag mesmo assim
+            if (window.isInventoryAdmin && !m.is_cancelled && !m.is_reversal) {
+                a.push({
+                    label: 'Inativar ajuste', icon: 'fa-ban',
+                    onclick: async () => {
+                        const reason = await confirmCancelMovement('ajuste');
+                        if (!reason) return;
+                        try {
+                            await apiCall(`/api/inventory/movements/${m.id}/cancel`, {
+                                method: 'POST', body: JSON.stringify({ reason })
+                            });
+                            toast('Ajuste inativado · estorno gerado');
+                            closeViewModal();
+                            load();
+                        } catch (err) { toast(err.message, 'error'); }
+                    }
+                });
+            }
+            return a;
+        })()
     });
 }
 

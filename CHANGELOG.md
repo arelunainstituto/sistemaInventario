@@ -34,6 +34,28 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e
 
 ## [Unreleased]
 
+_Nenhuma alteração pendente._
+
+---
+
+## [1.2.0] — 2026-06-03
+
+> **Marco**: inativação de movimentos por estorno (RN07-safe) + refatorações de relatórios + comprovante de impressão Brother + QR direto para ficha + access-log com nome real do utilizador. Toda a manipulação de movimentos agora é reversível por Admin sem violar o append-only de `inv_movements`.
+>
+> Ver [IMPLEMENTATION_REPORT.md](IMPLEMENTATION_REPORT.md) para visão geral arquitetural.
+
+### Adicionado
+- **Inativação de movimentos (cancelamento por estorno)** — nova migração [54-cancellation.sql](database/inventory-refactor/54-cancellation.sql) (**requer migração**):
+  - `inv_movements` ganha coluna `reversal_of_movement_id UUID` (FK self) — quando preenchida, indica que o movimento é estorno do referenciado. RN07 preservado (append-only mantido).
+  - `fn_inv_cancel_movement(movement_id, user_id, reason)` gera um movimento espelho, aplica delta inverso no stock e recalcula CMP do item quando uma entrada é cancelada. Para transferências, cancela atomicamente o par saida+entrada.
+  - `fn_inv_cancel_entry(entry_id, user_id, reason)` itera todos os movimentos derivados de uma entrada (`document_type+document_number+supplier_id`) e cancela cada um numa única transação.
+  - `fn_inv_apply_stock_delta` helper para UPSERT manual respeitando os índices parciais de `inv_stock`. Bypass de RN05 quando reverte (stock pode ficar negativo).
+  - `vw_inv_movements_with_status` view com flags `is_cancelled` / `is_reversal` / `reversal_id`.
+  - Endpoints `POST /api/inventory/movements/:id/cancel` ([movements.js](api/inventory/movements.js)) e `POST /api/inventory/entries/:id/cancel` ([entries.js](api/inventory/entries.js)) — ambos `requireRole(Admin)` e validam motivo ≥ 5 chars.
+  - UI: botão "Inativar" nos modais de view de [entries.html](public/inventory/entries.html), [exits.html](public/inventory/exits.html) e [adjustments.html](public/inventory/adjustments.html). Aparece apenas para Admin (`window.isInventoryAdmin`) e oculta-se em movimentos já cancelados ou que sejam estornos. Helper `confirmCancelMovement` ([_layout.js](public/inventory/_layout.js)) faz fluxo de confirmação dupla + motivo.
+  - Badges "Estornado" (vermelho, linha riscada) e "Estorno" (âmbar) nas listagens de saídas, ajustes e histórico de movimentos.
+  - `attachCancellationStatus` ([_stock.js](api/inventory/_stock.js)) enriquece resultados das listagens com `is_cancelled` / `is_reversal` via 1 query batch.
+
 ### Alterado
 - **Relatórios — filtros aplicados ANTES da consulta** ([reports.html](public/inventory/reports.html)): clicar no card abre painel de filtros vazio; usuário escolhe localização/datas e clica "Aplicar consulta" para disparar o fetch. Botões CSV/Excel/PDF só aparecem após a primeira consulta. Adicionado filtro de data (`from`/`to`) nos relatórios temporais (inventory-sessions, consumption-trend, user-activity) com default últimos 30 dias.
 - **Valoração dos Stocks (antes "Valorização de Stock")** ([reports.js](api/inventory/reports.js)): agregada por (item, localização) somando todos os lotes — não detalha lote por linha. Aceita `?location_id=` para filtrar; quando filtrado, agrega só por item (todos os lotes da localização). Lógica reescrita usando `inv_stock` direto em vez de `vw_inv_valuation` para suportar o filtro.
@@ -266,6 +288,7 @@ f29115a feat(inventory): Sprint 4C - log de acesso + janela de consumo por categ
 
 A partir de 1.0.0, toda alteração deve adicionar uma entrada acima na seção `[Unreleased]` antes do merge.
 
-[Unreleased]: https://github.com/<org>/sistemaInventario/compare/v1.1.0...HEAD
+[Unreleased]: https://github.com/<org>/sistemaInventario/compare/v1.2.0...HEAD
+[1.2.0]: https://github.com/<org>/sistemaInventario/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/<org>/sistemaInventario/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/<org>/sistemaInventario/releases/tag/v1.0.0

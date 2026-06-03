@@ -171,10 +171,17 @@ async function load(page = 1) {
         if (!rows.length) {
             tbody.innerHTML = '<tr><td colspan="10" class="p-6 text-center text-gray-400">Nenhum movimento para os filtros aplicados.</td></tr>';
         } else {
-            tbody.innerHTML = rows.map(m => `
-                <tr class="hover:bg-sky-50/30 transition">
+            tbody.innerHTML = rows.map(m => {
+                const cancelBadge = m.is_cancelled
+                    ? '<span class="ml-1 inline-flex items-center px-1 py-0.5 rounded text-[9px] uppercase font-bold bg-red-100 text-red-700" title="Foi cancelado por um estorno">Estornado</span>'
+                    : m.is_reversal
+                        ? '<span class="ml-1 inline-flex items-center px-1 py-0.5 rounded text-[9px] uppercase font-bold bg-amber-100 text-amber-700" title="Movimento de estorno">Estorno</span>'
+                        : '';
+                const rowCls = m.is_cancelled ? 'opacity-60 line-through' : '';
+                return `
+                <tr class="hover:bg-sky-50/30 transition ${rowCls}">
                     <td class="p-2 whitespace-nowrap">${new Date(m.occurred_at).toLocaleString('pt-PT')}</td>
-                    <td class="p-2"><span class="text-[10px] px-1.5 py-0.5 rounded ${badgeClass(m.type)}">${m.type}</span></td>
+                    <td class="p-2"><span class="text-[10px] px-1.5 py-0.5 rounded ${badgeClass(m.type)}">${m.type}</span>${cancelBadge}</td>
                     <td class="p-2">${escapeHtml(m.subtype || '—')}</td>
                     <td class="p-2">${escapeHtml(m.item?.name || '')}<br><span class="text-[10px] font-mono text-gray-400">${escapeHtml(m.item?.internal_code || '')}</span></td>
                     <td class="p-2 text-right">${parseFloat(m.quantity).toFixed(2)}</td>
@@ -183,7 +190,8 @@ async function load(page = 1) {
                     <td class="p-2">${m.lot ? escapeHtml(m.lot.lot_number) : '—'}</td>
                     <td class="p-2 text-right">€ ${parseFloat(m.cmp_at_moment || 0).toFixed(2)}</td>
                     <td class="p-2 max-w-[300px] truncate" title="${escapeHtml(m.justification || '')}">${escapeHtml(m.justification || '—')}</td>
-                </tr>`).join('');
+                </tr>`;
+            }).join('');
         }
         renderPagination(r.pagination);
     } catch (err) {

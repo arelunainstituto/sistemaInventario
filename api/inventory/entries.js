@@ -146,4 +146,34 @@ router.post('/', requirePermission('inventory', 'entry'), async (req, res) => {
     }
 });
 
+// POST /:id/cancel — inativa uma entrada inteira (cancela todos os movimentos
+// type=entrada derivados dela). Admin only. Body: { reason: string >= 5 chars }
+const { requireRole } = require('../middleware/auth');
+const ADMIN_ROLES = ['Inventory_Admin', 'Admin', 'admin'];
+
+router.post('/:id/cancel', requireRole(ADMIN_ROLES), async (req, res) => {
+    try {
+        const { reason } = req.body || {};
+        if (!reason || String(reason).trim().length < 5) {
+            return res.status(400).json({ error: 'Motivo é obrigatório (mínimo 5 caracteres)' });
+        }
+        const { data, error } = await supabaseAdmin.rpc('fn_inv_cancel_entry', {
+            p_entry_id: req.params.id,
+            p_user_id:  req.user?.id || null,
+            p_reason:   reason
+        });
+        if (error) {
+            if (error.code === '22023') return res.status(400).json({ error: error.message });
+            if (error.code === '02000') return res.status(404).json({ error: error.message });
+            if (error.code === 'P0001') return res.status(400).json({ error: error.message });
+            if (error.code === 'P0002') return res.status(409).json({ error: error.message });
+            throw error;
+        }
+        res.json({ success: true, data: { cancelled_count: data } });
+    } catch (err) {
+        console.error('POST inv_entries/:id/cancel error:', err);
+        res.status(500).json({ error: err.message || 'Erro ao cancelar entrada' });
+    }
+});
+
 module.exports = router;

@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { requirePermission, requireRole } = require('../middleware/auth');
-const { supabaseAdmin, parsePgException } = require('./_stock');
+const { supabaseAdmin, parsePgException, attachCancellationStatus } = require('./_stock');
 
 // F5.4: tela e endpoint de Ajustes restritos a Inventory_Admin/Admin
 // para evitar mau uso e desvio de estoque por operadores.
@@ -9,6 +9,7 @@ const ADMIN_ROLES = ['Inventory_Admin','Admin','admin'];
 
 const MOVEMENT_SELECT = `
     id, type, subtype, quantity, cmp_at_moment, justification, occurred_at,
+    reversal_of_movement_id,
     item:inv_items!item_id(id, name, internal_code, macro_category),
     lot:inv_lots!lot_id(id, lot_number, expiry_date),
     from_location:inv_locations!from_location_id(id, name, unit:inv_units!unit_id(id, name)),
@@ -30,9 +31,10 @@ router.get('/', requireRole(ADMIN_ROLES), async (req, res) => {
 
         const { data, error, count } = await q;
         if (error) throw error;
+        const enriched = await attachCancellationStatus(data || []);
         res.json({
             success: true,
-            data,
+            data: enriched,
             pagination: { page: parseInt(page), limit: parseInt(limit), total: count, totalPages: Math.ceil((count || 0) / parseInt(limit)) }
         });
     } catch (err) {

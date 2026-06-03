@@ -62,4 +62,24 @@ function parsePgException(message) {
     return { code, fields };
 }
 
-module.exports = { supabaseAdmin, getStockByItem, getStockAt, parsePgException };
+/**
+ * Enriquece uma lista de movimentos com is_cancelled (existe estorno
+ * apontando para ele) e is_reversal (é um estorno). Faz uma única query
+ * extra em inv_movements para os IDs do batch.
+ */
+async function attachCancellationStatus(rows) {
+    const ids = (rows || []).map(r => r.id).filter(Boolean);
+    if (!ids.length) return rows;
+    const { data: revs } = await supabaseAdmin
+        .from('inv_movements')
+        .select('reversal_of_movement_id')
+        .in('reversal_of_movement_id', ids);
+    const cancelledIds = new Set((revs || []).map(r => r.reversal_of_movement_id));
+    return rows.map(r => ({
+        ...r,
+        is_cancelled: cancelledIds.has(r.id),
+        is_reversal:  !!r.reversal_of_movement_id
+    }));
+}
+
+module.exports = { supabaseAdmin, getStockByItem, getStockAt, parsePgException, attachCancellationStatus };

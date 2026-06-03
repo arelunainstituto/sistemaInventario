@@ -1,12 +1,13 @@
 const express = require('express');
 const router = express.Router();
 const { requirePermission } = require('../middleware/auth');
-const { supabaseAdmin } = require('./_stock');
+const { supabaseAdmin, attachCancellationStatus } = require('./_stock');
 const { sendReport } = require('./_export');
 
 const MOVEMENT_SELECT = `
     id, type, subtype, quantity, unit_cost, total_cost, cmp_at_moment,
     document_type, document_number, justification, occurred_at, user_id,
+    reversal_of_movement_id,
     item:inv_items!item_id(id, internal_code, name, macro_category),
     lot:inv_lots!lot_id(id, lot_number, expiry_date),
     from_location:inv_locations!from_location_id(id, name, unit:inv_units!unit_id(id, name)),
@@ -92,9 +93,10 @@ router.get('/', requirePermission('inventory', 'read'), async (req, res) => {
         const { data, error, count } = await buildQuery(req, true)
             .range(offset, offset + parseInt(limit) - 1);
         if (error) throw error;
+        const enriched = await attachCancellationStatus(data || []);
         res.json({
             success: true,
-            data,
+            data: enriched,
             pagination: { page: parseInt(page), limit: parseInt(limit), total: count, totalPages: Math.ceil((count || 0) / parseInt(limit)) }
         });
     } catch (err) {
@@ -107,8 +109,13 @@ router.get('/', requirePermission('inventory', 'read'), async (req, res) => {
 router.get('/:id', requirePermission('inventory', 'read'), async (req, res) => {
     try {
         const { data, error } = await supabaseAdmin
-            .from('inv_movements')
-            .select(MOVEMENT_SELECT)
+            .from('vw_inv_movements_with_status')
+            .select(`*,
+                item:inv_items!item_id(id, internal_code, name, macro_category),
+                lot:inv_lots!lot_id(id, lot_number, expiry_date),
+                from_location:inv_locations!from_location_id(id, name, unit:inv_units!unit_id(id, name)),
+                to_location:inv_locations!to_location_id(id, name, unit:inv_units!unit_id(id, name)),
+                supplier:inv_suppliers!supplier_id(id, name)`)
             .eq('id', req.params.id)
             .single();
         if (error) throw error;
@@ -117,6 +124,37 @@ router.get('/:id', requirePermission('inventory', 'read'), async (req, res) => {
     } catch (err) {
         console.error('GET movement/:id error:', err);
         res.status(500).json({ error: err.message || 'Erro ao obter movimento' });
+    }
+});
+
+// POST /:id/cancel — inativa o movimento gerando um estorno espelho (Admin only).
+// Body: { reason: string (>= 5 chars) }
+// Para transferências, cancela atomicamente o par (saida + entrada).
+const { requireRole } = require('../middleware/auth');
+const ADMIN_ROLES = ['Inventory_Admin', 'Admin', 'admin'];
+
+router.post('/:id/cancel', requireRole(ADMIN_ROLES), async (req, res) => {
+    try {
+        const { reason } = req.body || {};
+        if (!reason || String(reason).trim().length < 5) {
+            return res.status(400).json({ error: 'Motivo é obrigatório (mínimo 5 caracteres)' });
+        }
+        const { data, error } = await supabaseAdmin.rpc('fn_inv_cancel_movement', {
+            p_movement_id: req.params.id,
+            p_user_id:     req.user?.id || null,
+            p_reason:      reason
+        });
+        if (error) {
+            if (error.code === '22023') return res.status(400).json({ error: error.message });
+            if (error.code === '02000') return res.status(404).json({ error: error.message });
+            if (error.code === 'P0001') return res.status(400).json({ error: error.message });
+            if (error.code === 'P0002') return res.status(409).json({ error: error.message });
+            throw error;
+        }
+        res.json({ success: true, data: { reversal_id: data } });
+    } catch (err) {
+        console.error('POST movement/:id/cancel error:', err);
+        res.status(500).json({ error: err.message || 'Erro ao cancelar movimento' });
     }
 });
 

@@ -250,13 +250,27 @@ function viewEntry(e) {
             ]
         });
     });
-    showViewModal({
-        title: `Entrada · ${e.document_number}`,
-        sections,
-        actions: [
-            { label: 'Imprimir comprovante', icon: 'fa-print', href: `print-receipt.html?type=entry&id=${e.id}` }
-        ]
-    });
+    const actions = [
+        { label: 'Imprimir comprovante', icon: 'fa-print', href: `print-receipt.html?type=entry&id=${e.id}` }
+    ];
+    if (window.isInventoryAdmin) {
+        actions.push({
+            label: 'Inativar entrada', icon: 'fa-ban',
+            onclick: async () => {
+                const reason = await confirmCancelMovement('entrada');
+                if (!reason) return;
+                try {
+                    const r = await apiCall(`/api/inventory/entries/${e.id}/cancel`, {
+                        method: 'POST', body: JSON.stringify({ reason })
+                    });
+                    toast(`Entrada inativada · ${r.data.cancelled_count} movimento(s) estornado(s)`);
+                    closeViewModal();
+                    load();
+                } catch (err) { toast(err.message, 'error'); }
+            }
+        });
+    }
+    showViewModal({ title: `Entrada · ${e.document_number}`, sections, actions });
 }
 
 (async () => { await bootstrap(); await load(); })();

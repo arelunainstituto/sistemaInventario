@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { requirePermission, requireRole } = require('../middleware/auth');
-const { supabaseAdmin, getStockByItem, parsePgException } = require('./_stock');
+const { supabaseAdmin, getStockByItem, parsePgException, attachCancellationStatus } = require('./_stock');
 
 // A partir da F5.4, saídas de operador só podem ser de tipo 'consumo'.
 // Avarias/extravios/perdas/quebras viraram fluxo administrativo e são
@@ -13,7 +13,7 @@ const ADMIN_ROLES           = ['Inventory_Admin','Admin','admin'];
 
 const MOVEMENT_SELECT = `
     id, type, subtype, quantity, unit_cost, total_cost, cmp_at_moment,
-    justification, occurred_at, created_at,
+    justification, occurred_at, created_at, reversal_of_movement_id,
     item:inv_items!item_id(id, name, internal_code, macro_category),
     lot:inv_lots!lot_id(id, lot_number, expiry_date),
     from_location:inv_locations!from_location_id(id, name, unit:inv_units!unit_id(id, name))
@@ -50,9 +50,10 @@ router.get('/', requirePermission('inventory', 'read'), async (req, res) => {
 
         const { data, error, count } = await q;
         if (error) throw error;
+        const enriched = await attachCancellationStatus(data || []);
         res.json({
             success: true,
-            data,
+            data: enriched,
             pagination: { page: parseInt(page), limit: parseInt(limit), total: count, totalPages: Math.ceil((count || 0) / parseInt(limit)) }
         });
     } catch (err) {
