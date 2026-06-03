@@ -13,7 +13,9 @@
 <div id="layoutRoot"></div>
 <script src="_layout.js"></script>
 <script>
-const itemId = new URLSearchParams(location.search).get('id');
+const params = new URLSearchParams(location.search);
+const itemId = params.get('id');
+const qrCode = params.get('qr');   // alternativa: vem de etiqueta escaneada
 
 renderInventoryLayout({
     activePage: 'items',
@@ -24,12 +26,19 @@ renderInventoryLayout({
 document.getElementById('pageContent').innerHTML = `<div id="content" class="text-sm text-gray-500 text-center py-12">Carregando…</div>`;
 
 async function loadItem() {
-    if (!itemId) {
-        document.getElementById('content').innerHTML = '<p class="text-red-500">ID não fornecido.</p>';
+    if (!itemId && !qrCode) {
+        document.getElementById('content').innerHTML = '<p class="text-red-500">ID ou QR não fornecido.</p>';
         return;
     }
     try {
-        const r = await apiCall(`/api/inventory/items/${itemId}`);
+        let resolvedId = itemId;
+        if (!resolvedId && qrCode) {
+            // Resolve QR Code → id via endpoint público de scan
+            const scan = await apiCall(`/api/inventory/scan/${qrCode}`);
+            resolvedId = scan.data?.id;
+            if (!resolvedId) throw new Error('QR Code não encontrado');
+        }
+        const r = await apiCall(`/api/inventory/items/${resolvedId}`);
         render(r.data);
     } catch (err) {
         document.getElementById('content').innerHTML = `<p class="text-red-500">${escapeHtml(err.message)}</p>`;

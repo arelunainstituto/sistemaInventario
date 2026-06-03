@@ -292,7 +292,10 @@ async function handleQrCode(req, res) {
         if (!item) return res.status(404).json({ error: 'Item não encontrado' });
 
         const base = process.env.PUBLIC_BASE_URL || `${req.protocol}://${req.get('host')}`;
-        const payload = `${base}/inventory/scan.html?code=${item.qr_code}`;
+        // QR aponta direto para a ficha do item — item-view aceita ?qr=<uuid>
+        // e resolve via /api/inventory/scan/:qrCode internamente. Evita rebote
+        // pela tela de scan.html (que fica reservada para leitura via câmera).
+        const payload = `${base}/inventory/item-view.html?qr=${item.qr_code}`;
         const dataUrl = await QRCode.toDataURL(payload, { width: 512, margin: 2 });
 
         // no-store força browser/proxy a sempre buscar do servidor — evita conflito

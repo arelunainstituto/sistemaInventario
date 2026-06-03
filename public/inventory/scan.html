@@ -14,6 +14,15 @@
 <div id="layoutRoot"></div>
 <script src="_layout.js"></script>
 <script>
+// Retrocompat: etiquetas antigas apontam para scan.html?code=<uuid>.
+// Hoje os QRs novos apontam direto para item-view.html?qr=<uuid>, então a
+// scan.html serve apenas para leitura por câmera. Se vier com ?code= (URL
+// antiga digitada manualmente), redireciona direto para a ficha.
+const urlCode = new URLSearchParams(location.search).get('code');
+if (urlCode) {
+    window.location.href = `item-view.html?qr=${encodeURIComponent(urlCode)}`;
+}
+
 renderInventoryLayout({ activePage: 'scan', title: 'Ler QR Code', subtitle: 'Aponte a câmera do telemóvel/computador para a etiqueta' });
 
 document.getElementById('pageContent').innerHTML = `
@@ -25,19 +34,9 @@ document.getElementById('pageContent').innerHTML = `
                 <p id="status" class="text-sm text-gray-600">Iniciando câmera…</p>
             </div>
         </div>
-
-        <div id="result" class="hidden mt-4 bg-white rounded-xl border border-gray-200/70 shadow-sm p-6"></div>
     </div>
 `;
 
-// Permite também ler via querystring (?code=<uuid>) — útil quando a etiqueta é
-// fotografada e o telemóvel abre o link diretamente.
-const urlCode = new URLSearchParams(location.search).get('code');
-if (urlCode) {
-    resolveCode(urlCode);
-}
-
-// Inicia câmera
 const reader = new Html5Qrcode('reader');
 const status = document.getElementById('status');
 
@@ -56,50 +55,18 @@ async function onScan(decoded) {
     if (resolved) return;
     resolved = true;
     try { await reader.stop(); } catch {}
-
-    // O QR contém URL como /inventory/scan.html?code=<uuid> — extrair UUID
-    const m = decoded.match(/code=([0-9a-f-]{36})/i) || decoded.match(/^([0-9a-f-]{36})$/i);
-    const code = m ? m[1] : decoded;
-    resolveCode(code);
-}
-
-async function resolveCode(code) {
-    status.textContent = 'Consultando item…';
-    try {
-        const r = await apiCall(`/api/inventory/scan/${code}`);
-        const it = r.data;
-        document.getElementById('result').classList.remove('hidden');
-        const isPatrim = it.macro_category === 'patrimonial';
-        document.getElementById('result').innerHTML = `
-            <div class="flex items-start gap-4">
-                ${it.image_url
-                    ? `<img src="${it.image_url}" class="w-24 h-24 rounded-xl object-cover border border-gray-200 flex-shrink-0">`
-                    : `<div class="w-24 h-24 rounded-xl bg-gradient-to-br from-gray-50 to-gray-100 border border-gray-200 flex items-center justify-center text-gray-300 text-2xl flex-shrink-0"><i class="fas fa-box"></i></div>`}
-                <div class="flex-1 min-w-0">
-                    <div class="flex items-center gap-2 mb-1.5 flex-wrap">
-                        <span class="inline-flex items-center gap-1.5 text-[11px] px-2 py-0.5 rounded-md ${isPatrim ? 'bg-purple-50 text-purple-700 border border-purple-100' : 'bg-sky-50 text-sky-700 border border-sky-100'} font-medium capitalize">
-                            <i class="fas ${isPatrim ? 'fa-laptop-medical' : 'fa-prescription-bottle'} text-[9px]"></i>${it.macro_category}
-                        </span>
-                        <span class="text-[11px] font-mono text-gray-400">${escapeHtml(it.internal_code)}</span>
-                    </div>
-                    <h3 class="text-lg font-bold text-gray-900">${escapeHtml(it.name)}</h3>
-                    <p class="text-sm text-gray-600 mt-1">Custo Médio: <span class="font-medium text-gray-800 tabular-nums">€ ${(parseFloat(it.cmp) || 0).toFixed(2)}</span></p>
-                    <div class="mt-4 flex gap-2 flex-wrap">
-                        <a href="item-view.html?id=${it.id}" class="px-3 py-1.5 bg-sky-600 hover:bg-sky-700 text-white rounded-lg text-xs font-medium shadow-sm shadow-sky-500/20 flex items-center gap-1.5 transition"><i class="fas fa-eye text-[10px]"></i> Visualizar</a>
-                        <a href="item-form.html?id=${it.id}" class="px-3 py-1.5 bg-sky-50 hover:bg-sky-100 text-sky-700 border border-sky-100 rounded-lg text-xs font-medium transition"><i class="fas fa-edit text-[10px]"></i> Editar</a>
-                        <a href="item-label.html?id=${it.id}" class="px-3 py-1.5 bg-gray-50 hover:bg-gray-100 text-gray-700 border border-gray-200 rounded-lg text-xs font-medium transition"><i class="fas fa-qrcode text-[10px]"></i> Etiqueta</a>
-                    </div>
-                </div>
-            </div>`;
-        status.textContent = '✓ Item encontrado';
-    } catch (err) {
-        document.getElementById('result').classList.remove('hidden');
-        document.getElementById('result').innerHTML = `<p class="text-red-600">${err.message}</p>`;
-        status.textContent = 'Falha ao resolver QR.';
+    // Extrai o UUID do payload (URL completa do QR ou UUID nu)
+    const m = decoded.match(/[?&]qr=([0-9a-f-]{36})/i)
+           || decoded.match(/[?&]code=([0-9a-f-]{36})/i)
+           || decoded.match(/^([0-9a-f-]{36})$/i);
+    const code = m ? m[1] : null;
+    if (!code) {
+        status.textContent = '✗ QR não reconhecido.';
+        return;
     }
+    status.textContent = '✓ Item encontrado — abrindo ficha…';
+    window.location.href = `item-view.html?qr=${encodeURIComponent(code)}`;
 }
-
-function escapeHtml(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 </script>
 </body>
 </html>
