@@ -7,23 +7,21 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/styles.css">
-    <script>if (!localStorage.getItem('access_token')) window.location.href = '/login.html';</script>
+    <script>if (!localStorage.getItem('access_token')) { const r = encodeURIComponent(location.pathname + location.search); window.location.href = '/login.html?redirect=' + r; }</script>
 </head>
 <body class="bg-white">
 <div id="layoutRoot"></div>
 <script src="_layout.js"></script>
 <script src="_searchable-select.js"></script>
 <script>
+// F5.4: saídas regulares são apenas tipo 'consumo'. Avarias/extravios/perdas/
+// quebras viraram fluxo administrativo e são lançadas pela tela de Ajustes
+// (acesso restrito a Admin) para evitar mau uso e desvio.
 const SUBTYPES = [
-    ['consumo',     'Consumo',     false],
-    ['avaria',      'Avaria',      true],
-    ['extravio',    'Extravio',    true],
-    ['perda',       'Perda',       true],
-    ['quebra',      'Quebra',      true],
-    ['depreciacao', 'Depreciação (patrimonial)', true]
+    ['consumo', 'Consumo', false]
 ];
 
-renderInventoryLayout({ activePage: 'exits', title: 'Saídas', subtitle: 'Consumo, avaria, extravio, perda, quebra, depreciação' });
+renderInventoryLayout({ activePage: 'exits', title: 'Saídas', subtitle: 'Consumo de stock pelo operador' });
 
 document.getElementById('pageContent').innerHTML = `
     <div class="flex justify-between items-center mb-4">
@@ -47,10 +45,12 @@ document.getElementById('pageContent').innerHTML = `
             </div>
             <form id="form" class="p-6 grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
-                    <label class="text-xs text-gray-500">Tipo de saída *</label>
-                    <select name="subtype" required onchange="onSubtypeChange()" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
-                        ${SUBTYPES.map(([v,l]) => `<option value="${v}">${l}</option>`).join('')}
-                    </select>
+                    <label class="text-xs text-gray-500">Tipo de saída</label>
+                    <div class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-gray-50 text-gray-600 flex items-center gap-2">
+                        <i class="fas fa-arrow-right-from-bracket text-gray-400 text-xs"></i> Consumo
+                    </div>
+                    <input type="hidden" name="subtype" value="consumo">
+                    <p class="text-[10px] text-gray-400 mt-1">Avaria/extravio/perda/quebra são lançados em Ajustes (Admin).</p>
                 </div>
                 <div class="md:col-span-2">
                     <label class="text-xs text-gray-500">Item *</label>
@@ -150,12 +150,8 @@ function openModal() {
 
 function closeModal() { document.getElementById('modal').classList.add('hidden'); }
 
-function onSubtypeChange() {
-    const subtype = document.getElementById('form').subtype.value;
-    const requires = SUBTYPES.find(s => s[0] === subtype)?.[2];
-    document.getElementById('justificationLabel').textContent = requires ? 'Justificação *' : 'Justificação';
-    document.getElementById('justificationField').required = !!requires;
-}
+// Saídas só de tipo 'consumo' — sem necessidade de toggle de justificação obrigatória
+function onSubtypeChange() {}
 
 async function onItemChange() {
     const itemId = document.getElementById('itemSelect').value;
@@ -261,7 +257,7 @@ function viewMovement(m, kind) {
                 ['Tipo', m.type],
                 ['Subtipo', m.subtype],
                 ['Quantidade', parseFloat(m.quantity).toFixed(4)],
-                ['Custo unitário (CMP)', `€ ${parseFloat(m.cmp_at_moment || 0).toFixed(4)}`],
+                ['Custo Médio', `€ ${parseFloat(m.cmp_at_moment || 0).toFixed(4)}`],
                 ['Custo total', `€ ${parseFloat(m.total_cost || 0).toFixed(2)}`, { bold: true }]
             ]},
             { title: 'Item', rows: [

@@ -300,8 +300,14 @@
                     localStorage.removeItem('rememberMe');
                 }
 
-                // Redirect to dashboard
-                window.location.href = 'dashboard.html';
+                // Redireciona para a página solicitada (?redirect=) se houver,
+                // caso contrário para o dashboard.
+                const params = new URLSearchParams(location.search);
+                const redirect = params.get('redirect');
+                const safeRedirect = redirect && /^\/[^/].*/.test(redirect) && !redirect.startsWith('//')
+                    ? redirect
+                    : 'dashboard.html';
+                window.location.href = safeRedirect;
 
             } catch (error) {
                 console.error('Erro no login:', error);
@@ -332,6 +338,15 @@
         document.addEventListener('DOMContentLoaded', () => {
             // Aguardar o AuthManager inicializar
             setTimeout(() => {
+                // Se já tem sessão válida E há ?redirect=, manda direto para o destino
+                // (evita rebote para dashboard antes do redirect real).
+                const params = new URLSearchParams(location.search);
+                const redirect = params.get('redirect');
+                if (redirect && localStorage.getItem('access_token') &&
+                    /^\/[^/].*/.test(redirect) && !redirect.startsWith('//')) {
+                    window.location.href = redirect;
+                    return;
+                }
                 redirectIfAuthenticated();
             }, 200);
         });

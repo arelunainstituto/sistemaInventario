@@ -1,7 +1,11 @@
 const express = require('express');
 const router = express.Router();
-const { requirePermission } = require('../middleware/auth');
+const { requirePermission, requireRole } = require('../middleware/auth');
 const { supabaseAdmin, parsePgException } = require('./_stock');
+
+// F5.4: tela e endpoint de Ajustes restritos a Inventory_Admin/Admin
+// para evitar mau uso e desvio de estoque por operadores.
+const ADMIN_ROLES = ['Inventory_Admin','Admin','admin'];
 
 const MOVEMENT_SELECT = `
     id, type, subtype, quantity, cmp_at_moment, justification, occurred_at,
@@ -11,7 +15,7 @@ const MOVEMENT_SELECT = `
     to_location:inv_locations!to_location_id(id, name, unit:inv_units!unit_id(id, name))
 `;
 
-router.get('/', requirePermission('inventory', 'read'), async (req, res) => {
+router.get('/', requireRole(ADMIN_ROLES), async (req, res) => {
     try {
         const { item_id, limit = 50, page = 1 } = req.query;
         const offset = (parseInt(page) - 1) * parseInt(limit);
@@ -37,7 +41,7 @@ router.get('/', requirePermission('inventory', 'read'), async (req, res) => {
     }
 });
 
-router.post('/', requirePermission('inventory', 'adjust'), async (req, res) => {
+router.post('/', requireRole(ADMIN_ROLES), async (req, res) => {
     try {
         const { item_id, location_id, lot_id, delta, reason_code, justification, force_negative } = req.body;
 

@@ -140,6 +140,13 @@ router.post('/', requirePermission('inventory', 'create_item'), async (req, res)
         // Não confiar em controls_lot/uses_serial do cliente — trigger define
         const { controls_lot, uses_serial, internal_code, qr_code, patrimony_number, ...rest } = req.body;
 
+        // Fase 5.2: a UI agora pede apenas UM de compra + UM de consumo.
+        // base_uom_id é sempre igual a purchase_uom_id (compat com triggers
+        // e relatórios; coluna NOT NULL no DB).
+        if (!rest.base_uom_id && rest.purchase_uom_id) {
+            rest.base_uom_id = rest.purchase_uom_id;
+        }
+
         const payload = {
             ...rest,
             controls_lot: req.body.macro_category === 'consumo',
@@ -188,6 +195,12 @@ router.put('/:id', requirePermission('inventory', 'update_item'), async (req, re
             patch[k] = v;
         }
 
+        // Fase 5.2: ao editar, se purchase_uom_id mudou, espelha em base_uom_id
+        // (UI nova não pede base — sempre alinhada à compra).
+        if (patch.purchase_uom_id) {
+            patch.base_uom_id = patch.purchase_uom_id;
+        }
+
         const { data, error } = await supabaseAdmin
             .from('inv_items')
             .update(patch)
@@ -218,18 +231,34 @@ router.delete('/:id', requirePermission('inventory', 'update_item'), async (req,
     }
 });
 
-// POST /:id/image — upload imagem
+// POST /:id/image — upload imagem (substitui a anterior se houver)
 router.post('/:id/image', requirePermission('inventory', 'update_item'), upload.single('image'), async (req, res) => {
     try {
         if (!req.file) return res.status(400).json({ error: 'Arquivo image ausente' });
         if (!req.file.mimetype.startsWith('image/')) return res.status(400).json({ error: 'Apenas imagens são permitidas' });
         const url = await uploadFile(req.file, 'inventory/items');
-        const { error } = await supabaseAdmin.from('inv_items').update({ image_url: url }).eq('id', req.params.id);
+        const { error } = await supabaseAdmin.from('inv_items').update({ image_url: url, updated_by: req.user?.id || null }).eq('id', req.params.id);
         if (error) throw error;
         res.json({ success: true, image_url: url });
     } catch (err) {
         console.error('POST inv_items/:id/image error:', err);
         res.status(500).json({ error: err.message || 'Erro ao fazer upload de imagem' });
+    }
+});
+
+// DELETE /:id/image — remove imagem do item (zera image_url; arquivo no Storage
+// fica órfão para auditoria — limpeza periódica fica fora deste fluxo).
+router.delete('/:id/image', requirePermission('inventory', 'update_item'), async (req, res) => {
+    try {
+        const { error } = await supabaseAdmin
+            .from('inv_items')
+            .update({ image_url: null, updated_by: req.user?.id || null })
+            .eq('id', req.params.id);
+        if (error) throw error;
+        res.json({ success: true });
+    } catch (err) {
+        console.error('DELETE inv_items/:id/image error:', err);
+        res.status(500).json({ error: err.message || 'Erro ao remover imagem' });
     }
 });
 

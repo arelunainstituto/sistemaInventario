@@ -8,7 +8,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/styles.css">
-    <script>if (!localStorage.getItem('access_token')) window.location.href = '/login.html';</script>
+    <script>if (!localStorage.getItem('access_token')) { const r = encodeURIComponent(location.pathname + location.search); window.location.href = '/login.html?redirect=' + r; }</script>
     <style>body{font-family:'Inter',system-ui,sans-serif}</style>
 </head>
 <body class="bg-white">
@@ -64,7 +64,7 @@ document.getElementById('pageContent').innerHTML = `
                         <th class="px-4 py-3 text-left font-semibold">Item</th>
                         <th class="px-4 py-3 text-left font-semibold">Categoria</th>
                         <th class="px-4 py-3 text-left font-semibold">Subcategoria</th>
-                        <th class="px-4 py-3 text-right font-semibold">CMP</th>
+                        <th class="px-4 py-3 text-right font-semibold">Custo M.</th>
                         <th class="px-4 py-3 text-right font-semibold">Stock mín.</th>
                         <th class="px-4 py-3 text-center font-semibold">Estado</th>
                         <th class="px-4 py-3 text-center font-semibold w-32">Ações</th>

@@ -7,7 +7,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/styles.css">
-    <script>if (!localStorage.getItem('access_token')) window.location.href = '/login.html';</script>
+    <script>if (!localStorage.getItem('access_token')) { const r = encodeURIComponent(location.pathname + location.search); window.location.href = '/login.html?redirect=' + r; }</script>
 </head>
 <body class="bg-white">
 <div id="layoutRoot"></div>
@@ -19,7 +19,7 @@ const REPORTS = [
     { key: 'reorder',            label: 'Ponto de Reposição',                  icon: 'fa-rotate',                color: 'red',     hint: 'Itens abaixo do ponto de reposição',      endpoint: '/reports/reorder',           supportsLocation: true  },
     { key: 'stock-min-max',      label: 'Abaixo do Mínimo / Acima do Máximo',  icon: 'fa-triangle-exclamation',  color: 'orange',  hint: 'Identifica ruturas e excessos',           endpoint: '/reports/stock-min-max',     supportsLocation: true  },
     { key: 'coverage',           label: 'Cobertura de Stock',                  icon: 'fa-clock',                 color: 'blue',    hint: 'Dias de cobertura por item',              endpoint: '/reports/coverage',          supportsLocation: true  },
-    { key: 'valuation',          label: 'Valorização de Stock',                icon: 'fa-euro-sign',             color: 'purple',  hint: 'Stock × CMP por item, categoria e local', endpoint: '/reports/valuation',         supportsLocation: false },
+    { key: 'valuation',          label: 'Valorização de Stock',                icon: 'fa-euro-sign',             color: 'purple',  hint: 'Stock × Custo Médio por item, categoria e local', endpoint: '/reports/valuation',         supportsLocation: false },
     { key: 'inventory-sessions', label: 'Inventário (Contagem)',               icon: 'fa-list-check',            color: 'indigo',  hint: 'Diferenças apuradas em sessões',          endpoint: '/reports/inventory-sessions', supportsLocation: false },
     { key: 'consumption-trend',  label: 'Tendência de Consumo',                icon: 'fa-chart-line',            color: 'sky',     hint: 'Mensal com comparativo anual',            endpoint: '/reports/consumption-trend', supportsLocation: true  },
     { key: 'user-activity',      label: 'Movimentos por Utilizador',           icon: 'fa-user-clock',            color: 'gray',    hint: 'Auditoria de operações por utilizador',   endpoint: '/reports/user-activity',     supportsLocation: false }

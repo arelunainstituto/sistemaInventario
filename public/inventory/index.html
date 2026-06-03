@@ -9,7 +9,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/styles.css">
     <script>
-        if (!localStorage.getItem('access_token')) window.location.href = '/login.html';
+        if (!localStorage.getItem('access_token')) { const r = encodeURIComponent(location.pathname + location.search); window.location.href = '/login.html?redirect=' + r; }
     </script>
     <style>body{font-family:'Inter',system-ui,sans-serif;font-feature-settings:'cv11','ss01'}</style>
 </head>

@@ -8,7 +8,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/styles.css">
-    <script>if (!localStorage.getItem('access_token')) window.location.href = '/login.html';</script>
+    <script>if (!localStorage.getItem('access_token')) { const r = encodeURIComponent(location.pathname + location.search); window.location.href = '/login.html?redirect=' + r; }</script>
     <style>
         body{font-family:'Inter',system-ui,sans-serif}
         .field-label{display:block;font-size:10px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px}
@@ -28,13 +28,13 @@ const editingId = params.get('id');
 renderInventoryLayout({
     activePage: 'items',
     title: editingId ? 'Editar Item' : 'Novo Item',
-    subtitle: editingId ? 'Atualize os dados do item' : 'Selecione o tipo e preencha o formulário'
+    subtitle: editingId ? 'Atualize os dados do item' : 'Selecione o tipo de cadastro e preencha o formulário'
 });
 
 document.getElementById('pageContent').innerHTML = `
     <div id="step1" class="bg-white border border-gray-200/70 rounded-xl shadow-sm p-8 max-w-3xl mx-auto">
         <div class="text-center mb-8">
-            <h3 class="text-xl font-bold text-gray-900">Qual o tipo de item?</h3>
+            <h3 class="text-xl font-bold text-gray-900">Qual o tipo de cadastro?</h3>
             <p class="text-sm text-gray-500 mt-1.5">Esta escolha define os campos do cadastro e regras de controlo aplicáveis.</p>
         </div>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -93,8 +93,9 @@ document.getElementById('pageContent').innerHTML = `
                         <textarea name="description" rows="2" class="field-input"></textarea>
                     </div>
                     <div>
-                        <label class="field-label">Subcategoria</label>
+                        <label class="field-label">Categoria</label>
                         <select name="subcategory_id" id="subcategorySelect" class="field-input"></select>
+                        <p class="text-[11px] text-gray-400 mt-1.5">Caminho completo aparece ao passar o mouse.</p>
                     </div>
                     <div>
                         <label class="field-label">Ref. fabricante</label>
@@ -116,16 +117,13 @@ document.getElementById('pageContent').innerHTML = `
             <section>
                 <h4 class="text-[10px] uppercase tracking-wider font-bold text-gray-500 mb-3">Unidades e conversão</h4>
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div>
-                        <label class="field-label">UoM base <span class="text-red-500">*</span></label>
-                        <select name="base_uom_id" id="baseUomSelect" required class="field-input"></select>
+                    <div id="purchaseUomWrap">
+                        <label class="field-label">UM de compra <span class="text-red-500">*</span></label>
+                        <select name="purchase_uom_id" id="purchaseUomSelect" required class="field-input"></select>
+                        <p class="text-[11px] text-gray-400 mt-1.5">Para consumo: também serve como unidade base.</p>
                     </div>
                     <div>
-                        <label class="field-label">UoM de compra</label>
-                        <select name="purchase_uom_id" id="purchaseUomSelect" class="field-input"></select>
-                    </div>
-                    <div>
-                        <label class="field-label">UoM de consumo</label>
+                        <label class="field-label">UM de consumo</label>
                         <select name="consumption_uom_id" id="consumptionUomSelect" class="field-input"></select>
                     </div>
                     <div>
@@ -134,6 +132,8 @@ document.getElementById('pageContent').innerHTML = `
                         <p class="text-[11px] text-gray-400 mt-1.5">Ex.: 1 caixa = 100 unidades → 100</p>
                     </div>
                 </div>
+                <!-- base_uom_id é definido automaticamente para consumo no submit -->
+                <input type="hidden" name="base_uom_id" id="baseUomSelect">
             </section>
 
             <section id="stockFieldset">
@@ -194,6 +194,7 @@ document.getElementById('pageContent').innerHTML = `
                 <h4 class="text-[10px] uppercase tracking-wider font-bold text-gray-500 mb-3">Imagem</h4>
                 <label class="border-2 border-dashed border-gray-200 rounded-lg p-4 block cursor-pointer hover:border-sky-400 hover:bg-sky-50/30 transition">
                     <input id="imageFile" type="file" accept="image/*" class="text-sm w-full">
+                    <p class="text-[11px] text-gray-400 mt-2">Substituir uma imagem existente é só escolher um novo arquivo.</p>
                 </label>
                 <div id="imagePreview" class="mt-3"></div>
             </section>
@@ -237,9 +238,11 @@ async function bootstrap() {
         categoriesAll = cats.data;
         uomsAll       = uoms.data;
         locationsAll  = (locs.data || []).filter(l => l.is_active);
-        for (const id of ['baseUomSelect','purchaseUomSelect','consumptionUomSelect']) {
+        // Fase 5.2: a UI agora só pede UM de compra e UM de consumo.
+        // base_uom_id é um hidden e o backend o preenche com purchase_uom_id.
+        for (const id of ['purchaseUomSelect','consumptionUomSelect']) {
             const sel = document.getElementById(id);
-            sel.innerHTML = (id === 'baseUomSelect' ? '' : '<option value="">—</option>')
+            sel.innerHTML = '<option value="">—</option>'
                 + uomsAll.map(u => `<option value="${u.id}">${escapeHtml(u.name)} (${escapeHtml(u.code)})</option>`).join('');
         }
         if (editingId) await loadForEdit();
@@ -252,9 +255,18 @@ function activateMacro(macro) {
     document.getElementById('formMacroLabel').innerHTML = isConsumo
         ? '<span class="inline-flex items-center gap-1.5"><span class="w-1.5 h-1.5 rounded-full bg-sky-500"></span>Consumo · controla lote e validade</span>'
         : '<span class="inline-flex items-center gap-1.5"><span class="w-1.5 h-1.5 rounded-full bg-purple-500"></span>Patrimonial · controla nº de série e depreciação</span>';
-    subcategorySelect.innerHTML = '<option value="">—</option>' +
-        categoriesAll.filter(c => c.parent_macro === macro)
-                     .map(c => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('');
+    // Categoria com hierarquia: exibe path completo "A / B / C" para o usuário
+    // entender o caminho. O API devolve já com path/depth via vw_inv_categories_tree.
+    const opts = categoriesAll
+        .filter(c => c.parent_macro === macro)
+        .sort((a, b) => (a.path || a.name).localeCompare(b.path || b.name))
+        .map(c => {
+            const indent = '  '.repeat((c.depth || 1) - 1);
+            const label  = c.path ? indent + c.path.split(' / ').slice(-1)[0] : c.name;
+            const title  = c.path ? ` title="${escapeHtml(c.path)}"` : '';
+            return `<option value="${c.id}"${title}>${escapeHtml(label)}</option>`;
+        }).join('');
+    subcategorySelect.innerHTML = '<option value="">—</option>' + opts;
     patrimonyFieldset.classList.toggle('hidden', macro !== 'patrimonial');
     // Overrides por localização só fazem sentido para consumo
     document.getElementById('locationParamsFieldset').classList.toggle('hidden', !isConsumo);
@@ -329,6 +341,16 @@ function renderLocationParams(effectiveParams) {
     `;
 }
 
+async function removeImage() {
+    if (!editingId) return;
+    if (!confirm('Remover a imagem deste item?')) return;
+    try {
+        await apiCall(`/api/inventory/items/${editingId}/image`, { method: 'DELETE' });
+        toast('Imagem removida');
+        document.getElementById('imagePreview').innerHTML = '';
+    } catch (err) { toast(err.message, 'error'); }
+}
+
 async function removeOverride(locationId) {
     if (!confirm('Voltar a herdar do padrão global para esta localização?')) return;
     try {
@@ -369,8 +391,13 @@ async function loadForEdit() {
             if (el && v !== null && v !== undefined) el.value = v;
         }
         if (it.image_url) {
-            document.getElementById('imagePreview').innerHTML =
-                `<img src="${it.image_url}" class="h-24 rounded-lg border border-gray-200 object-cover">`;
+            document.getElementById('imagePreview').innerHTML = `
+                <div class="flex items-start gap-3">
+                    <img src="${it.image_url}" class="h-24 rounded-lg border border-gray-200 object-cover">
+                    <button type="button" onclick="removeImage()" class="text-xs px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 rounded-lg flex items-center gap-1.5">
+                        <i class="fas fa-trash text-[10px]"></i> Remover imagem
+                    </button>
+                </div>`;
         }
         // Fase 4.3: tabela de parâmetros por localização (apenas consumo)
         if (it.macro_category === 'consumo') {

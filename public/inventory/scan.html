@@ -8,7 +8,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/styles.css">
     <script src="https://unpkg.com/html5-qrcode@2.3.10/html5-qrcode.min.js"></script>
-    <script>if (!localStorage.getItem('access_token')) window.location.href = '/login.html';</script>
+    <script>if (!localStorage.getItem('access_token')) { const r = encodeURIComponent(location.pathname + location.search); window.location.href = '/login.html?redirect=' + r; }</script>
 </head>
 <body class="bg-white">
 <div id="layoutRoot"></div>
@@ -83,7 +83,7 @@ async function resolveCode(code) {
                         <span class="text-[11px] font-mono text-gray-400">${escapeHtml(it.internal_code)}</span>
                     </div>
                     <h3 class="text-lg font-bold text-gray-900">${escapeHtml(it.name)}</h3>
-                    <p class="text-sm text-gray-600 mt-1">CMP atual: <span class="font-medium text-gray-800 tabular-nums">€ ${(parseFloat(it.cmp) || 0).toFixed(2)}</span></p>
+                    <p class="text-sm text-gray-600 mt-1">Custo Médio: <span class="font-medium text-gray-800 tabular-nums">€ ${(parseFloat(it.cmp) || 0).toFixed(2)}</span></p>
                     <div class="mt-4 flex gap-2 flex-wrap">
                         <a href="item-view.html?id=${it.id}" class="px-3 py-1.5 bg-sky-600 hover:bg-sky-700 text-white rounded-lg text-xs font-medium shadow-sm shadow-sky-500/20 flex items-center gap-1.5 transition"><i class="fas fa-eye text-[10px]"></i> Visualizar</a>
                         <a href="item-form.html?id=${it.id}" class="px-3 py-1.5 bg-sky-50 hover:bg-sky-100 text-sky-700 border border-sky-100 rounded-lg text-xs font-medium transition"><i class="fas fa-edit text-[10px]"></i> Editar</a>

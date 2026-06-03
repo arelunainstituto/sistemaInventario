@@ -7,7 +7,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/styles.css">
-    <script>if (!localStorage.getItem('access_token')) window.location.href = '/login.html';</script>
+    <script>if (!localStorage.getItem('access_token')) { const r = encodeURIComponent(location.pathname + location.search); window.location.href = '/login.html?redirect=' + r; }</script>
 </head>
 <body class="bg-white">
 <div id="layoutRoot"></div>
@@ -138,11 +138,14 @@ function addLine() {
                 ${locations.map(l => `<option value="${l.id}">${escapeHtml(l.unit?.name)} · ${escapeHtml(l.name)}</option>`).join('')}
             </select>
         </div>
-        <div class="col-span-1"><label class="text-xs text-gray-500">Qtd</label><input type="number" step="0.0001" required class="line-qty w-full px-2 py-1.5 border border-gray-300 rounded text-xs" oninput="recalcTotal()"></div>
-        <div class="col-span-1">
-            <label class="text-xs text-gray-500 flex items-center gap-1">Fator <span class="line-uom-hint text-[10px] text-gray-400"></span></label>
-            <input type="number" step="0.0001" value="1" readonly title="Fator definido no cadastro do item. Para alterar, edite o item em Itens → Editar." class="line-factor w-full px-2 py-1.5 border border-gray-200 rounded text-xs bg-gray-50 text-gray-600 cursor-not-allowed">
+        <div class="col-span-2">
+            <label class="text-xs text-gray-500 flex items-center gap-1">Qtd <span class="line-uom-hint text-[10px] text-gray-400"></span></label>
+            <input type="number" step="0.0001" required class="line-qty w-full px-2 py-1.5 border border-gray-300 rounded text-xs" oninput="recalcTotal()">
         </div>
+        <!-- Fator de conversão fica oculto. A entrada opera direto na unidade de consumo
+             (ex.: nota fiscal traz 100 ampolas, não 1 caixa). Campo preservado no schema
+             para fluxos futuros — backend recebe conversion_factor=1. -->
+        <input type="hidden" class="line-factor" value="1">
         <div class="col-span-1"><label class="text-xs text-gray-500">€ unit</label><input type="number" step="0.0001" required class="line-cost w-full px-2 py-1.5 border border-gray-300 rounded text-xs" oninput="recalcTotal()"></div>
         <div class="col-span-2 line-lot-area hidden"><label class="text-xs text-gray-500">Lote</label><input type="text" class="line-lot w-full px-2 py-1.5 border border-gray-300 rounded text-xs"></div>
         <div class="col-span-1 line-expiry-area hidden"><label class="text-xs text-gray-500">Validade</label><input type="date" class="line-expiry w-full px-2 py-1.5 border border-gray-300 rounded text-xs"></div>
@@ -161,15 +164,13 @@ function onItemChange(sel, idx) {
     line.querySelector('.line-expiry-area').classList.toggle('hidden', !controlsLot);
     line.querySelectorAll('.line-lot, .line-expiry').forEach(el => el.required = controlsLot);
 
-    // Fator de conversão e UoMs vêm do cadastro do item (read-only).
-    const factor       = parseFloat(opt?.dataset.conversion) || 1;
-    const purchaseUom  = opt?.dataset.purchaseUom || '';
-    const consumeUom   = opt?.dataset.consumptionUom || '';
-    line.querySelector('.line-factor').value = factor;
+    // Fator continua no schema do item (data-conversion) mas a UI da entrada
+    // não pede mais conversão — opera direto em unidade de consumo. Mantemos
+    // line-factor = 1 para o backend (purchase_qty = consumption_qty).
+    line.querySelector('.line-factor').value = 1;
+    const consumeUom = opt?.dataset.consumptionUom || opt?.dataset.purchaseUom || '';
     const hint = line.querySelector('.line-uom-hint');
-    if (hint) hint.textContent = (purchaseUom && consumeUom)
-        ? `(${purchaseUom} → ${consumeUom})`
-        : '';
+    if (hint) hint.textContent = consumeUom ? `(em ${consumeUom})` : '';
     recalcTotal();
 }
 
@@ -240,9 +241,8 @@ function viewEntry(e) {
             rows: [
                 ['Item',               `${l.item?.internal_code || ''} · ${l.item?.name || ''}`],
                 ['Localização',        l.location?.name],
-                ['Quantidade compra',  l.purchase_qty],
-                ['Fator conversão',    l.conversion_factor],
-                ['Quantidade consumo', l.consumption_qty],
+                ['Quantidade',         l.consumption_qty ?? l.purchase_qty],
+                ...(parseFloat(l.conversion_factor) !== 1 ? [['Fator conversão', l.conversion_factor]] : []),
                 ['Custo unitário',     `€ ${parseFloat(l.unit_cost || 0).toFixed(4)}`],
                 ['Custo total',        `€ ${parseFloat(l.total_cost || 0).toFixed(2)}`, { bold: true }],
                 ['Lote',               l.lot_number, { mono: true }],

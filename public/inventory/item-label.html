@@ -2,35 +2,106 @@
 <html lang="pt-PT">
 <head>
     <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Etiqueta · Inventário</title>
+    <title>Etiqueta</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <script>if (!localStorage.getItem('access_token')) window.location.href = '/login.html';</script>
+    <script>if (!localStorage.getItem('access_token')) { const r = encodeURIComponent(location.pathname + location.search); window.location.href = '/login.html?redirect=' + r; }</script>
     <style>
-        @media print {
-            .no-print { display: none !important; }
-            body { background: white; }
-            .label { box-shadow: none; border: 1px solid #ccc; page-break-after: always; }
-        }
         body { font-family: 'Inter', sans-serif; }
+
+        /* ===== Tamanho do papel para Brother QL-810W (DK-1202: 62×100 mm) ===== */
+        /* Para outros rolos, basta trocar a constante --label-w/--label-h.
+           Tamanhos comuns Brother DK:
+             DK-1202  62 × 100 mm   (padrão recomendado para QR + texto)
+             DK-1208  38 ×  90 mm
+             DK-1209  29 ×  62 mm
+             DK-2205  62 mm contínuo (ajustar altura conforme conteúdo) */
+        :root {
+            --label-w: 62mm;
+            --label-h: 100mm;
+        }
+
+        /* Pré-visualização na tela imita o tamanho real */
+        .label-preview {
+            width: var(--label-w);
+            height: var(--label-h);
+        }
+
+        /* ===== Modo impressão ===== */
+        @page {
+            size: var(--label-w) var(--label-h);
+            margin: 0;            /* sem cabeçalho/rodapé/margem do navegador */
+        }
+        @media print {
+            html, body {
+                margin: 0 !important;
+                padding: 0 !important;
+                width: var(--label-w);
+                height: var(--label-h);
+                background: white !important;
+            }
+            .no-print { display: none !important; }
+            .label-preview {
+                width: var(--label-w) !important;
+                height: var(--label-h) !important;
+                box-shadow: none !important;
+                border: none !important;
+                border-radius: 0 !important;
+                margin: 0 !important;
+                page-break-after: always;
+            }
+            /* Remove qualquer fundo decorativo herdado */
+            body * { background: white; }
+        }
     </style>
 </head>
-<body class="bg-gradient-to-b from-sky-50/40 via-blue-50/20 to-white min-h-screen p-8">
-<div class="max-w-3xl mx-auto">
-    <div class="no-print flex justify-between items-center mb-6">
-        <a href="items.html" class="inline-flex items-center gap-2 text-sky-600 hover:text-sky-700 text-sm font-medium"><i class="fas fa-arrow-left text-xs"></i> Voltar à lista</a>
-        <button onclick="window.print()" class="bg-sky-600 hover:bg-sky-700 text-white px-5 py-2 rounded-lg text-sm font-medium shadow-sm shadow-sky-500/20 transition flex items-center gap-2">
-            <i class="fas fa-print text-xs"></i> Imprimir
-        </button>
-    </div>
+<body class="bg-gradient-to-b from-sky-50/40 via-blue-50/20 to-white min-h-screen p-6">
 
+<!-- Barra superior (somente na tela) -->
+<div class="no-print max-w-4xl mx-auto">
+    <div class="flex justify-between items-start mb-4 gap-4">
+        <a href="items.html" class="inline-flex items-center gap-2 text-sky-600 hover:text-sky-700 text-sm font-medium">
+            <i class="fas fa-arrow-left text-xs"></i> Voltar à lista
+        </a>
+        <div class="flex items-end gap-3">
+            <div>
+                <label class="block text-[10px] uppercase tracking-wider text-gray-500 font-semibold">Formato Brother DK</label>
+                <select id="rollSize" class="px-3 py-1.5 border border-gray-300 rounded-lg text-sm bg-white mt-1">
+                    <option value="62,100">DK-1202 — 62 × 100 mm (padrão)</option>
+                    <option value="38,90">DK-1208 — 38 × 90 mm</option>
+                    <option value="29,62">DK-1209 — 29 × 62 mm</option>
+                    <option value="62,30">DK-2205 — 62 mm contínuo (30 mm)</option>
+                </select>
+            </div>
+            <button onclick="window.print()" class="bg-sky-600 hover:bg-sky-700 text-white px-5 py-2 rounded-lg text-sm font-medium shadow-sm shadow-sky-500/20 transition flex items-center gap-2">
+                <i class="fas fa-print text-xs"></i> Imprimir
+            </button>
+        </div>
+    </div>
+    <div class="bg-amber-50 border border-amber-200 rounded-lg p-3 text-[11px] text-amber-800 mb-4">
+        <i class="fas fa-circle-info"></i>
+        No diálogo de impressão do navegador, em <b>Mais configurações</b>:
+        ative <b>Margens: Nenhuma</b> e desative <b>Cabeçalhos e rodapés</b>.
+        Selecione a impressora <b>Brother QL-810W</b> e o rolo correspondente.
+    </div>
+</div>
+
+<!-- Etiqueta (única coisa que vai pro papel) -->
+<div class="flex justify-center">
     <div id="labelContainer" class="text-center text-gray-400 py-12">Carregando…</div>
 </div>
 
 <script>
 const id = new URLSearchParams(location.search).get('id');
 const token = localStorage.getItem('access_token');
+
+// Atualiza CSS var em runtime para refletir o rolo escolhido
+document.getElementById('rollSize').addEventListener('change', (e) => {
+    const [w, h] = e.target.value.split(',').map(n => `${n}mm`);
+    document.documentElement.style.setProperty('--label-w', w);
+    document.documentElement.style.setProperty('--label-h', h);
+});
 
 async function load() {
     if (!id) { document.getElementById('labelContainer').textContent = 'ID não fornecido.'; return; }
@@ -40,10 +111,6 @@ async function load() {
         if (!res.ok) throw new Error(json.error || 'Erro');
         const it = json.data;
 
-        // Endpoint atual devolve JSON { data: { data_url: "data:image/png;base64,…" } }.
-        // Mantemos compatibilidade com versões antigas que devolviam PNG binário direto,
-        // detetando o content-type da resposta. cache-bust (`?_=timestamp`) garante
-        // que browser/proxy não devolvem resposta antiga (mudou de PNG para JSON).
         const qrRes = await fetch(`/api/inventory/items/${id}/qr?_=${Date.now()}`, {
             headers: { Authorization: 'Bearer ' + token, 'Cache-Control': 'no-cache' },
             cache: 'no-store'
@@ -59,32 +126,30 @@ async function load() {
             qrUrl = qrJson.data?.data_url;
             if (!qrUrl) throw new Error('Resposta sem data_url do QR');
         } else if (ct.startsWith('image/')) {
-            // Fallback: servidor ainda devolve binário (precisa de restart)
             qrUrl = URL.createObjectURL(await qrRes.blob());
         } else {
             const txt = await qrRes.text();
             throw new Error(`Content-type inesperado (${ct}): ${txt.slice(0, 200)}`);
         }
 
-        const isPatrim = it.macro_category === 'patrimonial';
+        // Layout otimizado para 62×100mm. Tipografia em mm para escalar bem
+        // em diferentes rolos. Sem cores/rounding que confundam impressão térmica.
         document.getElementById('labelContainer').innerHTML = `
-            <div class="label bg-white rounded-2xl border-2 border-gray-200 shadow-sm p-8 mx-auto" style="width: 400px;">
-                <div class="text-center border-b border-gray-100 pb-4">
-                    <p class="text-[10px] text-sky-700 uppercase tracking-widest font-bold">Instituto Areluna · Inventário</p>
-                    <h2 class="text-lg font-bold text-gray-900 mt-2">${escapeHtml(it.name)}</h2>
-                    <span class="inline-flex items-center gap-1.5 text-[11px] px-2 py-0.5 rounded-md ${isPatrim ? 'bg-purple-50 text-purple-700 border border-purple-100' : 'bg-sky-50 text-sky-700 border border-sky-100'} font-medium mt-2 capitalize">
-                        <i class="fas ${isPatrim ? 'fa-laptop-medical' : 'fa-prescription-bottle'} text-[9px]"></i>${it.macro_category}
-                    </span>
-                </div>
-                <div class="my-6 flex justify-center">
-                    <img src="${qrUrl}" alt="QR Code do item" class="w-60 h-60" onerror="this.parentElement.innerHTML='<p class=&quot;text-red-500 text-xs py-12&quot;>Erro a renderizar imagem do QR</p>'">
-                </div>
-                <div class="text-center text-xs text-gray-700 space-y-1.5 border-t border-gray-100 pt-4">
-                    <p>Código: <span class="font-mono font-semibold text-gray-900">${escapeHtml(it.internal_code)}</span></p>
-                    ${it.patrimony_number ? `<p>Património: <span class="font-mono font-semibold text-gray-900">${escapeHtml(it.patrimony_number)}</span></p>` : ''}
-                    ${it.subcategory ? `<p class="text-gray-500">${escapeHtml(it.subcategory.name)}</p>` : ''}
-                </div>
-                <p class="text-center text-[10px] text-gray-400 mt-5 italic">Aponte a câmara do telemóvel para abrir a ficha.</p>
+            <div class="label-preview bg-white border border-gray-200 shadow-sm flex flex-col items-center justify-center"
+                 style="padding: 3mm 3mm 2mm 3mm;">
+                <p style="font-size: 2.6mm; font-weight: 700; text-align: center;
+                          color: #111; line-height: 1.15; max-height: 9mm; overflow: hidden;">
+                    ${escapeHtml(it.name)}
+                </p>
+                <img src="${qrUrl}" alt="QR" style="width: 55mm; height: 55mm; margin-top: 1.5mm; image-rendering: pixelated;"
+                     onerror="this.parentElement.innerHTML='<p style=&quot;color:red;font-size:2.5mm&quot;>Erro QR</p>'">
+                <p style="font-size: 2.8mm; font-family: 'Courier New', monospace; font-weight: 700; margin-top: 1.5mm;">
+                    ${escapeHtml(it.internal_code)}
+                </p>
+                ${it.patrimony_number ? `
+                <p style="font-size: 2.2mm; font-family: 'Courier New', monospace; color: #444;">
+                    ${escapeHtml(it.patrimony_number)}
+                </p>` : ''}
             </div>`;
     } catch (err) {
         document.getElementById('labelContainer').innerHTML = `<p class="text-red-500">${err.message}</p>`;

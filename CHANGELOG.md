@@ -34,7 +34,43 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e
 
 ## [Unreleased]
 
+_Nenhuma alteração pendente._
+
+---
+
+## [1.1.0] — 2026-06-03
+
+> **Marco**: stack arquitetural agora opera por (item, localização) — não apenas por item — e ganha hierarquia de categorias N-níveis. Toda a Fase 4 (parâmetros, views, API/UI por localização) e a Fase 5.x (hierarquia, cadastro refinado, fluxos administrativos restritos, etiqueta Brother QL-810W) entregues. Bug crítico de fuso horário no Kardex corrigido. Auth com redirect preservando origem.
+>
+> Ver [IMPLEMENTATION_REPORT.md](IMPLEMENTATION_REPORT.md) para visão geral arquitetural.
+
+### Alterado
+- **Auth: redirect para login com `?redirect=` em token expirado** ([_layout.js](public/inventory/_layout.js), [login.html](public/login.html), guards inline em 20 páginas de `public/`):
+  - `apiCall` detecta 401 e 403 com mensagem de "token" → limpa sessão e manda para `/login.html?redirect=<path_atual>`.
+  - Guards inline (`<script>if(!access_token)…</script>`) em todas as páginas de inventory atualizados para passar a URL atual via `?redirect=`.
+  - `login.html` honra `?redirect=` após login bem-sucedido — caso contrário cai no `dashboard.html`. Validação `^/[^/]` impede `javascript:` ou open redirect externo.
+  - Se o usuário já tem sessão válida e abre `/login.html?redirect=/inventory/items.html`, vai direto para a URL pedida (sem rebote pelo dashboard).
+- **JWT 12h — config operacional do Supabase** *(não é mudança de código)*: para estender a sessão de 1h (default) para 12h, no painel Supabase ir em **Project Settings → Auth → JWT Expiry** e setar para `43200`. O cliente Supabase JS já faz refresh automático antes de expirar enquanto a aba está aberta.
+- **Saídas restritas a tipo "consumo"** ([exits.js](api/inventory/exits.js), [exits.html](public/inventory/exits.html)): operador só lança consumo; tipos críticos (avaria/extravio/perda/quebra/depreciação) viraram fluxo administrativo e são bloqueados pelo endpoint para roles não-admin com erro 403 explícito.
+- **Tela de Ajustes restrita a Admin** ([adjustments.js](api/inventory/adjustments.js)): GET/POST agora usam `requireRole(['Inventory_Admin','Admin','admin'])` em vez de `requirePermission('inventory','adjust')`. Sidebar ([_layout.js](public/inventory/_layout.js)) marca o item como `adminOnly` — só aparece após `/api/auth/me` confirmar a role.
+- **Etiqueta QR Brother QL-810W** ([item-label.html](public/inventory/item-label.html)): novo layout otimizado para impressão térmica com `@page` em mm; seletor de formato Brother DK (1202/1208/1209/2205); tipografia em mm para escalar entre rolos; aviso na UI orientando ativar "Margens: Nenhuma" e desativar cabeçalho/rodapé no diálogo de impressão. Sem cabeçalho/rodapé/data/hora na etiqueta.
+
+### Corrigido
+- **Kardex exibia data anterior para entradas em fusos UTC-N**: nova migração [53-fix-entry-occurred-at.sql](database/inventory-refactor/53-fix-entry-occurred-at.sql) (**requer migração**). `fn_inv_process_entry_line` agora grava `occurred_at = NOW()` (instante real do lançamento) em vez de `document_date::TIMESTAMPTZ` que era 00:00 UTC e deslocava para o dia anterior em clientes UTC-3. `document_date` continua em `inv_entries` para auditoria fiscal. Movimentos antigos ficam como estão (RN07 bloqueia UPDATE).
+
 ### Adicionado
+- **Fase 5.2 — Cadastro de item refinado**:
+  - Novo endpoint `DELETE /api/inventory/items/:id/image` ([items.js](api/inventory/items.js)) — limpa `image_url` (arquivo no Storage fica órfão para auditoria).
+  - Backend faz fallback automático `base_uom_id = purchase_uom_id` em POST/PUT (UI nova não pede base).
+  - UI [item-form.html](public/inventory/item-form.html): "Tipo de item" → "Tipo de cadastro"; "Subcategoria" → "Categoria" com path completo no tooltip; UM base oculto; rename UoM → UM; botão "Remover imagem" no preview (modo edit).
+  - Seletor de categoria mostra o caminho completo "Categoria / Subcategoria" via `vw_inv_categories_tree`, com indentação por profundidade.
+- **Fase 5.3 — Entradas operam direto em unidade de consumo**:
+  - Campo "Fator de conversão" oculto em [entries.html](public/inventory/entries.html) (preservado no schema e enviado como 1 para o backend).
+  - Coluna "Qtd" passa a indicar a UM de consumo do item ("(em UN)", "(em ml)", etc.).
+  - Visualização de entrada agora mostra apenas "Quantidade" (omite fator quando =1).
+  - Rationale: caixa fechada de 100 ampolas → nota fiscal traz 100 ampolas, não 1 caixa. Evita números quebrados.
+- **CMP → "Custo Médio" na UI** (decisão: fórmula ponderada mantida em `inv_items.cmp`; só os labels mudam):
+  - [item-view.html](public/inventory/item-view.html), [scan.html](public/inventory/scan.html), [transfers.html](public/inventory/transfers.html), [exits.html](public/inventory/exits.html), [adjustments.html](public/inventory/adjustments.html), [movements.html](public/inventory/movements.html), [items.html](public/inventory/items.html), [depreciation.html](public/inventory/depreciation.html), [reports.html](public/inventory/reports.html), [reports.js](api/inventory/reports.js).
 - **Fase 5.1 — Hierarquia de categorias (N níveis)**: nova migração [52-fase5-categories-hierarchy.sql](database/inventory-refactor/52-fase5-categories-hierarchy.sql) (**requer migração**):
   - Adiciona `inv_categories.parent_id UUID REFERENCES inv_categories(id) ON DELETE RESTRICT` + índice parcial.
   - Trigger `fn_inv_categories_check_parent`: filhos herdam `parent_macro` do pai; bloqueia auto-referência e ciclos (até 100 ancestrais).
@@ -207,5 +243,6 @@ f29115a feat(inventory): Sprint 4C - log de acesso + janela de consumo por categ
 
 A partir de 1.0.0, toda alteração deve adicionar uma entrada acima na seção `[Unreleased]` antes do merge.
 
-[Unreleased]: https://github.com/<org>/sistemaInventario/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/<org>/sistemaInventario/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/<org>/sistemaInventario/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/<org>/sistemaInventario/releases/tag/v1.0.0

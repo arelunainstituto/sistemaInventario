@@ -224,7 +224,7 @@ router.get('/valuation', requirePermission('inventory', 'financial'), async (req
                 { key: 'unit_name',      label: 'Unidade',        width: 70 },
                 { key: 'location_name',  label: 'Localização',    width: 80 },
                 { key: 'quantity',       label: 'Qtd',            width: 50 },
-                { key: 'cmp',            label: 'CMP €',          width: 50 },
+                { key: 'cmp',            label: 'Custo M. €',     width: 60 },
                 { key: 'line_value',     label: 'Total €',        width: 70 }
             ],
             rows,

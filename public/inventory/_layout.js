@@ -7,7 +7,7 @@ const INVENTORY_NAV = [
     { id: 'entries',     label: 'Entradas',          icon: 'fa-arrow-right-to-bracket', href: 'entries.html' },
     { id: 'exits',       label: 'Saídas',            icon: 'fa-arrow-right-from-bracket', href: 'exits.html' },
     { id: 'transfers',   label: 'Transferências',    icon: 'fa-right-left',  href: 'transfers.html' },
-    { id: 'adjustments', label: 'Ajustes',           icon: 'fa-sliders',     href: 'adjustments.html' },
+    { id: 'adjustments', label: 'Ajustes',           icon: 'fa-sliders',     href: 'adjustments.html', adminOnly: true },
     { id: 'inventory-session', label: 'Inventário Físico', icon: 'fa-list-check', href: 'inventory-session.html' },
     { id: 'depreciation', label: 'Depreciação',       icon: 'fa-arrow-trend-down', href: 'depreciation.html' },
     { id: 'reports',     label: 'Relatórios',        icon: 'fa-chart-line',  href: 'reports.html' },
@@ -37,7 +37,9 @@ function navItemHtml(item, active) {
         : '';
     const onclick = item.disabled ? '' : `onclick="window.location.href='${item.href}'"`;
     const badge = item.badge ? `<span class="sidebar-label ml-auto text-[10px] font-bold px-1.5 py-0.5 rounded bg-gray-200 text-gray-600">${item.badge}</span>` : '';
-    return `<button ${onclick} class="${base} ${state}" title="${item.label}">
+    // adminOnly: item começa oculto e é revelado em populateUserHeader se a role conferir
+    const adminAttr = item.adminOnly ? ` data-admin-only="1" style="display:none"` : '';
+    return `<button ${onclick} class="${base} ${state}" title="${item.label}"${adminAttr}>
         ${activeBar}
         <i class="fas ${item.icon} w-5 text-center ${isActive ? 'text-sky-600' : ''}"></i>
         <span class="sidebar-label flex-1 text-left whitespace-nowrap overflow-hidden">${item.label}</span>
@@ -165,6 +167,13 @@ async function populateUserHeader() {
         const data = await r.json();
         const full = data.full_name || data.display_name || data.email;
         if (full && full !== display) renderUserAvatar(full);
+
+        // F5.4: revela itens marcados como adminOnly se a role for de admin
+        const roles  = Array.isArray(data.roles) ? data.roles : [];
+        const isAdmin = roles.some(r => ['Inventory_Admin','Admin','admin'].includes(r));
+        if (isAdmin) {
+            document.querySelectorAll('[data-admin-only]').forEach(el => { el.style.display = ''; });
+        }
     } catch {}
 }
 
@@ -219,10 +228,23 @@ function logout() {
     localStorage.removeItem('access_token');
     localStorage.removeItem('refresh_token');
     localStorage.removeItem('user_profile');
-    window.location.href = '/login.html';
+    redirectToLogin();
 }
 
-// Helper API call wrapper
+// Redireciona para o login preservando a URL atual em ?redirect=, para que
+// o login.html possa voltar à página de origem após autenticação.
+function redirectToLogin() {
+    const here = window.location.pathname + window.location.search;
+    const skip = ['/login.html', '/'];
+    const target = skip.includes(window.location.pathname)
+        ? '/login.html'
+        : `/login.html?redirect=${encodeURIComponent(here)}`;
+    window.location.href = target;
+}
+
+// Helper API call wrapper.
+// Detecta token expirado/inválido (401, ou 403 com mensagem mencionando token)
+// e redireciona para o login mantendo a URL atual em ?redirect=.
 async function apiCall(path, options = {}) {
     const token = localStorage.getItem('access_token');
     const headers = options.headers || {};
@@ -233,6 +255,15 @@ async function apiCall(path, options = {}) {
     const res = await fetch(path, { ...options, headers });
     const ct = res.headers.get('content-type') || '';
     const data = ct.includes('application/json') ? await res.json() : await res.text();
+
+    if (res.status === 401 ||
+        (res.status === 403 && /token|perfil de usuário/i.test((data && data.error) || ''))) {
+        localStorage.removeItem('access_token');
+        localStorage.removeItem('refresh_token');
+        redirectToLogin();
+        throw new Error('Sessão expirada — redirecionando para login');
+    }
+
     if (!res.ok) throw new Error((data && data.error) || `HTTP ${res.status}`);
     return data;
 }

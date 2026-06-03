@@ -1,9 +1,15 @@
 const express = require('express');
 const router = express.Router();
-const { requirePermission } = require('../middleware/auth');
+const { requirePermission, requireRole } = require('../middleware/auth');
 const { supabaseAdmin, getStockByItem, parsePgException } = require('./_stock');
 
-const VALID_SUBTYPES = ['consumo','avaria','extravio','perda','quebra','depreciacao'];
+// A partir da F5.4, saídas de operador só podem ser de tipo 'consumo'.
+// Avarias/extravios/perdas/quebras viraram fluxo administrativo e são
+// lançados pela tela de Ajustes (acesso restrito a Admin).
+const VALID_SUBTYPES        = ['consumo'];
+const ADMIN_SUBTYPES        = ['avaria','extravio','perda','quebra','depreciacao'];
+const ALL_VALID_SUBTYPES    = [...VALID_SUBTYPES, ...ADMIN_SUBTYPES];
+const ADMIN_ROLES           = ['Inventory_Admin','Admin','admin'];
 
 const MOVEMENT_SELECT = `
     id, type, subtype, quantity, unit_cost, total_cost, cmp_at_moment,
@@ -63,8 +69,19 @@ router.post('/', requirePermission('inventory', 'exit'), async (req, res) => {
         if (!item_id)     return res.status(400).json({ error: 'item_id é obrigatório' });
         if (!location_id) return res.status(400).json({ error: 'location_id é obrigatório' });
         if (!(quantity > 0)) return res.status(400).json({ error: 'quantity deve ser > 0' });
-        if (!subtype || !VALID_SUBTYPES.includes(subtype))
-            return res.status(400).json({ error: `subtype deve ser um de: ${VALID_SUBTYPES.join(', ')}` });
+        if (!subtype) return res.status(400).json({ error: 'subtype é obrigatório' });
+        if (!ALL_VALID_SUBTYPES.includes(subtype))
+            return res.status(400).json({ error: `subtype deve ser um de: ${ALL_VALID_SUBTYPES.join(', ')}` });
+        // F5.4: subtype não-consumo é fluxo administrativo (avaria/extravio/perda/
+        // quebra/depreciacao). Só Admin pode lançar via este endpoint —
+        // operador comum cai no fluxo de Ajustes.
+        const userRoles = Array.isArray(req.user?.roles) ? req.user.roles : [];
+        const isAdmin   = userRoles.some(r => ADMIN_ROLES.includes(r));
+        if (ADMIN_SUBTYPES.includes(subtype) && !isAdmin) {
+            return res.status(403).json({
+                error: `Tipo "${subtype}" é restrito a Inventory_Admin. Use a tela de Ajustes.`
+            });
+        }
 
         const { data, error } = await supabaseAdmin.rpc('fn_inv_consume', {
             p_item: item_id,

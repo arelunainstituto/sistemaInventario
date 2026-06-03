@@ -7,7 +7,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/styles.css">
-    <script>if (!localStorage.getItem('access_token')) window.location.href = '/login.html';</script>
+    <script>if (!localStorage.getItem('access_token')) { const r = encodeURIComponent(location.pathname + location.search); window.location.href = '/login.html?redirect=' + r; }</script>
 </head>
 <body class="bg-white">
 <div id="layoutRoot"></div>
@@ -97,7 +97,7 @@ document.getElementById('pageContent').innerHTML = `
                         <th class="text-left p-2">Origem</th>
                         <th class="text-left p-2">Destino</th>
                         <th class="text-left p-2">Lote</th>
-                        <th class="text-right p-2">CMP €</th>
+                        <th class="text-right p-2">CM €</th>
                         <th class="text-left p-2">Justificação</th>
                     </tr>
                 </thead>
