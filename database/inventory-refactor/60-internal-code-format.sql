@@ -123,7 +123,7 @@ COMMIT;
 -- =====================================================
 
 -- 1) Novas sequences existem e começam em 1
-SELECT sequencename, last_value, is_called
+SELECT sequencename, last_value
   FROM pg_sequences
  WHERE sequencename IN ('seq_inv_code_consumo', 'seq_inv_code_patrimonio', 'seq_inv_patrimony')
  ORDER BY sequencename;

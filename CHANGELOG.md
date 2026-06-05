@@ -38,6 +38,50 @@ _Nenhuma alteração pendente._
 
 ---
 
+## [1.5.0] — 2026-06-05
+
+> **Marco**: importador passa a consumir a aba dedicada **Cadastro de Fornecedores** da planilha v1.2 com chave de deduplicação por **NIF/NIPC**. Cadastro de produtos passa a deduplicar pelo **ID** da planilha (preservado quando segue o padrão `1XXXXXX`/`2XXXXXX`). Schema de `inv_suppliers` ganha campos fiscais e comerciais (Razão Social, IBAN, CAE/CIRS, Regime de IVA, vendedor, etc.).
+
+### Adicionado
+- Nova migração [70-suppliers-extended-fields.sql](database/inventory-refactor/70-suppliers-extended-fields.sql) (**requer migração manual**):
+  - `inv_suppliers.entity_type` — Pessoa Singular / Pessoa Coletiva
+  - `inv_suppliers.legal_name` — Razão Social
+  - `inv_suppliers.cae_code` — CIRS (PS) ou CAE (PC)
+  - `inv_suppliers.website`, `sales_rep_name`, `sales_rep_phone`, `iban`, `vat_regime`
+  - Índice `idx_inv_suppliers_legal_name`
+  - O índice `uq_inv_suppliers_tax` (UNIQUE em `tax_id` WHERE NOT NULL) — herdado da fase 1 — passa a ser a chave de dedup oficial para o importador.
+- [_layout.js:5](public/inventory/_layout.js#L5) bump `INVENTORY_VERSION` para `v1.5.0`.
+
+### Alterado
+- **Importador XLSX** ([import.js](api/inventory/import.js)) — refatorado para v1.2 da planilha:
+  - Parse da nova aba `Cadastro de Fornecedores` com 14 colunas (todos os campos fiscais).
+  - Deduplicação de fornecedores por NIF/NIPC (`tax_id`), tanto dentro do arquivo quanto contra o DB.
+  - Insert em batches de 100 com `INSERT ... ON CONFLICT` via filtragem prévia por NIF.
+  - **ID do produto agora é preservado** como `internal_code` quando segue o padrão `^[12]\d{6}$`. IDs fora do padrão geram warning e recebem código novo do trigger.
+  - Após inserir produtos, a sequence `seq_inv_code_consumo` é avançada para `max(id)` via `fn_inv_set_code_sequences(p_consumo, NULL)` — evita colisão futura com cadastros manuais.
+  - Avisos novos: NIF duplicado na planilha (bloqueia o cadastro), Nome Fantasia ambíguo (referenciado por produtos mas com múltiplos cadastros), Fornecedor referenciado mas ausente da aba dedicada.
+  - Resposta inclui `created_suppliers`, `skipped_suppliers`, `next_consumo_code`.
+- **Importador UI** ([import.html](public/inventory/import.html)):
+  - Banner reflete v1.2 e explica as 2 chaves (NIF para fornecedor, ID para produto).
+  - Cards de resumo: trocado "Fornecedores novos" por "Fornecedores: X novos · Y existentes".
+  - Nova tabela de fornecedores no preview com badge `cadastrar`/`existente` por linha.
+  - Mensagem final mostra fornecedores criados vs ignorados (mesmo NIF).
+
+### Corrigido
+- **Migração 60** ([60-internal-code-format.sql](database/inventory-refactor/60-internal-code-format.sql)) — bloco de verificação final usava `is_called` (coluna inexistente em `pg_sequences`). Apenas `last_value` é selecionado agora. O corpo transacional da migração não foi afetado.
+
+### Notas de aplicação
+1. Aplicar [60-internal-code-format.sql](database/inventory-refactor/60-internal-code-format.sql) (uma vez, se ainda não foi).
+2. Aplicar [70-suppliers-extended-fields.sql](database/inventory-refactor/70-suppliers-extended-fields.sql) (uma vez).
+3. Aplicar [55-clean-test-data.sql](database/inventory-refactor/55-clean-test-data.sql) (antes de cada import limpo).
+4. Importar a planilha v1.2 em `/inventory/adjustments.html` → "Importar planilha".
+
+### Notas de compatibilidade
+- Planilhas v1.0/v1.1 sem aba `Cadastro de Fornecedores` continuam funcionando: o passo de fornecedores é silenciosamente pulado. Recomenda-se atualizar a planilha para v1.2.
+- Itens existentes com `internal_code` no formato antigo `SKUXXX` permanecem intactos.
+
+---
+
 ## [1.4.0] — 2026-06-05
 
 > **Marco**: substituição do termo "SKU" por **Código de Registro Interno** com novo esquema de geração — prefixo por tipo de produto (1XXXXXX para Uso e Consumo, 2XXXXXX para Patrimônio), 7 dígitos. Decisão da equipe de regras: SKU exige composição lógica (Tipo+Produto+Marca+Variação) que o sistema ainda não suporta; até lá, o identificador é um sequencial puro, sem mascarar atributos.
@@ -359,7 +403,8 @@ f29115a feat(inventory): Sprint 4C - log de acesso + janela de consumo por categ
 
 A partir de 1.0.0, toda alteração deve adicionar uma entrada acima na seção `[Unreleased]` antes do merge.
 
-[Unreleased]: https://github.com/<org>/sistemaInventario/compare/v1.4.0...HEAD
+[Unreleased]: https://github.com/<org>/sistemaInventario/compare/v1.5.0...HEAD
+[1.5.0]: https://github.com/<org>/sistemaInventario/compare/v1.4.0...v1.5.0
 [1.4.0]: https://github.com/<org>/sistemaInventario/compare/v1.3.1...v1.4.0
 [1.3.1]: https://github.com/<org>/sistemaInventario/compare/v1.3.0...v1.3.1
 [1.3.0]: https://github.com/<org>/sistemaInventario/compare/v1.2.0...v1.3.0

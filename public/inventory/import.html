@@ -27,9 +27,9 @@ document.getElementById('pageContent').innerHTML = `
             <div class="bg-sky-50/40 border border-sky-100 rounded-lg p-3 text-xs text-sky-800 mb-4 flex items-start gap-2">
                 <i class="fas fa-circle-info text-sky-500 mt-0.5"></i>
                 <div>
-                    A planilha deve seguir o formato <b>Instituto Areluna v1.0</b> — aba <b>Cadastro_Produtos</b> com cabeçalhos na linha 3.
-                    O <b>Código de Registro Interno</b> é gerado pelo sistema no formato <span class="font-mono">1XXXXXX</span> (Uso e Consumo). A 1ª coluna da planilha é usada apenas como referência de origem.
-                    <br>Categorias, unidades e fornecedores são normalizados automaticamente.
+                    A planilha deve seguir o formato <b>Instituto Areluna v1.2</b> — abas <b>Cadastro_Produtos</b> e <b>Cadastro de Fornecedores</b>.
+                    <br>Chaves de deduplicação: <b>ID</b> para produtos · <b>NIF/NIPC</b> para fornecedores.
+                    <br>IDs de produto no padrão <span class="font-mono">1XXXXXX</span> são preservados; os fora do padrão recebem código gerado pelo sistema.
                 </div>
             </div>
             <form id="uploadForm" class="space-y-3">
@@ -81,9 +81,25 @@ document.getElementById('pageContent').innerHTML = `
                     <p class="text-[10px] uppercase tracking-wider font-bold text-gray-500 mb-1">Novas unidades de medida</p>
                     <div id="newUoms" class="flex flex-wrap gap-1.5"></div>
                 </div>
-                <div>
-                    <p class="text-[10px] uppercase tracking-wider font-bold text-gray-500 mb-1">Novos fornecedores</p>
-                    <div id="newSuppliers" class="flex flex-wrap gap-1.5"></div>
+            </div>
+
+            <!-- Fornecedores -->
+            <div id="suppliersBlock" class="hidden mb-4">
+                <p class="text-[10px] uppercase tracking-wider font-bold text-gray-500 mb-1.5">Fornecedores (chave: NIF/NIPC)</p>
+                <div class="border border-gray-200 rounded-lg overflow-hidden">
+                    <table class="w-full text-xs">
+                        <thead class="bg-gray-50 text-[10px] uppercase tracking-wider text-gray-500 border-b border-gray-200">
+                            <tr>
+                                <th class="text-left p-2">Linha</th>
+                                <th class="text-left p-2">Nome Fantasia</th>
+                                <th class="text-left p-2">Razão Social</th>
+                                <th class="text-left p-2 font-mono">NIF/NIPC</th>
+                                <th class="text-left p-2">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="suppliersPreview" class="divide-y divide-gray-100"></tbody>
+                    </table>
+                    <p class="px-3 py-2 text-[11px] text-gray-500 bg-gray-50/50 border-t border-gray-100">Mostrando até 10 · total = <span id="suppliersTotal">0</span></p>
                 </div>
             </div>
 
@@ -163,9 +179,9 @@ function renderPreview(data) {
     // Cards
     document.getElementById('summaryCards').innerHTML = [
         ['Itens', data.items_count, 'fa-boxes-stacked', 'sky'],
+        ['Fornecedores', `${data.new_suppliers_count} novos · ${data.existing_suppliers_count} existentes`, 'fa-truck', 'cyan'],
         ['Categorias novas', data.new_categories.length, 'fa-tags', 'amber'],
-        ['UMs novas', data.new_uoms.length, 'fa-ruler', 'purple'],
-        ['Fornecedores novos', data.new_suppliers.length, 'fa-truck', 'cyan']
+        ['UMs novas', data.new_uoms.length, 'fa-ruler', 'purple']
     ].map(([label, val, icon, color]) => `
         <div class="bg-white rounded-lg border border-gray-200 p-3">
             <p class="text-[10px] uppercase tracking-wider text-gray-500 font-semibold">${label}</p>
@@ -208,9 +224,28 @@ function renderPreview(data) {
     document.getElementById('newUoms').innerHTML = data.new_uoms.length
         ? data.new_uoms.map(u => `<span class="px-2 py-0.5 rounded bg-purple-50 text-purple-700 border border-purple-100 text-xs">${escapeHtml(u.name)} (${u.code})</span>`).join('')
         : '<span class="text-xs text-gray-400 italic">Nenhuma</span>';
-    document.getElementById('newSuppliers').innerHTML = data.new_suppliers.length
-        ? data.new_suppliers.map(n => `<span class="px-2 py-0.5 rounded bg-cyan-50 text-cyan-700 border border-cyan-100 text-xs">${escapeHtml(n)}</span>`).join('')
-        : '<span class="text-xs text-gray-400 italic">Nenhum</span>';
+
+    // Fornecedores
+    const sb = document.getElementById('suppliersBlock');
+    if (data.suppliers_count > 0) {
+        sb.classList.remove('hidden');
+        document.getElementById('suppliersTotal').textContent = data.suppliers_count;
+        document.getElementById('suppliersPreview').innerHTML = data.suppliers_preview.map(s => {
+            const badge = s._exists_in_db
+                ? '<span class="px-1.5 py-0.5 rounded text-[10px] bg-gray-100 text-gray-600 border border-gray-200">existente</span>'
+                : '<span class="px-1.5 py-0.5 rounded text-[10px] bg-cyan-50 text-cyan-700 border border-cyan-100">cadastrar</span>';
+            return `
+            <tr>
+                <td class="p-2 text-gray-400">${s.line}</td>
+                <td class="p-2 font-medium text-gray-800">${escapeHtml(s.name)}</td>
+                <td class="p-2 text-gray-600">${escapeHtml(s.legal_name || '—')}</td>
+                <td class="p-2 font-mono text-[11px] text-gray-600">${escapeHtml(s.tax_id)}</td>
+                <td class="p-2">${badge}</td>
+            </tr>`;
+        }).join('');
+    } else {
+        sb.classList.add('hidden');
+    }
 
     // Tabela
     document.getElementById('itemsTotal').textContent = data.items_count;
@@ -227,7 +262,10 @@ function renderPreview(data) {
 
 async function executeImport() {
     if (!previewPayload) return;
-    if (!confirm(`Confirmar criação de ${previewPayload.items.length} itens no sistema?`)) return;
+    const supCount = (previewPayload.suppliers || []).length;
+    const msg = `Confirmar criação de ${previewPayload.items.length} itens` +
+                (supCount ? ` e ${supCount} fornecedores (dedup por NIF)` : '') + ' no sistema?';
+    if (!confirm(msg)) return;
     const btn = document.getElementById('executeBtn');
     btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Importando…';
     try {
@@ -242,7 +280,8 @@ async function executeImport() {
         s.scrollIntoView({ behavior: 'smooth' });
         document.getElementById('resultSummary').innerHTML = `
             <p><b>${r.data.created_items}</b> itens criados</p>
-            <p><b>${r.data.created_categories}</b> categorias, <b>${r.data.created_uoms}</b> UMs, <b>${r.data.created_suppliers}</b> fornecedores</p>
+            <p><b>${r.data.created_suppliers}</b> fornecedores criados${r.data.skipped_suppliers > 0 ? ` · <span class="text-gray-500">${r.data.skipped_suppliers} já existiam (mesmo NIF)</span>` : ''}</p>
+            <p><b>${r.data.created_categories}</b> categorias · <b>${r.data.created_uoms}</b> UMs</p>
             ${r.data.next_consumo_code ? `<p class="text-[11px] text-gray-400 mt-2">Próximo código (Uso e Consumo): <span class="font-mono">${escapeHtml(r.data.next_consumo_code)}</span></p>` : ''}
         `;
     } catch (err) {

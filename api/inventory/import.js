@@ -1,19 +1,19 @@
-// Importador de planilha XLSX (Instituto Areluna v1.0).
+// Importador de planilha XLSX (Instituto Areluna v1.2).
 // Apenas Admin. Fluxo em 2 etapas:
 //   1) POST /preview  → parse + normalização + validação, sem persistir
 //   2) POST /execute  → persiste com transação lógica
 //
 // Decisões de design:
-//   • A coluna "SKU" da planilha é usada APENAS como chave de deduplicação
-//     dentro do arquivo (alertar quando o mesmo código aparece 2x). Não é
-//     persistida no banco. O Código de Registro Interno é gerado pelo
-//     trigger fn_inv_items_before_insert (formato 1XXXXXX para consumo,
-//     2XXXXXX para patrimônio).
+//   • Fornecedores vêm da aba "Cadastro de Fornecedores" (chave de dedup:
+//     NIF/NIPC). Itens da aba "Cadastro_Produtos" referem-se ao
+//     fornecedor pela coluna "Nome Fantasia" (informacional).
+//   • A 1ª coluna ("ID") da aba de produtos é a chave de dedup do item.
+//     Se o ID seguir o formato do sistema (^[12]\d{6}$), é usado como
+//     internal_code. Caso contrário, o trigger fn_inv_items_before_insert
+//     gera um código no formato correto.
 //   • Todas as 5 categorias canonicalizadas são criadas como raízes
-//     (parent_macro='consumo'). Match com normalização sem diacríticos.
+//     (parent_macro='consumo').
 //   • UoMs canonicalizadas correspondem à aba Tabelas_Aux.
-//   • Fornecedores normalizados (UPPER + trim de espaços duplos). "–" ou "-"
-//     são tratados como ausência.
 //   • Itens são marcados macro=consumo e controls_lot=true (default por trigger).
 
 const express = require('express');
@@ -39,6 +39,22 @@ function normKey(s) {
         .toLowerCase();
 }
 
+// Normaliza NIF: só dígitos, trim. Retorna null se vazio ou inválido.
+function normNif(s) {
+    if (!s) return null;
+    const digits = String(s).replace(/\D/g, '');
+    return digits.length >= 8 ? digits : null;
+}
+
+// Normaliza nome fantasia para matching (case-insensitive, sem
+// espaços duplos). Retorna null se vazio.
+function normNF(s) {
+    if (!s) return null;
+    const t = String(s).trim().replace(/\s+/g, ' ').toUpperCase();
+    if (!t || t === '–' || t === '-' || t === 'VARIAVEL') return null;
+    return t;
+}
+
 // Mapa de categorias da planilha → 5 canônicas (Tabelas_Aux)
 const CATEGORY_CANONICAL = {
     'consumiveis clinicos':   'Consumíveis Clínicos',
@@ -52,7 +68,6 @@ const CATEGORY_CANONICAL = {
     'outros':                 'Outros'
 };
 
-// UoMs canônicas: chave normalizada → { code, name }
 const UOM_CANONICAL = {
     'un':     { code: 'un',     name: 'Unidade' },
     'unidade':{ code: 'un',     name: 'Unidade' },
@@ -69,8 +84,7 @@ const UOM_CANONICAL = {
 
 function canonCategory(raw) {
     if (!raw) return null;
-    const k = normKey(raw);
-    return CATEGORY_CANONICAL[k] || 'Outros';
+    return CATEGORY_CANONICAL[normKey(raw)] || 'Outros';
 }
 
 function canonUom(raw) {
@@ -78,24 +92,34 @@ function canonUom(raw) {
     return UOM_CANONICAL[normKey(raw)] || null;
 }
 
-function canonSupplier(raw) {
-    if (!raw) return null;
-    const s = String(raw).trim().replace(/\s+/g, ' ').toUpperCase();
-    if (s === '–' || s === '-' || s === 'VARIAVEL' || !s) return null;
-    return s;
+const ITEM_CODE_PATTERN = /^[12]\d{6}$/;
+
+// ---------- Parse das abas ----------
+function readSheet(wb, name) {
+    if (!wb.SheetNames.includes(name)) return null;
+    return xlsx.utils.sheet_to_json(wb.Sheets[name], { header: 1, raw: false, defval: '' });
 }
 
-// ---------- Parse da planilha ----------
-function parseSheet(buffer) {
+function parseProductSheet(buffer) {
     const wb = xlsx.read(buffer);
     if (!wb.SheetNames.includes('Cadastro_Produtos')) {
         throw new Error('Aba "Cadastro_Produtos" não encontrada — verifique o formato da planilha');
     }
+    // Linhas 0-2 são título + subtítulo + cabeçalho
     const rows = xlsx.utils.sheet_to_json(wb.Sheets['Cadastro_Produtos'], {
         header: 1, raw: false, defval: ''
     });
-    // Linhas 0-2 são título + subtítulo + cabeçalho da tabela
-    return rows.slice(3).filter(r => r.some(c => c && String(c).trim()));
+    return {
+        wb,
+        productRows: rows.slice(3).filter(r => r.some(c => c && String(c).trim()))
+    };
+}
+
+function parseSupplierSheet(wb) {
+    const rows = readSheet(wb, 'Cadastro de Fornecedores');
+    if (!rows) return null; // sheet ausente — backward compat
+    // Linha 0 é cabeçalho. Dados começam na linha 1.
+    return rows.slice(1).filter(r => r.some(c => c && String(c).trim()));
 }
 
 // ---------- POST /preview ----------
@@ -106,100 +130,213 @@ router.post('/preview', requireRole(ADMIN_ROLES), upload.single('file'), async (
             return res.status(400).json({ error: 'Formato deve ser .xlsx ou .xls' });
         }
 
-        const dataRows = parseSheet(req.file.buffer);
+        const { wb, productRows } = parseProductSheet(req.file.buffer);
+        const supplierRows = parseSupplierSheet(wb);
 
-        const items = [];
-        const warnings = [];
         const errors   = [];
-        // Dedup pela 1ª coluna da planilha (a equipa chamava de "SKU",
-        // mas para nós é apenas referência de origem — não é persistida).
-        const sourceCodeSet = new Set();
-        const categoriesSet = new Set();
-        const uomsSet       = new Set();
-        const suppliersSet  = new Set();
+        const warnings = [];
 
-        for (const [idx, row] of dataRows.entries()) {
-            const line = idx + 4; // 1-based contando cabeçalhos
-            const [sourceCode, descricao, categoria, unidade, referencia, fornecedor,
+        // ---------- A. Fornecedores ----------
+        const suppliers = [];          // [{ line, ... }]
+        const nifSetInFile = new Set();
+        const nfToFileIdx  = new Map(); // Nome Fantasia normalizado → [indices em suppliers[]]
+
+        if (supplierRows) {
+            for (const [idx, row] of supplierRows.entries()) {
+                const line = idx + 2; // 1-based, 1 linha de cabeçalho
+                const [_id, tipo, nomeFantasia, razaoSocial, nif, sede,
+                       caeCirs, email, telefone, site, vendNome, vendTel,
+                       iban, regimeIva] = row.map(c => (c ?? '').toString().trim());
+
+                if (!nomeFantasia && !razaoSocial && !nif) continue; // linha vazia
+                const nifNorm = normNif(nif);
+                const nfNorm  = normNF(nomeFantasia);
+
+                if (!nifNorm) {
+                    errors.push({ line, msg: `Fornecedor sem NIF/NIPC válido (linha ${line}) — obrigatório para deduplicação` });
+                    continue;
+                }
+                if (!nfNorm) {
+                    errors.push({ line, msg: `Fornecedor sem Nome Fantasia (linha ${line})` });
+                    continue;
+                }
+                if (nifSetInFile.has(nifNorm)) {
+                    warnings.push({ line, source_code: nifNorm, msg: `NIF ${nifNorm} duplicado na aba de fornecedores — segunda ocorrência será ignorada` });
+                    continue;
+                }
+                nifSetInFile.add(nifNorm);
+
+                const supplier = {
+                    line,
+                    entity_type:     tipo || null,
+                    name:            nfNorm,
+                    legal_name:      razaoSocial || null,
+                    tax_id:          nifNorm,
+                    address:         sede || null,
+                    cae_code:        caeCirs || null,
+                    email:           email || null,
+                    phone:           telefone || null,
+                    website:         site || null,
+                    sales_rep_name:  vendNome || null,
+                    sales_rep_phone: vendTel || null,
+                    iban:            iban || null,
+                    vat_regime:      regimeIva || null,
+                };
+                suppliers.push(supplier);
+                if (!nfToFileIdx.has(nfNorm)) nfToFileIdx.set(nfNorm, []);
+                nfToFileIdx.get(nfNorm).push(suppliers.length - 1);
+            }
+        }
+
+        // Compara fornecedores com DB (por NIF)
+        const fileNifs = [...nifSetInFile];
+        let existingByNif = new Map();
+        if (fileNifs.length) {
+            const { data } = await supabaseAdmin.from('inv_suppliers')
+                .select('id, name, tax_id').in('tax_id', fileNifs).is('deleted_at', null);
+            existingByNif = new Map((data || []).map(s => [s.tax_id, s]));
+        }
+        // Marca cada fornecedor com seu status (para o preview da UI)
+        for (const s of suppliers) {
+            s._exists_in_db = existingByNif.has(s.tax_id);
+        }
+        const newSuppliers      = suppliers.filter(s => !s._exists_in_db);
+        const existingSuppliers = suppliers.filter(s =>  s._exists_in_db);
+
+        // ---------- B. Produtos ----------
+        const items = [];
+        const itemIdSetInFile = new Set();
+        const categoriesSet   = new Set();
+        const uomsSet         = new Set();
+        const referencedSupplierNFs = new Set();
+
+        for (const [idx, row] of productRows.entries()) {
+            const line = idx + 4; // 1-based, 3 linhas de cabeçalho
+            const [id, descricao, categoria, unidade, referencia, fornecedor,
                    _custo, stockMin, stockMax, _prateleira, observacoes, estado] =
                 row.map(c => (c ?? '').toString().trim());
 
-            if (!sourceCode && !descricao) {
-                // Linha totalmente em branco — ignorar silenciosamente
+            if (!id && !descricao) continue;
+            if (!id) {
+                errors.push({ line, msg: 'ID (1ª coluna) vazio — linha ignorada' });
                 continue;
             }
-            if (!sourceCode) {
-                errors.push({ line, msg: 'Código de origem (1ª coluna) vazio — linha ignorada' });
+            if (itemIdSetInFile.has(id)) {
+                warnings.push({ line, source_code: id, msg: `ID "${id}" duplicado na planilha — segunda ocorrência será ignorada` });
                 continue;
             }
-            if (sourceCodeSet.has(sourceCode)) {
-                warnings.push({ line, source_code: sourceCode, msg: `Código "${sourceCode}" duplicado na planilha — segunda ocorrência será ignorada` });
-                continue;
-            }
-            sourceCodeSet.add(sourceCode);
+            itemIdSetInFile.add(id);
 
-            if (!descricao) warnings.push({ line, source_code: sourceCode, msg: 'Descrição vazia' });
-            if (!categoria) warnings.push({ line, source_code: sourceCode, msg: 'Categoria vazia — será "Outros"' });
-            if (!unidade)   warnings.push({ line, source_code: sourceCode, msg: 'Unidade vazia — item ficará sem UM' });
+            if (!descricao) warnings.push({ line, source_code: id, msg: 'Descrição vazia' });
+            if (!categoria) warnings.push({ line, source_code: id, msg: 'Categoria vazia — será "Outros"' });
+            if (!unidade)   warnings.push({ line, source_code: id, msg: 'Unidade vazia — item ficará sem UM' });
 
             const cat = canonCategory(categoria);
             const uom = canonUom(unidade);
-            const sup = canonSupplier(fornecedor);
+            const nfRef = normNF(fornecedor);
 
-            if (cat) categoriesSet.add(cat);
-            if (uom) uomsSet.add(uom.code);
-            if (sup) suppliersSet.add(sup);
+            if (cat)   categoriesSet.add(cat);
+            if (uom)   uomsSet.add(uom.code);
+            if (nfRef) referencedSupplierNFs.add(nfRef);
 
             if (unidade && !uom) {
-                warnings.push({ line, source_code: sourceCode, msg: `Unidade "${unidade}" não reconhecida — item ficará sem UM` });
+                warnings.push({ line, source_code: id, msg: `Unidade "${unidade}" não reconhecida — item ficará sem UM` });
             }
 
             const minStock = stockMin ? parseFloat(stockMin.replace(',', '.')) : 0;
             const maxStock = stockMax ? parseFloat(stockMax.replace(',', '.')) : null;
 
+            // ID da planilha vira internal_code se já estiver no formato.
+            // Caso contrário, trigger gera (deixamos internal_code = null).
+            const useAsInternalCode = ITEM_CODE_PATTERN.test(id);
+            if (!useAsInternalCode) {
+                warnings.push({
+                    line, source_code: id,
+                    msg: `ID "${id}" fora do padrão 1XXXXXX/2XXXXXX — código será gerado pelo sistema`
+                });
+            }
+
             items.push({
                 line,
-                source_code:      sourceCode,
-                name:             descricao || `Item ${sourceCode}`,
+                source_code:      id,
+                internal_code:    useAsInternalCode ? id : null,
+                name:             descricao || `Item ${id}`,
                 manufacturer_ref: referencia || null,
                 description:      observacoes || null,
                 _category_name:   cat,
                 _uom_code:        uom?.code || null,
-                _supplier_name:   sup,
+                _supplier_nf:     nfRef,
                 min_stock:        isFinite(minStock) ? minStock : 0,
                 max_stock:        isFinite(maxStock) ? maxStock : null,
                 is_active:        !estado || /^acti?v|ativ/i.test(estado.toLowerCase())
             });
         }
 
-        // Compara com o que já existe no DB
-        const [existCats, existUoms, existSups] = await Promise.all([
+        // Verifica conflito de internal_code com DB (apenas para os IDs no padrão)
+        const codesToCheck = items.map(i => i.internal_code).filter(Boolean);
+        if (codesToCheck.length) {
+            const { data: existingItems } = await supabaseAdmin
+                .from('inv_items').select('internal_code')
+                .in('internal_code', codesToCheck);
+            const conflict = (existingItems || []).map(i => i.internal_code);
+            if (conflict.length) {
+                errors.push({
+                    msg: `${conflict.length} ID(s) de produto já existem no sistema. Rode 55-clean-test-data.sql para limpar antes da importação.`,
+                    source_codes: conflict.slice(0, 10)
+                });
+            }
+        }
+
+        // Fornecedores referenciados em produtos mas não cadastrados na aba
+        const allKnownNFs = new Set([
+            ...suppliers.map(s => s.name),
+            ...[...existingByNif.values()].map(s => normNF(s.name)).filter(Boolean)
+        ]);
+        const unresolvedRefs   = [...referencedSupplierNFs].filter(nf => !allKnownNFs.has(nf));
+        const ambiguousRefs    = [...referencedSupplierNFs].filter(nf =>
+            (nfToFileIdx.get(nf) || []).length > 1
+        );
+        for (const nf of unresolvedRefs) {
+            warnings.push({ msg: `Fornecedor "${nf}" referenciado em produtos não está em Cadastro de Fornecedores` });
+        }
+        for (const nf of ambiguousRefs) {
+            warnings.push({ msg: `Fornecedor "${nf}" tem múltiplos cadastros na aba — vínculo a partir do produto pode ser ambíguo` });
+        }
+
+        // Comparar categorias / UMs com DB
+        const [existCats, existUoms] = await Promise.all([
             supabaseAdmin.from('inv_categories').select('id, name, parent_macro').is('deleted_at', null),
             supabaseAdmin.from('inv_units_of_measure').select('id, code, name').is('deleted_at', null),
-            supabaseAdmin.from('inv_suppliers').select('id, name').is('deleted_at', null)
         ]);
         const existCatNames = new Set((existCats.data || []).map(c => c.name));
         const existUomCodes = new Set((existUoms.data || []).map(u => u.code));
-        const existSupNames = new Set((existSups.data || []).map(s => s.name));
-
         const newCategories = [...categoriesSet].filter(n => !existCatNames.has(n));
         const newUoms       = [...uomsSet].filter(c => !existUomCodes.has(c))
                                           .map(c => Object.values(UOM_CANONICAL).find(u => u.code === c))
                                           .filter(Boolean);
-        const newSuppliers  = [...suppliersSet].filter(n => !existSupNames.has(n));
 
         res.json({
             success: true,
             data: {
+                // Fornecedores
+                suppliers_count:          suppliers.length,
+                new_suppliers_count:      newSuppliers.length,
+                existing_suppliers_count: existingSuppliers.length,
+                suppliers_preview:        suppliers.slice(0, 10),
+                // Produtos
                 items_count:        items.length,
                 items_preview:      items.slice(0, 10),
                 new_categories:     newCategories,
                 new_uoms:           newUoms,
-                new_suppliers:      newSuppliers,
-                existing_categories: existCatNames.size,
+                unresolved_supplier_refs: unresolvedRefs,
+                ambiguous_supplier_refs:  ambiguousRefs,
+                // Comum
                 warnings,
                 errors,
-                _payload: { items, new_categories: newCategories, new_uoms: newUoms, new_suppliers: newSuppliers }
+                _payload: {
+                    suppliers, items,
+                    new_categories: newCategories, new_uoms: newUoms
+                }
             }
         });
     } catch (err) {
@@ -211,19 +348,25 @@ router.post('/preview', requireRole(ADMIN_ROLES), upload.single('file'), async (
 // ---------- POST /execute ----------
 router.post('/execute', requireRole(ADMIN_ROLES), async (req, res) => {
     try {
-        const { items, new_categories = [], new_uoms = [], new_suppliers = [] } = req.body || {};
+        const {
+            suppliers = [],
+            items = [],
+            new_categories = [],
+            new_uoms = []
+        } = req.body || {};
+
         if (!Array.isArray(items) || !items.length) {
             return res.status(400).json({ error: 'Lista de itens vazia' });
         }
 
-        // 1) Criar UoMs novas
+        // 1) UoMs novas
         if (new_uoms.length) {
             const { error } = await supabaseAdmin.from('inv_units_of_measure')
                 .insert(new_uoms.map(u => ({ code: u.code, name: u.name, is_active: true })));
             if (error && error.code !== '23505') throw error;
         }
 
-        // 2) Criar categorias novas (raízes, consumo)
+        // 2) Categorias novas (raízes, consumo)
         if (new_categories.length) {
             const { error } = await supabaseAdmin.from('inv_categories')
                 .insert(new_categories.map(name => ({
@@ -233,25 +376,59 @@ router.post('/execute', requireRole(ADMIN_ROLES), async (req, res) => {
             if (error && error.code !== '23505') throw error;
         }
 
-        // 3) Criar fornecedores novos
-        if (new_suppliers.length) {
-            const { error } = await supabaseAdmin.from('inv_suppliers')
-                .insert(new_suppliers.map(name => ({ name, is_active: true })));
-            if (error && error.code !== '23505') throw error;
+        // 3) Fornecedores — UPSERT por NIF (tax_id). O índice único
+        //    uq_inv_suppliers_tax garante que duplicatas são merged.
+        let createdSuppliers = 0;
+        let skippedSuppliers = 0;
+        if (suppliers.length) {
+            const taxIds = suppliers.map(s => s.tax_id).filter(Boolean);
+            const { data: alreadyIn } = await supabaseAdmin.from('inv_suppliers')
+                .select('tax_id').in('tax_id', taxIds).is('deleted_at', null);
+            const existingTaxIds = new Set((alreadyIn || []).map(s => s.tax_id));
+
+            const toInsert = suppliers.filter(s => !existingTaxIds.has(s.tax_id));
+            skippedSuppliers = suppliers.length - toInsert.length;
+
+            if (toInsert.length) {
+                const payload = toInsert.map(s => ({
+                    name:            s.name,
+                    tax_id:          s.tax_id,
+                    legal_name:      s.legal_name,
+                    entity_type:     s.entity_type,
+                    address:         s.address,
+                    cae_code:        s.cae_code,
+                    email:           s.email,
+                    phone:           s.phone,
+                    website:         s.website,
+                    sales_rep_name:  s.sales_rep_name,
+                    sales_rep_phone: s.sales_rep_phone,
+                    iban:            s.iban,
+                    vat_regime:      s.vat_regime,
+                    is_active:       true
+                }));
+                for (let i = 0; i < payload.length; i += 100) {
+                    const batch = payload.slice(i, i + 100);
+                    const { data, error } = await supabaseAdmin
+                        .from('inv_suppliers').insert(batch).select('id');
+                    if (error) throw error;
+                    createdSuppliers += (data || []).length;
+                }
+            }
         }
 
-        // 4) Buscar IDs (incluindo os recém-criados)
-        const [cats, uoms, sups] = await Promise.all([
+        // 4) IDs de categorias / UoMs
+        const [cats, uoms] = await Promise.all([
             supabaseAdmin.from('inv_categories').select('id, name').eq('parent_macro', 'consumo').is('parent_id', null).is('deleted_at', null),
             supabaseAdmin.from('inv_units_of_measure').select('id, code').is('deleted_at', null),
-            supabaseAdmin.from('inv_suppliers').select('id, name').is('deleted_at', null)
         ]);
         const catByName = new Map((cats.data || []).map(c => [c.name, c.id]));
         const uomByCode = new Map((uoms.data || []).map(u => [u.code, u.id]));
 
-        // 5) Itens — sem internal_code; o trigger fn_inv_items_before_insert
-        //    gera o código de registro interno (1XXXXXX para consumo).
+        // 5) Items — inserir em batches. internal_code pode estar
+        //    preenchido (vem da planilha no padrão correto) ou null
+        //    (deixa o trigger gerar).
         const itemsToInsert = items.map(it => ({
+            ...(it.internal_code ? { internal_code: it.internal_code } : {}),
             name:               it.name,
             description:        it.description,
             macro_category:     'consumo',
@@ -272,27 +449,38 @@ router.post('/execute', requireRole(ADMIN_ROLES), async (req, res) => {
             updated_by:         req.user?.id || null
         }));
 
-        let totalCreated = 0;
+        let createdItems = 0;
         let maxConsumoCode = 0;
         for (let i = 0; i < itemsToInsert.length; i += 100) {
             const batch = itemsToInsert.slice(i, i + 100);
             const { data, error } = await supabaseAdmin
                 .from('inv_items').insert(batch).select('id, internal_code');
             if (error) throw error;
-            totalCreated += (data || []).length;
+            createdItems += (data || []).length;
             for (const row of (data || [])) {
                 const m = (row.internal_code || '').match(/^1(\d{6})$/);
                 if (m) maxConsumoCode = Math.max(maxConsumoCode, parseInt(m[1], 10));
             }
         }
 
+        // 6) Avança a sequence de consumo para max(internal_code provido) + 1
+        //    Garante que cadastros manuais futuros não colidam com IDs já
+        //    importados da planilha. Patrimônio fica intacto.
+        if (maxConsumoCode > 0) {
+            await supabaseAdmin.rpc('fn_inv_set_code_sequences', {
+                p_consumo: maxConsumoCode,
+                p_patrimonio: null
+            }).catch(err => console.warn('Sequence advance falhou (não crítico):', err.message));
+        }
+
         res.json({
             success: true,
             data: {
-                created_items:        totalCreated,
+                created_items:        createdItems,
                 created_categories:   new_categories.length,
                 created_uoms:         new_uoms.length,
-                created_suppliers:    new_suppliers.length,
+                created_suppliers:    createdSuppliers,
+                skipped_suppliers:    skippedSuppliers,
                 next_consumo_code:    maxConsumoCode > 0 ? '1' + String(maxConsumoCode + 1).padStart(6, '0') : null
             }
         });
