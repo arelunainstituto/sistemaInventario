@@ -38,6 +38,40 @@ _Nenhuma alteração pendente._
 
 ---
 
+## [1.6.0] — 2026-06-05
+
+> **Marco**: itens passam a ter um **Fornecedor padrão** opcional (FK para `inv_suppliers`). Importador vincula automaticamente quando o Nome Fantasia do produto tem match único na aba de fornecedores; nos casos ambíguos (mesmo Nome Fantasia, NIFs diferentes — caso AMAZON) ou ausentes (Nome Fantasia com typo — caso INIBSA), deixa em branco para vinculação manual posterior. Decisão consolidada com a equipe de regras: a chave de identidade do fornecedor é o NIF; vínculos sem certeza ficam pendentes.
+
+### Adicionado
+- Nova migração [80-items-default-supplier.sql](database/inventory-refactor/80-items-default-supplier.sql) (**requer migração manual**):
+  - `inv_items.default_supplier_id UUID` (FK opcional → `inv_suppliers.id`)
+  - Índice parcial `idx_inv_items_default_supplier` (apenas quando preenchido)
+- **Campo "Fornecedor padrão"** no formulário de item ([item-form.html](public/inventory/item-form.html)):
+  - Dropdown ordenado alfabeticamente, exibindo `Nome · NIF` em cada opção
+  - Opcional — opção padrão "— sem fornecedor padrão —"
+  - Sugestão para entradas futuras; cada entrada continua podendo usar fornecedor diferente.
+- Exibição "Fornecedor padrão" em [item-view.html](public/inventory/item-view.html), no cartão de Identificação.
+- **Card no preview do importador** mostra "Vínculo item→fornecedor: X de Y" para o operador ter visibilidade antes de confirmar.
+- Resumo final do importador agora mostra quantos itens foram vinculados e quantos ficaram sem fornecedor para vinculação manual.
+
+### Alterado
+- **Importador** ([import.js](api/inventory/import.js)):
+  - Vínculo automático produto → fornecedor por **NIF** (lookup pelo Nome Fantasia que retorna NIF único).
+  - **Warnings removidos**: "Fornecedor X não está em Cadastro de Fornecedores" e "Nome Fantasia ambíguo" — esses casos agora são silenciosos e tratados como "sem vínculo, vincular manualmente".
+  - API select de items inclui `default_supplier:inv_suppliers(id, name, tax_id)` ([items.js:21-27](api/inventory/items.js#L21-L27)).
+- [_layout.js:5](public/inventory/_layout.js#L5) bump para `v1.6.0`.
+
+### Notas de aplicação
+1. Aplicar [80-items-default-supplier.sql](database/inventory-refactor/80-items-default-supplier.sql) **antes** do próximo import (uma vez).
+2. Importar a planilha v1.2 — vínculos automáticos por Nome Fantasia único acontecerão na hora.
+3. Itens sem vínculo automático (AMAZON ambíguo, INIBSA não-encontrado, etc.) podem ser editados em **Itens → ⋯ → Editar** para selecionar o fornecedor correto no dropdown.
+
+### Notas de compatibilidade
+- Itens existentes têm `default_supplier_id = NULL` por padrão. Nenhuma migração de dados é feita.
+- Entradas (`inv_entries.supplier_id`) continuam funcionando independente do `default_supplier_id` do item.
+
+---
+
 ## [1.5.1] — 2026-06-05
 
 > **Patch**: endurece a regra de ID do produto no importador. O ID da planilha É o `internal_code` — não há mais caminho lateral com geração por trigger. IDs fora do padrão `^[12]\d{6}$` bloqueiam o import (erro), forçando o operador a corrigir a planilha. Garante que dedup por ID funciona sempre.
@@ -419,7 +453,8 @@ f29115a feat(inventory): Sprint 4C - log de acesso + janela de consumo por categ
 
 A partir de 1.0.0, toda alteração deve adicionar uma entrada acima na seção `[Unreleased]` antes do merge.
 
-[Unreleased]: https://github.com/<org>/sistemaInventario/compare/v1.5.1...HEAD
+[Unreleased]: https://github.com/<org>/sistemaInventario/compare/v1.6.0...HEAD
+[1.6.0]: https://github.com/<org>/sistemaInventario/compare/v1.5.1...v1.6.0
 [1.5.1]: https://github.com/<org>/sistemaInventario/compare/v1.5.0...v1.5.1
 [1.5.0]: https://github.com/<org>/sistemaInventario/compare/v1.4.0...v1.5.0
 [1.4.0]: https://github.com/<org>/sistemaInventario/compare/v1.3.1...v1.4.0

@@ -180,8 +180,8 @@ function renderPreview(data) {
     document.getElementById('summaryCards').innerHTML = [
         ['Itens', data.items_count, 'fa-boxes-stacked', 'sky'],
         ['Fornecedores', `${data.new_suppliers_count} novos · ${data.existing_suppliers_count} existentes`, 'fa-truck', 'cyan'],
-        ['Categorias novas', data.new_categories.length, 'fa-tags', 'amber'],
-        ['UMs novas', data.new_uoms.length, 'fa-ruler', 'purple']
+        ['Vínculo item→fornecedor', `${data.items_with_supplier} de ${data.items_count}`, 'fa-link', 'emerald'],
+        ['Categorias novas', data.new_categories.length, 'fa-tags', 'amber']
     ].map(([label, val, icon, color]) => `
         <div class="bg-white rounded-lg border border-gray-200 p-3">
             <p class="text-[10px] uppercase tracking-wider text-gray-500 font-semibold">${label}</p>
@@ -280,6 +280,7 @@ async function executeImport() {
         s.scrollIntoView({ behavior: 'smooth' });
         document.getElementById('resultSummary').innerHTML = `
             <p><b>${r.data.created_items}</b> itens criados</p>
+            <p><b>${r.data.items_with_supplier}</b> com fornecedor vinculado · <span class="text-gray-500">${r.data.items_without_supplier} sem vínculo (vincular manualmente em Itens)</span></p>
             <p><b>${r.data.created_suppliers}</b> fornecedores criados${r.data.skipped_suppliers > 0 ? ` · <span class="text-gray-500">${r.data.skipped_suppliers} já existiam (mesmo NIF)</span>` : ''}</p>
             <p><b>${r.data.created_categories}</b> categorias · <b>${r.data.created_uoms}</b> UMs</p>
             ${r.data.next_consumo_code ? `<p class="text-[11px] text-gray-400 mt-2">Próximo código (Uso e Consumo): <span class="font-mono">${escapeHtml(r.data.next_consumo_code)}</span></p>` : ''}

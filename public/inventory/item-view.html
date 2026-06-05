@@ -98,6 +98,7 @@ function render(it) {
                 ${infoRow('Subcategoria', it.subcategory?.name)}
                 ${infoRow('Ref. fabricante', it.manufacturer_ref)}
                 ${infoRow('Código de barras', it.barcode, true)}
+                ${infoRow('Fornecedor padrão', it.default_supplier ? `${it.default_supplier.name}${it.default_supplier.tax_id ? ' · ' + it.default_supplier.tax_id : ''}` : null)}
                 ${infoRow('QR Code (UUID)', it.qr_code, true)}
                 ${isPatrimonial ? infoRow('Património', it.patrimony_number, true) : ''}
             </div>

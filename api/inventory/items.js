@@ -23,7 +23,8 @@ const ITEM_SELECT = `
     subcategory:inv_categories!subcategory_id(id, parent_macro, name),
     base_uom:inv_units_of_measure!base_uom_id(id, code, name),
     purchase_uom:inv_units_of_measure!purchase_uom_id(id, code, name),
-    consumption_uom:inv_units_of_measure!consumption_uom_id(id, code, name)
+    consumption_uom:inv_units_of_measure!consumption_uom_id(id, code, name),
+    default_supplier:inv_suppliers!default_supplier_id(id, name, tax_id)
 `;
 
 // Validação de payload por macro_category

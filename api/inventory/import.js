@@ -286,20 +286,38 @@ router.post('/preview', requireRole(ADMIN_ROLES), upload.single('file'), async (
             }
         }
 
-        // Fornecedores referenciados em produtos mas não cadastrados na aba
-        const allKnownNFs = new Set([
-            ...suppliers.map(s => s.name),
-            ...[...existingByNif.values()].map(s => normNF(s.name)).filter(Boolean)
-        ]);
-        const unresolvedRefs   = [...referencedSupplierNFs].filter(nf => !allKnownNFs.has(nf));
-        const ambiguousRefs    = [...referencedSupplierNFs].filter(nf =>
-            (nfToFileIdx.get(nf) || []).length > 1
-        );
-        for (const nf of unresolvedRefs) {
-            warnings.push({ msg: `Fornecedor "${nf}" referenciado em produtos não está em Cadastro de Fornecedores` });
+        // Vínculo automático produto → fornecedor (default_supplier_id).
+        // Constrói índice de Nome Fantasia → lista de NIFs (a partir
+        // dos suppliers do arquivo + existentes no DB). Regra de match
+        // alinhada com decisão da equipe:
+        //   • Exatamente 1 fornecedor com aquele Nome Fantasia → vincula
+        //   • 0 (Nome Fantasia ausente / typo) → deixa em branco, sem warning
+        //   • >1 (ambíguo, ex.: AMAZON) → deixa em branco, sem warning
+        // O usuário vincula manualmente depois.
+        const nfToNifs = new Map();
+        for (const s of suppliers) {
+            if (!nfToNifs.has(s.name)) nfToNifs.set(s.name, []);
+            nfToNifs.get(s.name).push(s.tax_id);
         }
-        for (const nf of ambiguousRefs) {
-            warnings.push({ msg: `Fornecedor "${nf}" tem múltiplos cadastros na aba — vínculo a partir do produto pode ser ambíguo` });
+        for (const s of existingByNif.values()) {
+            const nfn = normNF(s.name);
+            if (!nfn) continue;
+            if (!nfToNifs.has(nfn)) nfToNifs.set(nfn, []);
+            // Evita duplicar NIFs já incluídos via aba de fornecedores
+            if (!nfToNifs.get(nfn).includes(s.tax_id)) {
+                nfToNifs.get(nfn).push(s.tax_id);
+            }
+        }
+
+        let linkedItems = 0;
+        for (const it of items) {
+            if (!it._supplier_nf) continue;
+            const nifs = nfToNifs.get(it._supplier_nf) || [];
+            if (nifs.length === 1) {
+                it._supplier_nif = nifs[0]; // resolvido para um NIF único
+                linkedItems++;
+            }
+            // 0 ou >1: it._supplier_nif permanece undefined → fica em branco
         }
 
         // Comparar categorias / UMs com DB
@@ -323,12 +341,12 @@ router.post('/preview', requireRole(ADMIN_ROLES), upload.single('file'), async (
                 existing_suppliers_count: existingSuppliers.length,
                 suppliers_preview:        suppliers.slice(0, 10),
                 // Produtos
-                items_count:        items.length,
-                items_preview:      items.slice(0, 10),
-                new_categories:     newCategories,
-                new_uoms:           newUoms,
-                unresolved_supplier_refs: unresolvedRefs,
-                ambiguous_supplier_refs:  ambiguousRefs,
+                items_count:           items.length,
+                items_with_supplier:   linkedItems,
+                items_without_supplier: items.length - linkedItems,
+                items_preview:         items.slice(0, 10),
+                new_categories:        newCategories,
+                new_uoms:              newUoms,
                 // Comum
                 warnings,
                 errors,
@@ -415,36 +433,43 @@ router.post('/execute', requireRole(ADMIN_ROLES), async (req, res) => {
             }
         }
 
-        // 4) IDs de categorias / UoMs
-        const [cats, uoms] = await Promise.all([
+        // 4) IDs de categorias / UoMs / fornecedores (por NIF)
+        const allTaxIds = [...new Set(items.map(it => it._supplier_nif).filter(Boolean))];
+        const [cats, uoms, sups] = await Promise.all([
             supabaseAdmin.from('inv_categories').select('id, name').eq('parent_macro', 'consumo').is('parent_id', null).is('deleted_at', null),
             supabaseAdmin.from('inv_units_of_measure').select('id, code').is('deleted_at', null),
+            allTaxIds.length
+                ? supabaseAdmin.from('inv_suppliers').select('id, tax_id').in('tax_id', allTaxIds).is('deleted_at', null)
+                : Promise.resolve({ data: [] })
         ]);
-        const catByName = new Map((cats.data || []).map(c => [c.name, c.id]));
-        const uomByCode = new Map((uoms.data || []).map(u => [u.code, u.id]));
+        const catByName  = new Map((cats.data || []).map(c => [c.name, c.id]));
+        const uomByCode  = new Map((uoms.data || []).map(u => [u.code, u.id]));
+        const supByTaxId = new Map((sups.data || []).map(s => [s.tax_id, s.id]));
 
         // 5) Items — inserir em batches. internal_code = ID da planilha
         //    (já validado no preview contra o padrão ^[12]\d{6}$).
+        //    default_supplier_id resolvido pelo NIF do match único.
         const itemsToInsert = items.map(it => ({
-            internal_code:      it.internal_code,
-            name:               it.name,
-            description:        it.description,
-            macro_category:     'consumo',
-            controls_lot:       true,
-            uses_serial:        false,
-            subcategory_id:     it._category_name ? (catByName.get(it._category_name) || null) : null,
-            base_uom_id:        it._uom_code ? (uomByCode.get(it._uom_code) || null) : null,
-            consumption_uom_id: it._uom_code ? (uomByCode.get(it._uom_code) || null) : null,
-            purchase_uom_id:    it._uom_code ? (uomByCode.get(it._uom_code) || null) : null,
-            conversion_factor:  1,
-            manufacturer_ref:   it.manufacturer_ref,
-            min_stock:          it.min_stock || 0,
-            max_stock:          it.max_stock,
-            reorder_point:      it.min_stock || 0,
-            lead_time_days:     0,
-            is_active:          it.is_active !== false,
-            created_by:         req.user?.id || null,
-            updated_by:         req.user?.id || null
+            internal_code:       it.internal_code,
+            name:                it.name,
+            description:         it.description,
+            macro_category:      'consumo',
+            controls_lot:        true,
+            uses_serial:         false,
+            subcategory_id:      it._category_name ? (catByName.get(it._category_name) || null) : null,
+            base_uom_id:         it._uom_code ? (uomByCode.get(it._uom_code) || null) : null,
+            consumption_uom_id:  it._uom_code ? (uomByCode.get(it._uom_code) || null) : null,
+            purchase_uom_id:     it._uom_code ? (uomByCode.get(it._uom_code) || null) : null,
+            conversion_factor:   1,
+            manufacturer_ref:    it.manufacturer_ref,
+            min_stock:           it.min_stock || 0,
+            max_stock:           it.max_stock,
+            reorder_point:       it.min_stock || 0,
+            lead_time_days:      0,
+            default_supplier_id: it._supplier_nif ? (supByTaxId.get(it._supplier_nif) || null) : null,
+            is_active:           it.is_active !== false,
+            created_by:          req.user?.id || null,
+            updated_by:          req.user?.id || null
         }));
 
         let createdItems = 0;
@@ -471,15 +496,19 @@ router.post('/execute', requireRole(ADMIN_ROLES), async (req, res) => {
             }).catch(err => console.warn('Sequence advance falhou (não crítico):', err.message));
         }
 
+        const itemsWithSupplier = itemsToInsert.filter(i => i.default_supplier_id).length;
+
         res.json({
             success: true,
             data: {
-                created_items:        createdItems,
-                created_categories:   new_categories.length,
-                created_uoms:         new_uoms.length,
-                created_suppliers:    createdSuppliers,
-                skipped_suppliers:    skippedSuppliers,
-                next_consumo_code:    maxConsumoCode > 0 ? '1' + String(maxConsumoCode + 1).padStart(6, '0') : null
+                created_items:          createdItems,
+                items_with_supplier:    itemsWithSupplier,
+                items_without_supplier: createdItems - itemsWithSupplier,
+                created_categories:     new_categories.length,
+                created_uoms:           new_uoms.length,
+                created_suppliers:      createdSuppliers,
+                skipped_suppliers:      skippedSuppliers,
+                next_consumo_code:      maxConsumoCode > 0 ? '1' + String(maxConsumoCode + 1).padStart(6, '0') : null
             }
         });
     } catch (err) {

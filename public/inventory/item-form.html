@@ -105,7 +105,14 @@ document.getElementById('pageContent').innerHTML = `
                         <label class="field-label">Código de barras</label>
                         <input name="barcode" class="field-input">
                     </div>
-                    <div class="flex items-end">
+                    <div>
+                        <label class="field-label">Fornecedor padrão</label>
+                        <select name="default_supplier_id" id="defaultSupplierSelect" class="field-input">
+                            <option value="">— sem fornecedor padrão —</option>
+                        </select>
+                        <p class="text-[11px] text-gray-400 mt-1.5">Sugestão usada em entradas. Cada entrada pode usar fornecedor diferente.</p>
+                    </div>
+                    <div class="md:col-span-2 flex items-end">
                         <p class="text-[11px] text-gray-500 bg-sky-50/50 border border-sky-100 rounded-lg px-3 py-2 flex items-start gap-2">
                             <i class="fas fa-circle-info text-sky-500 mt-0.5"></i>
                             <span>Código interno e QR Code são gerados automaticamente.</span>
@@ -230,10 +237,11 @@ let locationsAll = [];
 
 async function bootstrap() {
     try {
-        const [cats, uoms, locs] = await Promise.all([
+        const [cats, uoms, locs, sups] = await Promise.all([
             apiCall('/api/inventory/categories'),
             apiCall('/api/inventory/uoms'),
-            apiCall('/api/inventory/locations')
+            apiCall('/api/inventory/locations'),
+            apiCall('/api/inventory/suppliers')
         ]);
         categoriesAll = cats.data;
         uomsAll       = uoms.data;
@@ -245,6 +253,15 @@ async function bootstrap() {
             sel.innerHTML = '<option value="">—</option>'
                 + uomsAll.map(u => `<option value="${u.id}">${escapeHtml(u.name)} (${escapeHtml(u.code)})</option>`).join('');
         }
+        // Fornecedor padrão: ordena alfabeticamente, mostra nome + NIF.
+        const supList = (sups.data || []).filter(s => s.is_active)
+            .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+        document.getElementById('defaultSupplierSelect').innerHTML =
+            '<option value="">— sem fornecedor padrão —</option>'
+            + supList.map(s => {
+                const tag = s.tax_id ? ` · ${escapeHtml(s.tax_id)}` : '';
+                return `<option value="${s.id}">${escapeHtml(s.name)}${tag}</option>`;
+            }).join('');
         if (editingId) await loadForEdit();
     } catch (err) { toast(err.message, 'error'); }
 }
