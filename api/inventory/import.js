@@ -7,10 +7,10 @@
 //   • Fornecedores vêm da aba "Cadastro de Fornecedores" (chave de dedup:
 //     NIF/NIPC). Itens da aba "Cadastro_Produtos" referem-se ao
 //     fornecedor pela coluna "Nome Fantasia" (informacional).
-//   • A 1ª coluna ("ID") da aba de produtos é a chave de dedup do item.
-//     Se o ID seguir o formato do sistema (^[12]\d{6}$), é usado como
-//     internal_code. Caso contrário, o trigger fn_inv_items_before_insert
-//     gera um código no formato correto.
+//   • A 1ª coluna ("ID") da aba de produtos é a chave de dedup do item
+//     E o internal_code persistido. DEVE seguir o padrão ^[12]\d{6}$
+//     (1XXXXXX para consumo, 2XXXXXX para patrimônio). IDs fora do
+//     padrão bloqueiam o import — o operador precisa corrigir a planilha.
 //   • Todas as 5 categorias canonicalizadas são criadas como raízes
 //     (parent_macro='consumo').
 //   • UoMs canonicalizadas correspondem à aba Tabelas_Aux.
@@ -246,20 +246,19 @@ router.post('/preview', requireRole(ADMIN_ROLES), upload.single('file'), async (
             const minStock = stockMin ? parseFloat(stockMin.replace(',', '.')) : 0;
             const maxStock = stockMax ? parseFloat(stockMax.replace(',', '.')) : null;
 
-            // ID da planilha vira internal_code se já estiver no formato.
-            // Caso contrário, trigger gera (deixamos internal_code = null).
-            const useAsInternalCode = ITEM_CODE_PATTERN.test(id);
-            if (!useAsInternalCode) {
-                warnings.push({
-                    line, source_code: id,
-                    msg: `ID "${id}" fora do padrão 1XXXXXX/2XXXXXX — código será gerado pelo sistema`
+            // ID da planilha É o internal_code. Padrão obrigatório.
+            if (!ITEM_CODE_PATTERN.test(id)) {
+                errors.push({
+                    line, source_codes: [id],
+                    msg: `ID "${id}" fora do padrão 1XXXXXX/2XXXXXX — corrija a linha na planilha`
                 });
+                continue;
             }
 
             items.push({
                 line,
                 source_code:      id,
-                internal_code:    useAsInternalCode ? id : null,
+                internal_code:    id,
                 name:             descricao || `Item ${id}`,
                 manufacturer_ref: referencia || null,
                 description:      observacoes || null,
@@ -272,8 +271,8 @@ router.post('/preview', requireRole(ADMIN_ROLES), upload.single('file'), async (
             });
         }
 
-        // Verifica conflito de internal_code com DB (apenas para os IDs no padrão)
-        const codesToCheck = items.map(i => i.internal_code).filter(Boolean);
+        // Verifica conflito de internal_code com DB
+        const codesToCheck = items.map(i => i.internal_code);
         if (codesToCheck.length) {
             const { data: existingItems } = await supabaseAdmin
                 .from('inv_items').select('internal_code')
@@ -424,11 +423,10 @@ router.post('/execute', requireRole(ADMIN_ROLES), async (req, res) => {
         const catByName = new Map((cats.data || []).map(c => [c.name, c.id]));
         const uomByCode = new Map((uoms.data || []).map(u => [u.code, u.id]));
 
-        // 5) Items — inserir em batches. internal_code pode estar
-        //    preenchido (vem da planilha no padrão correto) ou null
-        //    (deixa o trigger gerar).
+        // 5) Items — inserir em batches. internal_code = ID da planilha
+        //    (já validado no preview contra o padrão ^[12]\d{6}$).
         const itemsToInsert = items.map(it => ({
-            ...(it.internal_code ? { internal_code: it.internal_code } : {}),
+            internal_code:      it.internal_code,
             name:               it.name,
             description:        it.description,
             macro_category:     'consumo',

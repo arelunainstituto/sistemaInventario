@@ -29,7 +29,7 @@ document.getElementById('pageContent').innerHTML = `
                 <div>
                     A planilha deve seguir o formato <b>Instituto Areluna v1.2</b> — abas <b>Cadastro_Produtos</b> e <b>Cadastro de Fornecedores</b>.
                     <br>Chaves de deduplicação: <b>ID</b> para produtos · <b>NIF/NIPC</b> para fornecedores.
-                    <br>IDs de produto no padrão <span class="font-mono">1XXXXXX</span> são preservados; os fora do padrão recebem código gerado pelo sistema.
+                    <br>O ID do produto deve seguir o padrão <span class="font-mono">1XXXXXX</span> (Uso e Consumo) ou <span class="font-mono">2XXXXXX</span> (Patrimônio). Linhas fora do padrão bloqueiam o import.
                 </div>
             </div>
             <form id="uploadForm" class="space-y-3">

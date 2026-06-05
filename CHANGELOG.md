@@ -38,6 +38,22 @@ _Nenhuma alteração pendente._
 
 ---
 
+## [1.5.1] — 2026-06-05
+
+> **Patch**: endurece a regra de ID do produto no importador. O ID da planilha É o `internal_code` — não há mais caminho lateral com geração por trigger. IDs fora do padrão `^[12]\d{6}$` bloqueiam o import (erro), forçando o operador a corrigir a planilha. Garante que dedup por ID funciona sempre.
+
+### Alterado
+- **Importador** ([import.js](api/inventory/import.js)):
+  - Removido o caminho condicional `internal_code = null`. Itens válidos sempre carregam o ID da planilha como `internal_code`.
+  - ID fora do padrão `^[12]\d{6}$` vira **erro bloqueante** com mensagem "corrija a linha na planilha" (antes era warning silencioso que deixava o trigger gerar um código novo — risco de duplicação em re-imports).
+- **Importador UI** ([import.html](public/inventory/import.html)) — banner reflete a regra estrita.
+- [_layout.js:5](public/inventory/_layout.js#L5) bump para `v1.5.1`.
+
+### Motivação
+Time confirmou que dedup de produto é pelo **ID interno** (1000001, etc.) — o ID da planilha **é** o internal_code, não um identificador separado. A versão anterior gerava codigos novos para IDs não conformes, o que silenciosamente quebrava a dedup em segundas execuções.
+
+---
+
 ## [1.5.0] — 2026-06-05
 
 > **Marco**: importador passa a consumir a aba dedicada **Cadastro de Fornecedores** da planilha v1.2 com chave de deduplicação por **NIF/NIPC**. Cadastro de produtos passa a deduplicar pelo **ID** da planilha (preservado quando segue o padrão `1XXXXXX`/`2XXXXXX`). Schema de `inv_suppliers` ganha campos fiscais e comerciais (Razão Social, IBAN, CAE/CIRS, Regime de IVA, vendedor, etc.).
@@ -403,7 +419,8 @@ f29115a feat(inventory): Sprint 4C - log de acesso + janela de consumo por categ
 
 A partir de 1.0.0, toda alteração deve adicionar uma entrada acima na seção `[Unreleased]` antes do merge.
 
-[Unreleased]: https://github.com/<org>/sistemaInventario/compare/v1.5.0...HEAD
+[Unreleased]: https://github.com/<org>/sistemaInventario/compare/v1.5.1...HEAD
+[1.5.1]: https://github.com/<org>/sistemaInventario/compare/v1.5.0...v1.5.1
 [1.5.0]: https://github.com/<org>/sistemaInventario/compare/v1.4.0...v1.5.0
 [1.4.0]: https://github.com/<org>/sistemaInventario/compare/v1.3.1...v1.4.0
 [1.3.1]: https://github.com/<org>/sistemaInventario/compare/v1.3.0...v1.3.1
