@@ -489,11 +489,18 @@ router.post('/execute', requireRole(ADMIN_ROLES), async (req, res) => {
         // 6) Avança a sequence de consumo para max(internal_code provido) + 1
         //    Garante que cadastros manuais futuros não colidam com IDs já
         //    importados da planilha. Patrimônio fica intacto.
+        //    Importante: supabaseAdmin.rpc(...) retorna um builder thenable,
+        //    NÃO uma Promise — usar try/await + checar { error } no resultado.
         if (maxConsumoCode > 0) {
-            await supabaseAdmin.rpc('fn_inv_set_code_sequences', {
-                p_consumo: maxConsumoCode,
-                p_patrimonio: null
-            }).catch(err => console.warn('Sequence advance falhou (não crítico):', err.message));
+            try {
+                const { error: seqErr } = await supabaseAdmin.rpc('fn_inv_set_code_sequences', {
+                    p_consumo:    maxConsumoCode,
+                    p_patrimonio: null
+                });
+                if (seqErr) console.warn('Sequence advance falhou (não crítico):', seqErr.message);
+            } catch (err) {
+                console.warn('Sequence advance lançou (não crítico):', err.message);
+            }
         }
 
         const itemsWithSupplier = itemsToInsert.filter(i => i.default_supplier_id).length;

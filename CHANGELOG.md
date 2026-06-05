@@ -38,6 +38,29 @@ _Nenhuma alteração pendente._
 
 ---
 
+## [1.6.1] — 2026-06-05
+
+> **Hotfix**: importador retornava 500 ao final do `/execute` apesar dos itens terem sido inseridos com sucesso. Causa: `supabaseAdmin.rpc()` retorna um builder thenable (não uma Promise), então `.catch()` jogado direto na chamada lançava `TypeError`. Substituído por `try/await` + verificação de `{ error }`.
+
+### Corrigido
+- **Importador** ([import.js:489](api/inventory/import.js#L489)) — `fn_inv_set_code_sequences` agora é chamado dentro de `try { ... }` com `await` e checagem do campo `error` no resultado. Falhas continuam sendo apenas logadas (não crítico para o import).
+
+### Notas operacionais — imports já feitos com v1.6.0
+Se você importou antes deste patch, a sequence `seq_inv_code_consumo` provavelmente NÃO foi avançada (a falha aconteceu antes desse passo). Para evitar que o próximo cadastro manual colida com IDs `1000XXX` já importados, rode uma vez no SQL Editor:
+```sql
+SELECT fn_inv_set_code_sequences(
+  (SELECT COALESCE(MAX(SUBSTRING(internal_code FROM 2)::INTEGER), 0)
+     FROM inv_items
+    WHERE macro_category = 'consumo'
+      AND internal_code ~ '^1\d{6}$'),
+  NULL
+);
+```
+
+[_layout.js:5](public/inventory/_layout.js#L5) bump para `v1.6.1`.
+
+---
+
 ## [1.6.0] — 2026-06-05
 
 > **Marco**: itens passam a ter um **Fornecedor padrão** opcional (FK para `inv_suppliers`). Importador vincula automaticamente quando o Nome Fantasia do produto tem match único na aba de fornecedores; nos casos ambíguos (mesmo Nome Fantasia, NIFs diferentes — caso AMAZON) ou ausentes (Nome Fantasia com typo — caso INIBSA), deixa em branco para vinculação manual posterior. Decisão consolidada com a equipe de regras: a chave de identidade do fornecedor é o NIF; vínculos sem certeza ficam pendentes.
@@ -453,7 +476,8 @@ f29115a feat(inventory): Sprint 4C - log de acesso + janela de consumo por categ
 
 A partir de 1.0.0, toda alteração deve adicionar uma entrada acima na seção `[Unreleased]` antes do merge.
 
-[Unreleased]: https://github.com/<org>/sistemaInventario/compare/v1.6.0...HEAD
+[Unreleased]: https://github.com/<org>/sistemaInventario/compare/v1.6.1...HEAD
+[1.6.1]: https://github.com/<org>/sistemaInventario/compare/v1.6.0...v1.6.1
 [1.6.0]: https://github.com/<org>/sistemaInventario/compare/v1.5.1...v1.6.0
 [1.5.1]: https://github.com/<org>/sistemaInventario/compare/v1.5.0...v1.5.1
 [1.5.0]: https://github.com/<org>/sistemaInventario/compare/v1.4.0...v1.5.0
