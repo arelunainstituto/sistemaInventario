@@ -38,6 +38,16 @@ _Nenhuma alteração pendente._
 
 ---
 
+## [1.3.1] — 2026-06-05
+
+> **Patch UX**: identificação visual da versão do módulo Inventário no sidebar.
+
+### Adicionado
+- Exibe a versão atual do módulo abaixo do subtítulo do sidebar (`Areluna · Gestão de Estoques`) — fonte mono, cinza claro, recolhe junto com o sidebar ([_layout.js:5](public/inventory/_layout.js#L5), [_layout.js:62](public/inventory/_layout.js#L62)).
+- Constante `INVENTORY_VERSION` centralizada em [_layout.js](public/inventory/_layout.js) — deve ser atualizada a cada release junto com o `CHANGELOG.md`.
+
+---
+
 ## [1.3.0] — 2026-06-05
 
 > **Marco**: importador de planilha XLSX para carga inicial do cadastro (255 itens da planilha v1.0 do Instituto) + migração de limpeza para preparar a base. Inclui fix de seleção do sidebar no Kardex.
@@ -314,7 +324,8 @@ f29115a feat(inventory): Sprint 4C - log de acesso + janela de consumo por categ
 
 A partir de 1.0.0, toda alteração deve adicionar uma entrada acima na seção `[Unreleased]` antes do merge.
 
-[Unreleased]: https://github.com/<org>/sistemaInventario/compare/v1.3.0...HEAD
+[Unreleased]: https://github.com/<org>/sistemaInventario/compare/v1.3.1...HEAD
+[1.3.1]: https://github.com/<org>/sistemaInventario/compare/v1.3.0...v1.3.1
 [1.3.0]: https://github.com/<org>/sistemaInventario/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/<org>/sistemaInventario/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/<org>/sistemaInventario/compare/v1.0.0...v1.1.0

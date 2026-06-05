@@ -1,6 +1,9 @@
 // Shared layout for inventory module: sidebar + header.
 // Each page calls renderInventoryLayout({ activePage, title, subtitle }).
 
+// Versão exibida no sidebar — manter em sync com CHANGELOG.md
+const INVENTORY_VERSION = 'v1.3.1';
+
 const INVENTORY_NAV = [
     { id: 'dashboard',   label: 'Dashboard',         icon: 'fa-chart-pie',  href: 'index.html' },
     { id: 'items',       label: 'Itens',             icon: 'fa-boxes-stacked', href: 'items.html' },
@@ -57,6 +60,7 @@ function renderInventoryLayout({ activePage = 'dashboard', title = 'Inventário'
                 <div class="sidebar-label overflow-hidden">
                     <h1 class="text-base font-bold text-gray-900 leading-tight whitespace-nowrap">Inventário</h1>
                     <p class="text-[11px] text-gray-500 leading-tight whitespace-nowrap">Areluna · Gestão de Estoques</p>
+                    <p class="text-[10px] text-gray-400 leading-tight whitespace-nowrap font-mono">${INVENTORY_VERSION}</p>
                 </div>
             </div>
 
