@@ -38,6 +38,41 @@ _Nenhuma alteração pendente._
 
 ---
 
+## [1.4.0] — 2026-06-05
+
+> **Marco**: substituição do termo "SKU" por **Código de Registro Interno** com novo esquema de geração — prefixo por tipo de produto (1XXXXXX para Uso e Consumo, 2XXXXXX para Patrimônio), 7 dígitos. Decisão da equipe de regras: SKU exige composição lógica (Tipo+Produto+Marca+Variação) que o sistema ainda não suporta; até lá, o identificador é um sequencial puro, sem mascarar atributos.
+
+### Adicionado
+- Nova migração [60-internal-code-format.sql](database/inventory-refactor/60-internal-code-format.sql) (**requer migração manual**):
+  - Cria as sequences `seq_inv_code_consumo` (gera `1000001`, `1000002`, …) e `seq_inv_code_patrimonio` (gera `2000001`, `2000002`, …).
+  - Reescreve `fn_inv_items_before_insert()` para gerar `internal_code` pelo prefixo do `macro_category`.
+  - Helper RPC `fn_inv_set_code_sequences(p_consumo, p_patrimonio)` para reiniciar contadores em casos excepcionais.
+  - Bloco de verificação ao final mostra o próximo código que sairia de cada sequence.
+
+### Alterado
+- **Importador XLSX** ([import.js](api/inventory/import.js)) não persiste mais a coluna SKU da planilha como `internal_code`. O código de origem é usado apenas para deduplicação dentro do arquivo (warnings) e exibição no preview. O código real é gerado pelo trigger do banco.
+- **Resposta do importador**: campo `next_sku_starts_at` substituído por `next_consumo_code` (string formatada `1XXXXXX`).
+- **Importador UI** ([import.html](public/inventory/import.html)) — banner, cabeçalho da tabela e mensagem final atualizados para refletir o novo formato. A coluna do preview agora rotula "Código (origem)".
+- **Placeholders dos comboboxes** trocados de "Buscar item por nome, SKU ou categoria…" para "Buscar item por nome, código ou categoria…" em [transfers.html](public/inventory/transfers.html), [exits.html](public/inventory/exits.html), [adjustments.html](public/inventory/adjustments.html), [entries.html](public/inventory/entries.html) e [kardex.html](public/inventory/kardex.html).
+- [_layout.js:5](public/inventory/_layout.js#L5) bump `INVENTORY_VERSION` para `v1.4.0`.
+
+### Migração operacional
+- Migração [55-clean-test-data.sql](database/inventory-refactor/55-clean-test-data.sql) atualizada para resetar `seq_inv_code_consumo` e `seq_inv_code_patrimonio` (mantém compatibilidade com `seq_inv_sku` legada se ainda existir). Helper `fn_inv_set_sku_sequence` foi removido daqui — a função e sequence antigas são dropadas pela migração 60.
+
+### Removido
+- Sequence `seq_inv_sku` e função `fn_inv_set_sku_sequence(INTEGER)` (dropadas pela migração 60).
+- Geração automática de `internal_code` no formato `SKUXXX` (sequence única, 3 dígitos).
+
+### Ordem de aplicação no ambiente
+1. **Antes do primeiro import:** aplicar [60-internal-code-format.sql](database/inventory-refactor/60-internal-code-format.sql) (uma vez).
+2. **Antes de cada import limpo:** aplicar [55-clean-test-data.sql](database/inventory-refactor/55-clean-test-data.sql).
+3. Acessar `/inventory/adjustments.html` → "Importar planilha".
+
+### Notas de compatibilidade
+- Itens já cadastrados no sistema (se houver) com `internal_code` no formato antigo `SKUXXX` permanecem intactos. Apenas o gerador é trocado — novos cadastros usarão `1XXXXXX` / `2XXXXXX`.
+
+---
+
 ## [1.3.1] — 2026-06-05
 
 > **Patch UX**: identificação visual da versão do módulo Inventário no sidebar.
@@ -324,7 +359,8 @@ f29115a feat(inventory): Sprint 4C - log de acesso + janela de consumo por categ
 
 A partir de 1.0.0, toda alteração deve adicionar uma entrada acima na seção `[Unreleased]` antes do merge.
 
-[Unreleased]: https://github.com/<org>/sistemaInventario/compare/v1.3.1...HEAD
+[Unreleased]: https://github.com/<org>/sistemaInventario/compare/v1.4.0...HEAD
+[1.4.0]: https://github.com/<org>/sistemaInventario/compare/v1.3.1...v1.4.0
 [1.3.1]: https://github.com/<org>/sistemaInventario/compare/v1.3.0...v1.3.1
 [1.3.0]: https://github.com/<org>/sistemaInventario/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/<org>/sistemaInventario/compare/v1.1.0...v1.2.0

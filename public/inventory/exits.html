@@ -116,7 +116,7 @@ async function bootstrap() {
         document.getElementById('itemSelect').innerHTML = '<option value="">— selecione —</option>' +
             items.map(i => `<option value="${i.id}" data-controls-lot="${i.controls_lot}" data-min="${i.min_stock || 0}" data-macro="${i.macro_category}">${escapeHtml(i.internal_code)} · ${escapeHtml(i.name)}${i.subcategory?.name ? ' · ' + escapeHtml(i.subcategory.name) : ''}</option>`).join('');
         // Combobox no item (location e lot mudam dinamicamente — re-aplicamos depois)
-        makeSearchable('itemSelect', { placeholder: 'Buscar item por nome, SKU ou categoria…' });
+        makeSearchable('itemSelect', { placeholder: 'Buscar item por nome, código ou categoria…' });
     } catch (err) { toast(err.message, 'error'); }
 }
 

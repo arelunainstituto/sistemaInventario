@@ -25,8 +25,13 @@
 --   • Itens/categorias/locations/suppliers com "teste" no nome
 --
 -- Reset:
---   • Sequence seq_inv_sku para 1 (próxima importação começa em SKU001)
+--   • Sequences seq_inv_code_consumo e seq_inv_code_patrimonio para 1
+--     (próxima importação começa em 1000001 / 2000001)
 --   • Sequence seq_inv_patrimony para 1
+--
+-- Pré-requisito: 60-internal-code-format.sql DEVE ter sido aplicado antes
+-- desta migração (cria as novas sequences). Se ainda existir a sequence
+-- legada seq_inv_sku, ela também é resetada para evitar lixo.
 --
 -- ⚠️ DESTRUTIVO — rodar apenas em ambiente vazio/pré-produção.
 -- Idempotente: pode ser rodado várias vezes sem efeito adicional após o primeiro.
@@ -74,35 +79,37 @@ DELETE FROM inv_suppliers
  WHERE name ILIKE '%teste%'
     OR name ILIKE '%test%';
 
--- ---------- 6) Reset das sequences para SKU e PAT começarem do 1 ----------
+-- ---------- 6) Reset das sequences de código interno e patrimônio ----------
+-- Próxima importação começa em 1000001 (consumo) / 2000001 (patrimônio).
+-- A sequence legada seq_inv_sku é tratada por compatibilidade: se ainda
+-- existir (60-internal-code-format.sql não aplicado), é resetada também.
 DO $$
 BEGIN
-    -- seq_inv_sku é a sequence usada por fn_inv_generate_sku
-    IF EXISTS (SELECT 1 FROM pg_class WHERE relkind = 'S' AND relname = 'seq_inv_sku') THEN
-        PERFORM setval('seq_inv_sku', 1, false);
-        RAISE NOTICE 'Sequence seq_inv_sku resetada para 1';
+    IF EXISTS (SELECT 1 FROM pg_class WHERE relkind = 'S' AND relname = 'seq_inv_code_consumo') THEN
+        PERFORM setval('seq_inv_code_consumo', 1, false);
+        RAISE NOTICE 'Sequence seq_inv_code_consumo resetada para 1 (próximo código: 1000001)';
+    ELSE
+        RAISE NOTICE 'seq_inv_code_consumo NÃO existe — aplique 60-internal-code-format.sql primeiro';
     END IF;
+
+    IF EXISTS (SELECT 1 FROM pg_class WHERE relkind = 'S' AND relname = 'seq_inv_code_patrimonio') THEN
+        PERFORM setval('seq_inv_code_patrimonio', 1, false);
+        RAISE NOTICE 'Sequence seq_inv_code_patrimonio resetada para 1 (próximo código: 2000001)';
+    ELSE
+        RAISE NOTICE 'seq_inv_code_patrimonio NÃO existe — aplique 60-internal-code-format.sql primeiro';
+    END IF;
+
     IF EXISTS (SELECT 1 FROM pg_class WHERE relkind = 'S' AND relname = 'seq_inv_patrimony') THEN
         PERFORM setval('seq_inv_patrimony', 1, false);
         RAISE NOTICE 'Sequence seq_inv_patrimony resetada para 1';
     END IF;
+
+    -- Compatibilidade: sequence legada removida em 60-internal-code-format.sql
+    IF EXISTS (SELECT 1 FROM pg_class WHERE relkind = 'S' AND relname = 'seq_inv_sku') THEN
+        PERFORM setval('seq_inv_sku', 1, false);
+        RAISE NOTICE 'Sequence legada seq_inv_sku ainda existe — considere aplicar 60-internal-code-format.sql';
+    END IF;
 END $$;
-
--- ---------- 7) Helper RPC para o importador ajustar a sequence ----------
--- Usado depois de inserir SKUs com internal_code explícito (SKU001-SKU254).
--- O próximo item criado por trigger usará seq_inv_sku.nextval = max+1.
-CREATE OR REPLACE FUNCTION fn_inv_set_sku_sequence(p_value INTEGER)
-RETURNS BIGINT
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public
-AS $$
-BEGIN
-    RETURN setval('seq_inv_sku', GREATEST(p_value, 1), true);
-END;
-$$;
-
-GRANT EXECUTE ON FUNCTION fn_inv_set_sku_sequence(INTEGER) TO authenticated;
 
 COMMIT;
 
@@ -133,4 +140,5 @@ SELECT id, code, name, is_active FROM inv_units ORDER BY name;
 -- 4) Sequences resetadas
 SELECT sequencename, last_value
   FROM pg_sequences
- WHERE sequencename IN ('seq_inv_sku', 'seq_inv_patrimony');
+ WHERE sequencename IN ('seq_inv_code_consumo', 'seq_inv_code_patrimonio', 'seq_inv_patrimony')
+ ORDER BY sequencename;

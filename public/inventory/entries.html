@@ -152,7 +152,7 @@ function addLine() {
         <div class="col-span-1 flex items-center"><button type="button" onclick="this.closest('[data-line]').remove(); recalcTotal();" class="text-red-500 hover:text-red-700"><i class="fas fa-trash"></i></button></div>`;
     document.getElementById('lines').appendChild(div);
     // Combobox nas seleções da linha
-    makeSearchable(`lineItem-${idx}`,     { placeholder: 'Buscar item por nome, SKU ou categoria…' });
+    makeSearchable(`lineItem-${idx}`,     { placeholder: 'Buscar item por nome, código ou categoria…' });
     makeSearchable(`lineLocation-${idx}`, { placeholder: 'Buscar localização…' });
 }
 

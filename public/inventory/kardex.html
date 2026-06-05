@@ -93,7 +93,7 @@ async function bootstrap() {
         document.getElementById('locationFilter').innerHTML = '<option value="">Todas (saldo global)</option>' +
             (locs.data || []).filter(l => l.is_active)
                 .map(l => `<option value="${l.id}">${escapeHtml(l.unit?.name || '')} · ${escapeHtml(l.name)}</option>`).join('');
-        makeSearchable('itemSelect',     { placeholder: 'Buscar item por nome ou SKU…' });
+        makeSearchable('itemSelect',     { placeholder: 'Buscar item por nome ou código…' });
         makeSearchable('locationFilter', { placeholder: 'Buscar localização…' });
 
         // Aceita ?item=<uuid> e ?location_id=<uuid> na URL (deep-link)

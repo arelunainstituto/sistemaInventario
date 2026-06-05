@@ -2,7 +2,7 @@
 // de busca + dropdown com filtragem em tempo real.
 //
 // Uso típico:
-//   makeSearchable('itemSelect', { placeholder: 'Buscar item por nome ou SKU…' });
+//   makeSearchable('itemSelect', { placeholder: 'Buscar item por nome ou código…' });
 //
 // Como funciona:
 //   • Mantém o <select> original (apenas oculto) para que os forms

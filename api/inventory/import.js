@@ -4,11 +4,13 @@
 //   2) POST /execute  → persiste com transação lógica
 //
 // Decisões de design:
-//   • SKUs da planilha (SKU001-SKU254) são mantidos como internal_code.
-//     A sequence seq_inv_sku é setada para max(num) ao final para que novos
-//     itens criados via UI sigam a numeração.
+//   • A coluna "SKU" da planilha é usada APENAS como chave de deduplicação
+//     dentro do arquivo (alertar quando o mesmo código aparece 2x). Não é
+//     persistida no banco. O Código de Registro Interno é gerado pelo
+//     trigger fn_inv_items_before_insert (formato 1XXXXXX para consumo,
+//     2XXXXXX para patrimônio).
 //   • Todas as 5 categorias canonicalizadas são criadas como raízes
-//     (parent_macro='consumo'). Match com Levenshtein-like normalizado.
+//     (parent_macro='consumo'). Match com normalização sem diacríticos.
 //   • UoMs canonicalizadas correspondem à aba Tabelas_Aux.
 //   • Fornecedores normalizados (UPPER + trim de espaços duplos). "–" ou "-"
 //     são tratados como ausência.
@@ -109,30 +111,36 @@ router.post('/preview', requireRole(ADMIN_ROLES), upload.single('file'), async (
         const items = [];
         const warnings = [];
         const errors   = [];
-        const skuSet   = new Set();
+        // Dedup pela 1ª coluna da planilha (a equipa chamava de "SKU",
+        // mas para nós é apenas referência de origem — não é persistida).
+        const sourceCodeSet = new Set();
         const categoriesSet = new Set();
         const uomsSet       = new Set();
         const suppliersSet  = new Set();
 
         for (const [idx, row] of dataRows.entries()) {
             const line = idx + 4; // 1-based contando cabeçalhos
-            const [sku, descricao, categoria, unidade, referencia, fornecedor,
+            const [sourceCode, descricao, categoria, unidade, referencia, fornecedor,
                    _custo, stockMin, stockMax, _prateleira, observacoes, estado] =
                 row.map(c => (c ?? '').toString().trim());
 
-            if (!sku) {
-                errors.push({ line, msg: 'SKU vazio — linha ignorada' });
+            if (!sourceCode && !descricao) {
+                // Linha totalmente em branco — ignorar silenciosamente
                 continue;
             }
-            if (skuSet.has(sku)) {
-                warnings.push({ line, sku, msg: `SKU ${sku} duplicado na planilha — segunda ocorrência será ignorada` });
+            if (!sourceCode) {
+                errors.push({ line, msg: 'Código de origem (1ª coluna) vazio — linha ignorada' });
                 continue;
             }
-            skuSet.add(sku);
+            if (sourceCodeSet.has(sourceCode)) {
+                warnings.push({ line, source_code: sourceCode, msg: `Código "${sourceCode}" duplicado na planilha — segunda ocorrência será ignorada` });
+                continue;
+            }
+            sourceCodeSet.add(sourceCode);
 
-            if (!descricao) warnings.push({ line, sku, msg: 'Descrição vazia' });
-            if (!categoria) warnings.push({ line, sku, msg: 'Categoria vazia — será "Outros"' });
-            if (!unidade)   warnings.push({ line, sku, msg: 'Unidade vazia — item ficará sem UM' });
+            if (!descricao) warnings.push({ line, source_code: sourceCode, msg: 'Descrição vazia' });
+            if (!categoria) warnings.push({ line, source_code: sourceCode, msg: 'Categoria vazia — será "Outros"' });
+            if (!unidade)   warnings.push({ line, source_code: sourceCode, msg: 'Unidade vazia — item ficará sem UM' });
 
             const cat = canonCategory(categoria);
             const uom = canonUom(unidade);
@@ -143,7 +151,7 @@ router.post('/preview', requireRole(ADMIN_ROLES), upload.single('file'), async (
             if (sup) suppliersSet.add(sup);
 
             if (unidade && !uom) {
-                warnings.push({ line, sku, msg: `Unidade "${unidade}" não reconhecida — item ficará sem UM` });
+                warnings.push({ line, source_code: sourceCode, msg: `Unidade "${unidade}" não reconhecida — item ficará sem UM` });
             }
 
             const minStock = stockMin ? parseFloat(stockMin.replace(',', '.')) : 0;
@@ -151,16 +159,16 @@ router.post('/preview', requireRole(ADMIN_ROLES), upload.single('file'), async (
 
             items.push({
                 line,
-                internal_code: sku,
-                name:          descricao || `Item ${sku}`,
+                source_code:      sourceCode,
+                name:             descricao || `Item ${sourceCode}`,
                 manufacturer_ref: referencia || null,
-                description:   observacoes || null,
-                _category_name: cat,
-                _uom_code:      uom?.code || null,
-                _supplier_name: sup,
-                min_stock:      isFinite(minStock) ? minStock : 0,
-                max_stock:      isFinite(maxStock) ? maxStock : null,
-                is_active:      !estado || /^acti?v|ativ/i.test(estado.toLowerCase())
+                description:      observacoes || null,
+                _category_name:   cat,
+                _uom_code:        uom?.code || null,
+                _supplier_name:   sup,
+                min_stock:        isFinite(minStock) ? minStock : 0,
+                max_stock:        isFinite(maxStock) ? maxStock : null,
+                is_active:        !estado || /^acti?v|ativ/i.test(estado.toLowerCase())
             });
         }
 
@@ -179,21 +187,6 @@ router.post('/preview', requireRole(ADMIN_ROLES), upload.single('file'), async (
                                           .map(c => Object.values(UOM_CANONICAL).find(u => u.code === c))
                                           .filter(Boolean);
         const newSuppliers  = [...suppliersSet].filter(n => !existSupNames.has(n));
-
-        // Conflitos de SKU
-        const allSkus = items.map(i => i.internal_code);
-        if (allSkus.length) {
-            const { data: existingItems } = await supabaseAdmin
-                .from('inv_items').select('internal_code')
-                .in('internal_code', allSkus);
-            const conflictSkus = (existingItems || []).map(i => i.internal_code);
-            if (conflictSkus.length) {
-                errors.push({
-                    msg: `${conflictSkus.length} SKU(s) já existem no sistema. Rode 55-clean-test-data.sql para limpar antes da importação.`,
-                    skus: conflictSkus.slice(0, 10)
-                });
-            }
-        }
 
         res.json({
             success: true,
@@ -256,9 +249,9 @@ router.post('/execute', requireRole(ADMIN_ROLES), async (req, res) => {
         const catByName = new Map((cats.data || []).map(c => [c.name, c.id]));
         const uomByCode = new Map((uoms.data || []).map(u => [u.code, u.id]));
 
-        // 5) Itens — em batches de 100 para evitar payload gigante
+        // 5) Itens — sem internal_code; o trigger fn_inv_items_before_insert
+        //    gera o código de registro interno (1XXXXXX para consumo).
         const itemsToInsert = items.map(it => ({
-            internal_code:      it.internal_code,
             name:               it.name,
             description:        it.description,
             macro_category:     'consumo',
@@ -280,32 +273,27 @@ router.post('/execute', requireRole(ADMIN_ROLES), async (req, res) => {
         }));
 
         let totalCreated = 0;
+        let maxConsumoCode = 0;
         for (let i = 0; i < itemsToInsert.length; i += 100) {
             const batch = itemsToInsert.slice(i, i + 100);
             const { data, error } = await supabaseAdmin
-                .from('inv_items').insert(batch).select('id');
+                .from('inv_items').insert(batch).select('id, internal_code');
             if (error) throw error;
             totalCreated += (data || []).length;
-        }
-
-        // 6) Ajustar sequence para o próximo SKU disponível
-        const maxSkuNum = items.reduce((mx, it) => {
-            const m = it.internal_code.match(/^SKU(\d+)$/i);
-            return m ? Math.max(mx, parseInt(m[1])) : mx;
-        }, 0);
-        if (maxSkuNum > 0) {
-            await supabaseAdmin.rpc('fn_inv_set_sku_sequence', { p_value: maxSkuNum })
-                .catch(err => console.warn('Sequence reset falhou (não crítico):', err.message));
+            for (const row of (data || [])) {
+                const m = (row.internal_code || '').match(/^1(\d{6})$/);
+                if (m) maxConsumoCode = Math.max(maxConsumoCode, parseInt(m[1], 10));
+            }
         }
 
         res.json({
             success: true,
             data: {
-                created_items:      totalCreated,
-                created_categories: new_categories.length,
-                created_uoms:       new_uoms.length,
-                created_suppliers:  new_suppliers.length,
-                next_sku_starts_at: maxSkuNum + 1
+                created_items:        totalCreated,
+                created_categories:   new_categories.length,
+                created_uoms:         new_uoms.length,
+                created_suppliers:    new_suppliers.length,
+                next_consumo_code:    maxConsumoCode > 0 ? '1' + String(maxConsumoCode + 1).padStart(6, '0') : null
             }
         });
     } catch (err) {

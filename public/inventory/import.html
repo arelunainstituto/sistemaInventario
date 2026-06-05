@@ -28,7 +28,7 @@ document.getElementById('pageContent').innerHTML = `
                 <i class="fas fa-circle-info text-sky-500 mt-0.5"></i>
                 <div>
                     A planilha deve seguir o formato <b>Instituto Areluna v1.0</b> — aba <b>Cadastro_Produtos</b> com cabeçalhos na linha 3.
-                    Os SKUs serão usados como código interno; novos itens criados depois continuarão a sequência.
+                    O <b>Código de Registro Interno</b> é gerado pelo sistema no formato <span class="font-mono">1XXXXXX</span> (Uso e Consumo). A 1ª coluna da planilha é usada apenas como referência de origem.
                     <br>Categorias, unidades e fornecedores são normalizados automaticamente.
                 </div>
             </div>
@@ -93,7 +93,7 @@ document.getElementById('pageContent').innerHTML = `
                     <thead class="bg-gray-50 text-[10px] uppercase tracking-wider text-gray-500 border-b border-gray-200">
                         <tr>
                             <th class="text-left p-2">Linha</th>
-                            <th class="text-left p-2">SKU</th>
+                            <th class="text-left p-2">Código (origem)</th>
                             <th class="text-left p-2">Nome</th>
                             <th class="text-left p-2">Categoria</th>
                             <th class="text-left p-2">UM</th>
@@ -179,7 +179,7 @@ function renderPreview(data) {
     if (data.errors.length) {
         eb.classList.remove('hidden');
         document.getElementById('errorsList').innerHTML = data.errors.map(e =>
-            `<li>${e.line ? `Linha ${e.line}: ` : ''}${escapeHtml(e.msg)}${e.skus ? ` <span class="font-mono text-[10px]">[${e.skus.slice(0, 5).join(', ')}${e.skus.length > 5 ? '…' : ''}]</span>` : ''}</li>`
+            `<li>${e.line ? `Linha ${e.line}: ` : ''}${escapeHtml(e.msg)}${e.source_codes ? ` <span class="font-mono text-[10px]">[${e.source_codes.slice(0, 5).join(', ')}${e.source_codes.length > 5 ? '…' : ''}]</span>` : ''}</li>`
         ).join('');
         document.getElementById('executeBtn').disabled = true;
         document.getElementById('executeBtn').classList.add('opacity-50', 'cursor-not-allowed');
@@ -195,7 +195,7 @@ function renderPreview(data) {
         wb.classList.remove('hidden');
         document.getElementById('warningsCount').textContent = data.warnings.length;
         document.getElementById('warningsList').innerHTML = data.warnings.map(w =>
-            `<li>${w.line ? `Linha ${w.line}` : ''}${w.sku ? ` · ${w.sku}` : ''}: ${escapeHtml(w.msg)}</li>`
+            `<li>${w.line ? `Linha ${w.line}` : ''}${w.source_code ? ` · ${w.source_code}` : ''}: ${escapeHtml(w.msg)}</li>`
         ).join('');
     } else {
         wb.classList.add('hidden');
@@ -217,7 +217,7 @@ function renderPreview(data) {
     document.getElementById('itemsPreview').innerHTML = data.items_preview.map(it => `
         <tr>
             <td class="p-2 text-gray-400">${it.line}</td>
-            <td class="p-2 font-mono text-[11px]">${escapeHtml(it.internal_code)}</td>
+            <td class="p-2 font-mono text-[11px] text-gray-500">${escapeHtml(it.source_code)}</td>
             <td class="p-2 text-gray-800">${escapeHtml(it.name)}</td>
             <td class="p-2 text-gray-600">${escapeHtml(it._category_name || '—')}</td>
             <td class="p-2 text-gray-600">${escapeHtml(it._uom_code || '—')}</td>
@@ -243,7 +243,7 @@ async function executeImport() {
         document.getElementById('resultSummary').innerHTML = `
             <p><b>${r.data.created_items}</b> itens criados</p>
             <p><b>${r.data.created_categories}</b> categorias, <b>${r.data.created_uoms}</b> UMs, <b>${r.data.created_suppliers}</b> fornecedores</p>
-            <p class="text-[11px] text-gray-400 mt-2">Próximo SKU automático: SKU${String(r.data.next_sku_starts_at).padStart(3, '0')}</p>
+            ${r.data.next_consumo_code ? `<p class="text-[11px] text-gray-400 mt-2">Próximo código (Uso e Consumo): <span class="font-mono">${escapeHtml(r.data.next_consumo_code)}</span></p>` : ''}
         `;
     } catch (err) {
         toast(err.message, 'error');

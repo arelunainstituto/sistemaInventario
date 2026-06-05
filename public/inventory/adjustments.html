@@ -189,7 +189,7 @@ async function bootstrap() {
             items.map(i => `<option value="${i.id}" data-controls-lot="${i.controls_lot}">${escapeHtml(i.internal_code)} · ${escapeHtml(i.name)}${i.subcategory?.name ? ' · ' + escapeHtml(i.subcategory.name) : ''}</option>`).join('');
         document.getElementById('reasonSelect').innerHTML = '<option value="">— selecione —</option>' +
             reasons.map(r => `<option value="${r.code}">${escapeHtml(r.label)}</option>`).join('');
-        makeSearchable('itemSelect', { placeholder: 'Buscar item por nome, SKU ou categoria…' });
+        makeSearchable('itemSelect', { placeholder: 'Buscar item por nome, código ou categoria…' });
     } catch (err) { toast(err.message, 'error'); }
 }
 
@@ -372,7 +372,7 @@ function openAdminExitModal() {
     document.getElementById('adminExitLot').innerHTML = '<option value="">— Sugestão FEFO automática —</option>';
     document.getElementById('adminExitLotHint').textContent = '';
     document.getElementById('adminExitModal').classList.remove('hidden');
-    makeSearchable('adminExitItem',     { placeholder: 'Buscar item por nome, SKU ou categoria…' });
+    makeSearchable('adminExitItem',     { placeholder: 'Buscar item por nome, código ou categoria…' });
     makeSearchable('adminExitLocation', { placeholder: 'Buscar localização…' });
 }
 
