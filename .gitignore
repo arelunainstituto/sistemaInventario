@@ -106,3 +106,6 @@ Desktop.ini
 # Temporary files
 *.tmp
 *.temp
+# Planilhas operacionais (dados de cliente)
+*.xlsx
+*.xls

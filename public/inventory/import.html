@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Inventário · Importar planilha</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/styles.css">
+    <script>if (!localStorage.getItem('access_token')) { const r = encodeURIComponent(location.pathname + location.search); window.location.href = '/login.html?redirect=' + r; }</script>
+</head>
+<body class="bg-white">
+<div id="layoutRoot"></div>
+<script src="_layout.js"></script>
+<script>
+renderInventoryLayout({ activePage: 'adjustments', title: 'Importar planilha XLSX', subtitle: 'Cadastro inicial de itens a partir do Excel (Admin)' });
+
+document.getElementById('pageContent').innerHTML = `
+    <div class="max-w-5xl mx-auto space-y-4">
+
+        <!-- Step 1: Upload -->
+        <section id="step1" class="bg-white rounded-xl border border-gray-200/70 shadow-sm p-6">
+            <h3 class="text-base font-bold text-gray-900 mb-3 flex items-center gap-2">
+                <span class="inline-flex w-6 h-6 rounded-full bg-sky-600 text-white text-xs font-bold items-center justify-center">1</span>
+                Selecione o arquivo
+            </h3>
+            <div class="bg-sky-50/40 border border-sky-100 rounded-lg p-3 text-xs text-sky-800 mb-4 flex items-start gap-2">
+                <i class="fas fa-circle-info text-sky-500 mt-0.5"></i>
+                <div>
+                    A planilha deve seguir o formato <b>Instituto Areluna v1.0</b> — aba <b>Cadastro_Produtos</b> com cabeçalhos na linha 3.
+                    Os SKUs serão usados como código interno; novos itens criados depois continuarão a sequência.
+                    <br>Categorias, unidades e fornecedores são normalizados automaticamente.
+                </div>
+            </div>
+            <form id="uploadForm" class="space-y-3">
+                <label class="border-2 border-dashed border-gray-200 rounded-lg p-6 block cursor-pointer hover:border-sky-400 hover:bg-sky-50/30 transition text-center">
+                    <i class="fas fa-file-excel text-3xl text-green-600 mb-2"></i>
+                    <p class="text-sm text-gray-700">Clique para escolher ou arraste o arquivo .xlsx aqui</p>
+                    <p class="text-[11px] text-gray-400 mt-1">Tamanho máximo: 10 MB</p>
+                    <input id="fileInput" name="file" type="file" accept=".xlsx,.xls" class="hidden" required>
+                </label>
+                <p id="fileLabel" class="text-xs text-gray-500"></p>
+                <button type="submit" class="w-full bg-sky-600 hover:bg-sky-700 text-white py-2.5 rounded-lg text-sm font-medium shadow-sm shadow-sky-500/20 transition flex items-center justify-center gap-2" disabled id="previewBtn">
+                    <i class="fas fa-eye text-xs"></i> Pré-visualizar
+                </button>
+            </form>
+        </section>
+
+        <!-- Step 2: Preview -->
+        <section id="step2" class="hidden bg-white rounded-xl border border-gray-200/70 shadow-sm p-6">
+            <h3 class="text-base font-bold text-gray-900 mb-3 flex items-center gap-2">
+                <span class="inline-flex w-6 h-6 rounded-full bg-sky-600 text-white text-xs font-bold items-center justify-center">2</span>
+                Pré-visualização
+            </h3>
+
+            <!-- Cards de resumo -->
+            <div id="summaryCards" class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4"></div>
+
+            <!-- Erros bloqueantes -->
+            <div id="errorsBox" class="hidden mb-4 p-3 rounded-lg border border-red-200 bg-red-50">
+                <p class="text-sm font-semibold text-red-800 mb-1.5 flex items-center gap-2"><i class="fas fa-circle-xmark"></i> Erros que impedem a importação</p>
+                <ul id="errorsList" class="text-xs text-red-700 space-y-1 list-disc list-inside"></ul>
+            </div>
+
+            <!-- Warnings -->
+            <div id="warningsBox" class="hidden mb-4 p-3 rounded-lg border border-amber-200 bg-amber-50">
+                <p class="text-sm font-semibold text-amber-900 mb-1.5 flex items-center gap-2"><i class="fas fa-triangle-exclamation"></i> Avisos (não impedem)</p>
+                <details class="text-xs text-amber-800">
+                    <summary class="cursor-pointer font-medium">Ver detalhes (<span id="warningsCount">0</span>)</summary>
+                    <ul id="warningsList" class="mt-2 space-y-1 list-disc list-inside max-h-48 overflow-y-auto"></ul>
+                </details>
+            </div>
+
+            <!-- Detalhes do que será criado -->
+            <div id="detailsBox" class="space-y-3 mb-4">
+                <div>
+                    <p class="text-[10px] uppercase tracking-wider font-bold text-gray-500 mb-1">Novas categorias</p>
+                    <div id="newCategories" class="flex flex-wrap gap-1.5"></div>
+                </div>
+                <div>
+                    <p class="text-[10px] uppercase tracking-wider font-bold text-gray-500 mb-1">Novas unidades de medida</p>
+                    <div id="newUoms" class="flex flex-wrap gap-1.5"></div>
+                </div>
+                <div>
+                    <p class="text-[10px] uppercase tracking-wider font-bold text-gray-500 mb-1">Novos fornecedores</p>
+                    <div id="newSuppliers" class="flex flex-wrap gap-1.5"></div>
+                </div>
+            </div>
+
+            <!-- Tabela com primeiros itens -->
+            <div class="border border-gray-200 rounded-lg overflow-hidden">
+                <table class="w-full text-xs">
+                    <thead class="bg-gray-50 text-[10px] uppercase tracking-wider text-gray-500 border-b border-gray-200">
+                        <tr>
+                            <th class="text-left p-2">Linha</th>
+                            <th class="text-left p-2">SKU</th>
+                            <th class="text-left p-2">Nome</th>
+                            <th class="text-left p-2">Categoria</th>
+                            <th class="text-left p-2">UM</th>
+                            <th class="text-right p-2">Min</th>
+                        </tr>
+                    </thead>
+                    <tbody id="itemsPreview" class="divide-y divide-gray-100"></tbody>
+                </table>
+                <p class="px-3 py-2 text-[11px] text-gray-500 bg-gray-50/50 border-t border-gray-100">Mostrando até 10 itens · total = <span id="itemsTotal">0</span></p>
+            </div>
+
+            <div class="flex justify-between mt-5">
+                <button onclick="resetWizard()" class="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">← Voltar</button>
+                <button id="executeBtn" onclick="executeImport()" class="px-5 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-lg text-sm font-medium shadow-sm shadow-sky-500/20 transition flex items-center gap-2">
+                    <i class="fas fa-check text-xs"></i> Confirmar e importar
+                </button>
+            </div>
+        </section>
+
+        <!-- Step 3: Resultado -->
+        <section id="step3" class="hidden bg-white rounded-xl border border-gray-200/70 shadow-sm p-6 text-center">
+            <div class="inline-flex w-14 h-14 rounded-full bg-sky-100 items-center justify-center text-sky-600 text-2xl mb-3">
+                <i class="fas fa-check"></i>
+            </div>
+            <h3 class="text-lg font-bold text-gray-900 mb-2">Importação concluída</h3>
+            <div id="resultSummary" class="text-sm text-gray-600 mb-5"></div>
+            <div class="flex justify-center gap-3">
+                <a href="items.html" class="px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-lg text-sm font-medium"><i class="fas fa-boxes-stacked text-xs"></i> Ver itens</a>
+                <button onclick="resetWizard()" class="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">Importar outra planilha</button>
+            </div>
+        </section>
+
+    </div>
+`;
+
+let previewPayload = null;
+
+document.getElementById('fileInput').addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    document.getElementById('fileLabel').textContent = file ? `Arquivo: ${file.name} · ${(file.size / 1024).toFixed(1)} KB` : '';
+    document.getElementById('previewBtn').disabled = !file;
+});
+
+document.getElementById('uploadForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const file = document.getElementById('fileInput').files[0];
+    if (!file) return;
+    const fd = new FormData();
+    fd.append('file', file);
+    const btn = document.getElementById('previewBtn');
+    btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processando…';
+    try {
+        const r = await apiCall('/api/inventory/import/preview', { method: 'POST', body: fd });
+        renderPreview(r.data);
+    } catch (err) {
+        toast(err.message, 'error');
+    } finally {
+        btn.disabled = false; btn.innerHTML = '<i class="fas fa-eye text-xs"></i> Pré-visualizar';
+    }
+});
+
+function renderPreview(data) {
+    previewPayload = data._payload;
+    document.getElementById('step2').classList.remove('hidden');
+    document.getElementById('step2').scrollIntoView({ behavior: 'smooth' });
+
+    // Cards
+    document.getElementById('summaryCards').innerHTML = [
+        ['Itens', data.items_count, 'fa-boxes-stacked', 'sky'],
+        ['Categorias novas', data.new_categories.length, 'fa-tags', 'amber'],
+        ['UMs novas', data.new_uoms.length, 'fa-ruler', 'purple'],
+        ['Fornecedores novos', data.new_suppliers.length, 'fa-truck', 'cyan']
+    ].map(([label, val, icon, color]) => `
+        <div class="bg-white rounded-lg border border-gray-200 p-3">
+            <p class="text-[10px] uppercase tracking-wider text-gray-500 font-semibold">${label}</p>
+            <p class="text-2xl font-bold text-gray-900 mt-1 tabular-nums flex items-center gap-2">
+                <i class="fas ${icon} text-${color}-500 text-sm"></i> ${val}
+            </p>
+        </div>`).join('');
+
+    // Erros
+    const eb = document.getElementById('errorsBox');
+    if (data.errors.length) {
+        eb.classList.remove('hidden');
+        document.getElementById('errorsList').innerHTML = data.errors.map(e =>
+            `<li>${e.line ? `Linha ${e.line}: ` : ''}${escapeHtml(e.msg)}${e.skus ? ` <span class="font-mono text-[10px]">[${e.skus.slice(0, 5).join(', ')}${e.skus.length > 5 ? '…' : ''}]</span>` : ''}</li>`
+        ).join('');
+        document.getElementById('executeBtn').disabled = true;
+        document.getElementById('executeBtn').classList.add('opacity-50', 'cursor-not-allowed');
+    } else {
+        eb.classList.add('hidden');
+        document.getElementById('executeBtn').disabled = false;
+        document.getElementById('executeBtn').classList.remove('opacity-50', 'cursor-not-allowed');
+    }
+
+    // Warnings
+    const wb = document.getElementById('warningsBox');
+    if (data.warnings.length) {
+        wb.classList.remove('hidden');
+        document.getElementById('warningsCount').textContent = data.warnings.length;
+        document.getElementById('warningsList').innerHTML = data.warnings.map(w =>
+            `<li>${w.line ? `Linha ${w.line}` : ''}${w.sku ? ` · ${w.sku}` : ''}: ${escapeHtml(w.msg)}</li>`
+        ).join('');
+    } else {
+        wb.classList.add('hidden');
+    }
+
+    // Detalhes
+    document.getElementById('newCategories').innerHTML = data.new_categories.length
+        ? data.new_categories.map(n => `<span class="px-2 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-100 text-xs">${escapeHtml(n)}</span>`).join('')
+        : '<span class="text-xs text-gray-400 italic">Nenhuma (todas já existem)</span>';
+    document.getElementById('newUoms').innerHTML = data.new_uoms.length
+        ? data.new_uoms.map(u => `<span class="px-2 py-0.5 rounded bg-purple-50 text-purple-700 border border-purple-100 text-xs">${escapeHtml(u.name)} (${u.code})</span>`).join('')
+        : '<span class="text-xs text-gray-400 italic">Nenhuma</span>';
+    document.getElementById('newSuppliers').innerHTML = data.new_suppliers.length
+        ? data.new_suppliers.map(n => `<span class="px-2 py-0.5 rounded bg-cyan-50 text-cyan-700 border border-cyan-100 text-xs">${escapeHtml(n)}</span>`).join('')
+        : '<span class="text-xs text-gray-400 italic">Nenhum</span>';
+
+    // Tabela
+    document.getElementById('itemsTotal').textContent = data.items_count;
+    document.getElementById('itemsPreview').innerHTML = data.items_preview.map(it => `
+        <tr>
+            <td class="p-2 text-gray-400">${it.line}</td>
+            <td class="p-2 font-mono text-[11px]">${escapeHtml(it.internal_code)}</td>
+            <td class="p-2 text-gray-800">${escapeHtml(it.name)}</td>
+            <td class="p-2 text-gray-600">${escapeHtml(it._category_name || '—')}</td>
+            <td class="p-2 text-gray-600">${escapeHtml(it._uom_code || '—')}</td>
+            <td class="p-2 text-right text-gray-600">${it.min_stock || 0}</td>
+        </tr>`).join('');
+}
+
+async function executeImport() {
+    if (!previewPayload) return;
+    if (!confirm(`Confirmar criação de ${previewPayload.items.length} itens no sistema?`)) return;
+    const btn = document.getElementById('executeBtn');
+    btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Importando…';
+    try {
+        const r = await apiCall('/api/inventory/import/execute', {
+            method: 'POST',
+            body: JSON.stringify(previewPayload)
+        });
+        document.getElementById('step1').classList.add('hidden');
+        document.getElementById('step2').classList.add('hidden');
+        const s = document.getElementById('step3');
+        s.classList.remove('hidden');
+        s.scrollIntoView({ behavior: 'smooth' });
+        document.getElementById('resultSummary').innerHTML = `
+            <p><b>${r.data.created_items}</b> itens criados</p>
+            <p><b>${r.data.created_categories}</b> categorias, <b>${r.data.created_uoms}</b> UMs, <b>${r.data.created_suppliers}</b> fornecedores</p>
+            <p class="text-[11px] text-gray-400 mt-2">Próximo SKU automático: SKU${String(r.data.next_sku_starts_at).padStart(3, '0')}</p>
+        `;
+    } catch (err) {
+        toast(err.message, 'error');
+        btn.disabled = false; btn.innerHTML = '<i class="fas fa-check text-xs"></i> Confirmar e importar';
+    }
+}
+
+function resetWizard() {
+    document.getElementById('step1').classList.remove('hidden');
+    document.getElementById('step2').classList.add('hidden');
+    document.getElementById('step3').classList.add('hidden');
+    document.getElementById('uploadForm').reset();
+    document.getElementById('fileLabel').textContent = '';
+    document.getElementById('previewBtn').disabled = true;
+    previewPayload = null;
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// Auth: redireciona se não-admin
+document.addEventListener('inventory:admin-resolved', (e) => {
+    if (!e.detail.isAdmin) {
+        toast('Apenas Admin pode importar planilhas', 'error');
+        setTimeout(() => window.location.href = 'index.html', 1500);
+    }
+});
+
+function escapeHtml(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+</script>
+</body>
+</html>

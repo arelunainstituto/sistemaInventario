@@ -41,6 +41,9 @@ router.use('/movements',          require('./movements'));
 // Sprint 4C — Log de acesso (§17)
 router.use('/access-log',         require('./access-log'));
 
+// Importador de planilha XLSX — admin only
+router.use('/import',             require('./import'));
+
 // Healthcheck do módulo (útil para verificar montagem do router)
 router.get('/_health', (_req, res) => {
     res.json({ ok: true, module: 'inventory', stage: 'fase-0' });

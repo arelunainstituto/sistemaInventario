@@ -38,6 +38,32 @@ _Nenhuma alteração pendente._
 
 ---
 
+## [1.3.0] — 2026-06-05
+
+> **Marco**: importador de planilha XLSX para carga inicial do cadastro (255 itens da planilha v1.0 do Instituto) + migração de limpeza para preparar a base. Inclui fix de seleção do sidebar no Kardex.
+
+### Adicionado
+- **Importador de planilha XLSX (Areluna v1.0)** ([import.js](api/inventory/import.js), [import.html](public/inventory/import.html)):
+  - Botão "Importar planilha" na tela de Ajustes (Admin only).
+  - Fluxo em 2 etapas: `POST /api/inventory/import/preview` (multipart, parser XLSX, normalização, validação sem persistir) → `POST /api/inventory/import/execute` (persiste em batches de 100).
+  - Normalização automática de categorias (7 variações → 5 canônicas via lookup), UoMs (10 → 7 canônicas), fornecedores (UPPER + trim, "–"/"VARIAVEL"/"-" tratados como ausência).
+  - SKUs da planilha mantidos como `internal_code`; sequência ajustada ao final via `fn_inv_set_sku_sequence` para não duplicar nos novos cadastros.
+  - Preview mostra cards de resumo, erros bloqueantes, avisos (expansíveis), listas de novas categorias/UMs/fornecedores e tabela com primeiros 10 itens.
+  - Items são criados como `macro=consumo`, `controls_lot=true` (default por trigger), `base_uom_id = consumption_uom_id = purchase_uom_id` da UoM mapeada.
+
+### Migração operacional
+- **Limpeza de dados de teste** — nova migração [55-clean-test-data.sql](database/inventory-refactor/55-clean-test-data.sql) (**requer migração manual antes da importação**):
+  - TRUNCATE `inv_movements, inv_stock, inv_lots, inv_entries, inv_entry_lines, inv_inventory_sessions, inv_inventory_counts, inv_item_location_params, inv_depreciation_runs` (RN07 contornado via TRUNCATE).
+  - DELETE em `inv_items / inv_locations / inv_categories / inv_suppliers` com WHERE `name ILIKE '%teste%'` — preserva o resto.
+  - `inv_units` (Marquês/Cristal/ProStoral) preservada intacta.
+  - Reset de `seq_inv_sku` e `seq_inv_patrimony` para 1.
+  - Nova função `fn_inv_set_sku_sequence(value)` para o importador ajustar a sequence após inserir SKUs explícitos.
+
+### Corrigido
+- **Sidebar — Kardex destacava "Relatórios"**: `activePage` em [kardex.html](public/inventory/kardex.html) trocado de `'reports'` para `'kardex'`.
+
+---
+
 ## [1.2.0] — 2026-06-03
 
 > **Marco**: inativação de movimentos por estorno (RN07-safe) + refatorações de relatórios + comprovante de impressão Brother + QR direto para ficha + access-log com nome real do utilizador. Toda a manipulação de movimentos agora é reversível por Admin sem violar o append-only de `inv_movements`.
@@ -288,7 +314,8 @@ f29115a feat(inventory): Sprint 4C - log de acesso + janela de consumo por categ
 
 A partir de 1.0.0, toda alteração deve adicionar uma entrada acima na seção `[Unreleased]` antes do merge.
 
-[Unreleased]: https://github.com/<org>/sistemaInventario/compare/v1.2.0...HEAD
+[Unreleased]: https://github.com/<org>/sistemaInventario/compare/v1.3.0...HEAD
+[1.3.0]: https://github.com/<org>/sistemaInventario/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/<org>/sistemaInventario/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/<org>/sistemaInventario/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/<org>/sistemaInventario/releases/tag/v1.0.0

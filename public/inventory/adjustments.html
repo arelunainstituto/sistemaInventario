@@ -19,7 +19,8 @@ renderInventoryLayout({ activePage: 'adjustments', title: 'Ajustes (Admin)', sub
 document.getElementById('pageContent').innerHTML = `
     <div class="flex justify-between items-center mb-4 flex-wrap gap-2">
         <h3 class="text-base font-bold text-gray-900">Histórico de ajustes</h3>
-        <div class="flex gap-2">
+        <div class="flex gap-2 flex-wrap">
+            <a href="import.html" class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-medium shadow-sm shadow-emerald-500/20 transition flex items-center gap-2"><i class="fas fa-file-import"></i> Importar planilha</a>
             <button onclick="openAdminExitModal()" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm font-medium shadow-sm shadow-red-500/20 transition flex items-center gap-2"><i class="fas fa-arrow-right-from-bracket"></i> Saída administrativa</button>
             <button onclick="openModal()" class="bg-amber-500 hover:bg-amber-600 text-white px-4 py-2 rounded-lg text-sm font-medium shadow-sm shadow-amber-500/20 transition flex items-center gap-2"><i class="fas fa-sliders"></i> Novo ajuste</button>
         </div>
