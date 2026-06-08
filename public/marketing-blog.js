@@ -51,11 +51,14 @@ const BlogManager = {
 
 
     // Detecta HTML "rico" que o Quill estripa ao normalizar:
-    // <figure>, <table>, <aside> ou qualquer classe começando com
-    // article-/blog- (article-cta, blog-tabela-wrapper, blog-tabela-comparativa…).
-    // Quando isso aparece, o modal abre DIRETO no Modo HTML — nunca
-    // passa pelo innerHTML do Quill.
-    COMPLEX_HTML_RE: /<(figure|table|aside)\b|class\s*=\s*"[^"]*(?:article-|blog-)/i,
+    //   • <figure> (galeria)
+    //   • <table>  (tabelas comparativas)
+    //   • <aside>  (Leia também inline, blocos auxiliares)
+    //   • <ul>/<ol>  (listas — Quill mangle quando <li> contém <a> ou emoji)
+    //   • classes article-/blog-  (article-cta, blog-tabela-wrapper, etc.)
+    // Quando QUALQUER um aparece, o modal abre DIRETO no Modo HTML —
+    // nunca passa pelo innerHTML do Quill.
+    COMPLEX_HTML_RE: /<(figure|table|aside|ul|ol)\b|class\s*=\s*"[^"]*(?:article-|blog-)/i,
 
     hasComplexHtml(html) {
         return this.COMPLEX_HTML_RE.test(String(html || ''));
@@ -97,8 +100,8 @@ const BlogManager = {
             const sourceHtml = source.value || '';
             if (this.hasComplexHtml(sourceHtml)) {
                 const ok = confirm(
-                    'Atenção: o conteúdo contém <figure>, <table>, <aside> ou classes custom (article-/blog-) ' +
-                    'que o Modo Editor (Quill) vai estripar.\n\n' +
+                    'Atenção: o conteúdo contém <figure>, <table>, <aside>, <ul>/<ol> ou classes custom ' +
+                    '(article-/blog-) que o Modo Editor (Quill) vai estripar.\n\n' +
                     'Recomendo manter no Modo HTML.\n\nContinuar mesmo assim?'
                 );
                 if (!ok) return;
