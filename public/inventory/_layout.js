@@ -237,27 +237,45 @@ function applySidebarState(collapsed) {
 
 /**
  * Logout robusto para as páginas do inventário (auth.js não é carregado aqui).
- * - Limpa TODOS os keys de sessão usados em qualquer parte do app
- * - Se window.authManager.supabase existir (auth.js carregado), também
- *   invalida a sessão server-side via supabase.auth.signOut()
- * - try/finally garante o redirect mesmo se algo acima falhar
+ *
+ * O fix crítico aqui é remover TAMBÉM as chaves do Supabase JS client
+ * (`sb-<projectRef>-auth-token`, etc.). Sem isso, quando o browser
+ * navega para /login.html, o auth.js carrega o cliente Supabase que
+ * encontra a sessão na sua própria chave e RECOLOCA o access_token
+ * no localStorage. O login.html então vê o token + ?redirect e manda
+ * o usuário de volta — o que aparece como "reload da tela".
+ *
+ * Cobertura:
+ *   • Chaves explícitas do app (access_token, user, etc.)
+ *   • Qualquer chave que comece com `sb-` (formato canônico do Supabase JS)
+ *   • sessionStorage inteiro (Supabase pode usar dependendo do storage config)
+ *   • Best-effort: chama supabase.auth.signOut() se window.authManager existir
  */
 async function logout() {
     try {
-        // Best-effort: invalidar sessão no Supabase se o cliente estiver disponível
+        // Best-effort: invalidar sessão server-side se o cliente Supabase estiver carregado
         if (window.authManager?.supabase?.auth?.signOut) {
             try { await window.authManager.supabase.auth.signOut(); } catch (_) { /* não bloquear */ }
         }
     } finally {
-        // Limpa todos os caches de sessão (super-set entre auth.js e _layout.js)
-        const keys = [
+        // 1. Keys explícitos do app
+        const knownKeys = [
             'access_token', 'refresh_token',
             'user', 'user_profile',
             'isAuthenticated', 'rememberMe'
         ];
-        for (const k of keys) {
+        for (const k of knownKeys) {
             try { localStorage.removeItem(k); } catch (_) {}
         }
+        // 2. Qualquer chave do Supabase JS client (formato `sb-<projectRef>-auth-token` etc.)
+        try {
+            for (const k of Object.keys(localStorage)) {
+                if (k.startsWith('sb-')) localStorage.removeItem(k);
+            }
+        } catch (_) {}
+        // 3. sessionStorage inteiro
+        try { sessionStorage.clear(); } catch (_) {}
+
         redirectToLogin();
     }
 }
