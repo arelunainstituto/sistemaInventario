@@ -380,7 +380,7 @@ const BlogManager = {
                 </div>
                 <div class="p-5 flex-1 flex flex-col">
                     <div class="text-xs text-gray-400 mb-2 flex items-center gap-2">
-                        <i class="far fa-calendar"></i> ${new Date(post.created_at).toLocaleDateString('pt-PT')}
+                        <i class="far fa-calendar"></i> ${new Date(post.published_at || post.created_at).toLocaleDateString('pt-PT')}
                         ${post.author_name ? `<span class="mx-1">•</span> <i class="far fa-user"></i> ${post.author_name}` : ''}
                     </div>
                     <h3 class="text-lg font-bold text-gray-800 mb-2 line-clamp-2" title="${post.title}">${post.title}</h3>
