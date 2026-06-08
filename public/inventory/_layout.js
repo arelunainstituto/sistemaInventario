@@ -131,7 +131,7 @@ function renderInventoryLayout({ activePage = 'dashboard', title = 'Inventário'
                     <div class="w-8 h-8 rounded-md bg-gradient-to-br from-sky-500 to-sky-600 flex items-center justify-center text-white text-xs font-bold" id="userAvatar">U</div>
                     <span class="text-sm font-medium text-gray-700" id="userName">Utilizador</span>
                 </div>
-                <button onclick="logout()" title="Sair" class="w-9 h-9 rounded-lg bg-gray-50 hover:bg-red-50 border border-gray-200 hover:border-red-200 hover:text-red-600 flex items-center justify-center text-gray-500 transition">
+                <button id="btnInventoryLogout" type="button" title="Sair" class="w-9 h-9 rounded-lg bg-gray-50 hover:bg-red-50 border border-gray-200 hover:border-red-200 hover:text-red-600 flex items-center justify-center text-gray-500 transition">
                     <i class="fas fa-sign-out-alt text-sm"></i>
                 </button>
             </div>
@@ -150,6 +150,9 @@ function renderInventoryLayout({ activePage = 'dashboard', title = 'Inventário'
     // Popula user info: tenta localStorage primeiro (fast path), depois /api/auth/me
     populateUserHeader();
     restoreSidebarState();
+
+    // Bind explícito do botão de logout (mais robusto que onclick inline)
+    document.getElementById('btnInventoryLogout')?.addEventListener('click', logout);
 }
 
 async function populateUserHeader() {
@@ -232,12 +235,35 @@ function applySidebarState(collapsed) {
     if (btn)  btn.title = collapsed ? 'Expandir menu' : 'Recolher menu';
 }
 
-function logout() {
-    localStorage.removeItem('access_token');
-    localStorage.removeItem('refresh_token');
-    localStorage.removeItem('user_profile');
-    redirectToLogin();
+/**
+ * Logout robusto para as páginas do inventário (auth.js não é carregado aqui).
+ * - Limpa TODOS os keys de sessão usados em qualquer parte do app
+ * - Se window.authManager.supabase existir (auth.js carregado), também
+ *   invalida a sessão server-side via supabase.auth.signOut()
+ * - try/finally garante o redirect mesmo se algo acima falhar
+ */
+async function logout() {
+    try {
+        // Best-effort: invalidar sessão no Supabase se o cliente estiver disponível
+        if (window.authManager?.supabase?.auth?.signOut) {
+            try { await window.authManager.supabase.auth.signOut(); } catch (_) { /* não bloquear */ }
+        }
+    } finally {
+        // Limpa todos os caches de sessão (super-set entre auth.js e _layout.js)
+        const keys = [
+            'access_token', 'refresh_token',
+            'user', 'user_profile',
+            'isAuthenticated', 'rememberMe'
+        ];
+        for (const k of keys) {
+            try { localStorage.removeItem(k); } catch (_) {}
+        }
+        redirectToLogin();
+    }
 }
+
+// Exposição explícita como global — não confiar apenas no hoisting da function declaration
+window.logout = logout;
 
 // Redireciona para o login preservando a URL atual em ?redirect=, para que
 // o login.html possa voltar à página de origem após autenticação.
