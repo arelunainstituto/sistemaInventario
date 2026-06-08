@@ -26,6 +26,24 @@ const upload = multer({
     }
 });
 
+// Helper: slugify (espelha slugify_pt do SQL — manter os dois em sync)
+function slugifyPt(input) {
+    if (!input) return null;
+    const map = {
+        'á':'a','à':'a','â':'a','ã':'a','ä':'a',
+        'é':'e','è':'e','ê':'e','ë':'e',
+        'í':'i','ì':'i','î':'i','ï':'i',
+        'ó':'o','ò':'o','ô':'o','õ':'o','ö':'o',
+        'ú':'u','ù':'u','û':'u','ü':'u',
+        'ç':'c','ñ':'n'
+    };
+    let s = String(input).toLowerCase();
+    s = s.replace(/[áàâãäéèêëíìîïóòôõöúùûüçñ]/g, ch => map[ch] || ch);
+    s = s.replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+    if (s.length > 80) s = s.slice(0, 80).replace(/-+$/, '');
+    return s || null;
+}
+
 // Helper to upload image to Supabase Storage
 async function uploadImageToStorage(file) {
     const fileName = `marketing/${Date.now()}-${file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
@@ -193,7 +211,12 @@ router.get('/:id', requireRole(['Marketing', 'Admin', 'admin', 'employee']), asy
 // POST / - Create post
 router.post('/', requireRole(['Marketing', 'Admin', 'admin', 'employee']), upload.single('image'), async (req, res) => {
     try {
-        let { title, content, excerpt, status = 'draft', tags = '[]', image_url, author_id, custom_author } = req.body;
+        let {
+            title, content, excerpt, status = 'draft', tags = '[]',
+            image_url, author_id, custom_author,
+            // Campos do blog público (v2)
+            slug, subtitle, image_caption, image_object_position
+        } = req.body;
 
         // Only Admins can set a different author
         const isAdmin = req.user.roles?.some(r => r.toLowerCase().includes('admin'));
@@ -224,15 +247,22 @@ router.post('/', requireRole(['Marketing', 'Admin', 'admin', 'employee']), uploa
             return res.status(400).json({ error: 'Título é obrigatório' });
         }
 
+        // Auto-slug se não vier preenchido. Se vier do form, normaliza (pode chegar com acentos do usuário).
+        const finalSlug = slugifyPt(slug && slug.trim() ? slug : title);
+
         const { data, error } = await supabaseAdmin
             .from('marketing_posts')
             .insert([{
                 title,
+                slug:                  finalSlug,
+                subtitle:              subtitle || null,
                 content,
                 excerpt,
                 status,
                 tags,
                 image_url,
+                image_caption:         image_caption || null,
+                image_object_position: image_object_position || null,
                 author_id,
                 custom_author: isAdmin && custom_author ? custom_author : null,
                 published_at: status === 'published' ? new Date() : null
@@ -240,7 +270,12 @@ router.post('/', requireRole(['Marketing', 'Admin', 'admin', 'employee']), uploa
             .select()
             .single();
 
-        if (error) throw error;
+        if (error) {
+            if (error.code === '23505' && error.message?.includes('slug')) {
+                return res.status(409).json({ error: 'Slug já existe — escolha outro ou deixe em branco para gerar automaticamente.' });
+            }
+            throw error;
+        }
 
         res.json({ success: true, data });
     } catch (error) {
@@ -253,7 +288,11 @@ router.post('/', requireRole(['Marketing', 'Admin', 'admin', 'employee']), uploa
 router.put('/:id', requireRole(['Marketing', 'Admin', 'admin', 'employee']), upload.single('image'), async (req, res) => {
     try {
         const { id } = req.params;
-        let { title, content, excerpt, status, tags, image_url, author_id, custom_author } = req.body;
+        let {
+            title, content, excerpt, status, tags, image_url, author_id, custom_author,
+            // Campos do blog público (v2)
+            slug, subtitle, image_caption, image_object_position
+        } = req.body;
 
         // Check for admin
         const isAdmin = req.user.roles?.some(r => r.toLowerCase().includes('admin'));
@@ -288,6 +327,11 @@ router.put('/:id', requireRole(['Marketing', 'Admin', 'admin', 'employee']), upl
         if (excerpt !== undefined) updates.excerpt = excerpt;
         if (tags !== undefined) updates.tags = tags;
         if (image_url !== undefined) updates.image_url = image_url;
+        // Blog v2: normalize empty strings to null para não estourar UNIQUE em slug
+        if (slug !== undefined) updates.slug = slug && slug.trim() ? slugifyPt(slug) : null;
+        if (subtitle !== undefined) updates.subtitle = subtitle || null;
+        if (image_caption !== undefined) updates.image_caption = image_caption || null;
+        if (image_object_position !== undefined) updates.image_object_position = image_object_position || null;
 
         // Update author if admin and provided
         if (isAdmin) {
@@ -312,7 +356,12 @@ router.put('/:id', requireRole(['Marketing', 'Admin', 'admin', 'employee']), upl
             .select()
             .single();
 
-        if (error) throw error;
+        if (error) {
+            if (error.code === '23505' && error.message?.includes('slug')) {
+                return res.status(409).json({ error: 'Slug já existe — escolha outro.' });
+            }
+            throw error;
+        }
 
         res.json({ success: true, data });
     } catch (error) {

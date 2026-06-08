@@ -372,7 +372,11 @@ const BlogManager = {
             document.getElementById('modalTitle').textContent = 'Editar Post';
             document.getElementById('postId').value = post.id;
             document.getElementById('postTitle').value = post.title;
+            document.getElementById('postSubtitle').value = post.subtitle || '';
+            document.getElementById('postSlug').value = post.slug || '';
             document.getElementById('postExcerpt').value = post.excerpt || '';
+            document.getElementById('postImageCaption').value = post.image_caption || '';
+            document.getElementById('postImageObjectPosition').value = post.image_object_position || '';
 
             if (this.quill) {
                 // Determine if content is HTML or plain text (legacy)
@@ -444,10 +448,14 @@ const BlogManager = {
         // Use FormData for multipart/form-data support (File Upload)
         const formData = new FormData();
         formData.append('title', document.getElementById('postTitle').value);
+        formData.append('subtitle', document.getElementById('postSubtitle').value);
+        formData.append('slug', document.getElementById('postSlug').value);
         formData.append('excerpt', document.getElementById('postExcerpt').value);
         formData.append('content', content);
         formData.append('status', document.getElementById('postStatus').value);
         formData.append('image_url', document.getElementById('postImage').value); // Send URL if present
+        formData.append('image_caption', document.getElementById('postImageCaption').value);
+        formData.append('image_object_position', document.getElementById('postImageObjectPosition').value);
 
         // Append author if visible
         const authorSelect = document.getElementById('postAuthor');

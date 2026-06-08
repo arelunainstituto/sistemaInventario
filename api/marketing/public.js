@@ -62,7 +62,7 @@ const verifySecureAccess = (req, res, next) => {
 // Aplicar middleware em todas as rotas deste router
 router.use(verifySecureAccess);
 
-// GET /posts - Listar posts publicados
+// GET /posts - Listar posts publicados (sem content para poupar payload)
 router.get('/posts', async (req, res) => {
     try {
         const { page = 1, limit = 10, tag } = req.query;
@@ -71,8 +71,9 @@ router.get('/posts', async (req, res) => {
         let query = supabaseAdmin
             .from('marketing_posts')
             .select(`
-                id, title, excerpt, image_url, 
-                published_at, tags, custom_author,
+                id, title, slug, subtitle, excerpt,
+                image_url, image_caption, image_object_position,
+                published_at, updated_at, tags, custom_author,
                 author_id
             `, { count: 'exact' })
             .eq('status', 'published')
@@ -134,17 +135,21 @@ router.get('/posts', async (req, res) => {
     }
 });
 
-// GET /posts/:id - Obter um post específico
-router.get('/posts/:id', async (req, res) => {
-    try {
-        const { id } = req.params;
+// GET /posts/:idOrSlug - Obter um post específico (aceita UUID ou slug)
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-        const { data: post, error } = await supabaseAdmin
+router.get('/posts/:idOrSlug', async (req, res) => {
+    try {
+        const { idOrSlug } = req.params;
+        const isUuid = UUID_RE.test(idOrSlug);
+
+        let q = supabaseAdmin
             .from('marketing_posts')
             .select('*')
-            .eq('id', id)
-            .eq('status', 'published')
-            .single();
+            .eq('status', 'published');
+        q = isUuid ? q.eq('id', idOrSlug) : q.eq('slug', idOrSlug);
+
+        const { data: post, error } = await q.maybeSingle();
 
         if (error || !post) {
             return res.status(404).json({ error: 'Post not found' });
