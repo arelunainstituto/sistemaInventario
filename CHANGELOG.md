@@ -38,6 +38,45 @@ _Nenhuma alteração pendente._
 
 ---
 
+## [1.7.0] — 2026-06-08
+
+> **Marco**: corrige 4 bugs do fluxo de criação de usuários (módulo RH) que faziam "acesso liberado, mas API responde 403". O principal era um case mismatch entre `permissions.module_name` (`'INVENTORY'`) e o que as rotas verificavam (`'inventory:read'`), que silenciosamente bloqueava todos os usuários com roles `Inventory_*`. O modal de RH passa também a expor um dropdown para escolher a role inventária na hora do cadastro.
+
+### Corrigido
+- **Case mismatch nas permissões do Inventário** ([90-normalize-permission-names.sql](database/inventory-refactor/90-normalize-permission-names.sql), [01-roles-permissions.sql:65-77](database/inventory-refactor/01-roles-permissions.sql#L65-L77)):
+  - `permissions.module_name` passa de `'INVENTORY'` para `'inventory'`.
+  - `permissions.action` passa do verbo curto (`'create'`) para o sufixo completo do nome (`'create_item'`), de modo que `module_name || ':' || action === name`.
+  - Resultado: `auth.js:128` agora constrói exatamente a mesma string que as rotas verificam (`requirePermission('inventory', 'create_item')`).
+- **Lockout silencioso por `tenant_id` NULL** ([employees.js:78-122](api/rh/employees.js#L78-L122)): `ensureAuthUserAndProfile()` passa a retornar `{ userId, tenantId, error }` e os callers (POST/PUT) **falham com 400 explícito** se o profile não foi criado. Antes, o usuário era criado em `auth.users` mas ficava trancado no primeiro login (`auth.js:48-50` retorna 403 "Perfil de usuário não encontrado").
+- **Propagação de erros das atribuições de role** ([employees.js](api/rh/employees.js)): inserts em `user_roles` e `user_module_access` agora têm erros checados e propagados via campo `warnings` no response. O modal exibe esses avisos via alert. Antes, falhas silenciosas devolviam 201 mas o usuário ficava com permissões incompletas.
+
+### Adicionado
+- **Helper `assignInventoryRole(userId, roleName, tenantId)`** ([employees.js:135-184](api/rh/employees.js#L135-L184)): centraliza a lógica de aplicar/trocar/remover role inventária. Garante invariante: no máximo 1 role `Inventory_*` por usuário.
+- **Dropdown "Role no Inventário" no modal de RH** ([rh-employees.js:474-501](public/rh-employees.js#L474-L501)) — Access tab. Opções:
+  - _Sem acesso operacional_ (default — apenas leitura via módulo)
+  - Consulta — leitura + relatórios
+  - Contabilidade — leitura + relatórios + financeiro
+  - Operador — lançamentos (entrada/saída/transferência/contagem)
+  - Admin do Inventário — controle total
+- **GET `/api/rh/employees/:id`** passa a retornar `inventory_role` (nome da role atual ou `null`), permitindo prefill no modal de edição.
+- **Field `warnings` no response** de POST e PUT de funcionário, surfaceando falhas não-bloqueantes (módulo não atribuído, role não inserida, cliente não vinculado).
+- [_layout.js:5](public/inventory/_layout.js#L5) bump para `v1.7.0`.
+
+### Notas de aplicação
+**Pré-requisito antes do deploy do código v1.7.0**: aplicar [90-normalize-permission-names.sql](database/inventory-refactor/90-normalize-permission-names.sql) no Supabase SQL Editor. Sem ela, **toda role `Inventory_*` continua não funcionando** (o código novo não muda o comportamento da auth — só passa a usar as permissões corrigidas).
+
+Ordem completa:
+1. Aplicar `90-normalize-permission-names.sql` (uma vez).
+2. Deploy do código v1.7.0.
+3. Re-editar funcionários do Inventário no modal de RH para atribuir a role correta no novo dropdown.
+
+### Notas de compatibilidade
+- Usuários que já estão no sistema e tinham roles `Inventory_*` atribuídas **manualmente via SQL** passam a ter as permissões funcionando automaticamente após o passo (1).
+- Roles HR (`rh_manager`, `employee`) e Admin não foram afetadas — usam `module_name='HR'` que já era consistente com as rotas.
+- A coluna `permissions.action` mudou de "verbo curto" para "sufixo completo" para o módulo inventário. Outros módulos (HR, etc.) ficam intactos.
+
+---
+
 ## [1.6.1] — 2026-06-05
 
 > **Hotfix**: importador retornava 500 ao final do `/execute` apesar dos itens terem sido inseridos com sucesso. Causa: `supabaseAdmin.rpc()` retorna um builder thenable (não uma Promise), então `.catch()` jogado direto na chamada lançava `TypeError`. Substituído por `try/await` + verificação de `{ error }`.
@@ -476,7 +515,8 @@ f29115a feat(inventory): Sprint 4C - log de acesso + janela de consumo por categ
 
 A partir de 1.0.0, toda alteração deve adicionar uma entrada acima na seção `[Unreleased]` antes do merge.
 
-[Unreleased]: https://github.com/<org>/sistemaInventario/compare/v1.6.1...HEAD
+[Unreleased]: https://github.com/<org>/sistemaInventario/compare/v1.7.0...HEAD
+[1.7.0]: https://github.com/<org>/sistemaInventario/compare/v1.6.1...v1.7.0
 [1.6.1]: https://github.com/<org>/sistemaInventario/compare/v1.6.0...v1.6.1
 [1.6.0]: https://github.com/<org>/sistemaInventario/compare/v1.5.1...v1.6.0
 [1.5.1]: https://github.com/<org>/sistemaInventario/compare/v1.5.0...v1.5.1

@@ -480,6 +480,21 @@ const employeesTemplate = `
                                 </div>
                             </div>
 
+                            <h4 class="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4 mt-6">Role no módulo Inventário</h4>
+                            <div class="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                                <p class="text-xs text-gray-500 mb-2">
+                                    Define o que o usuário pode fazer dentro do módulo Inventário.
+                                    Sem role, mesmo com o checkbox "Inventário" marcado acima, só haverá leitura.
+                                </p>
+                                <select name="inventory_role" class="form-input text-sm">
+                                    <option value="">— Sem acesso operacional (somente leitura via módulo) —</option>
+                                    <option value="Inventory_Consulta">Consulta — leitura + relatórios</option>
+                                    <option value="Inventory_Contabilidade">Contabilidade — leitura + relatórios + financeiro</option>
+                                    <option value="Inventory_Operador">Operador — lançamentos (entrada, saída, transferência, contagem)</option>
+                                    <option value="Inventory_Admin">Admin do Inventário — controle total (ajustes, depreciação, cadastros)</option>
+                                </select>
+                            </div>
+
                             <h4 class="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4 mt-6">Vinculação com Cliente (Externo)</h4>
                             <div class="bg-gray-50 p-4 rounded-lg border border-gray-200">
                                 <label class="form-label text-sm">Vincular a Cliente Existente</label>
@@ -981,6 +996,11 @@ window.openEmployeeModal = async function (employee = null) {
             });
         }
 
+        // Role atual do Inventário (vinda do GET /:id)
+        if (form.inventory_role) {
+            form.inventory_role.value = employee.inventory_role || '';
+        }
+
         // Preencher Contactos de Emergência
         if (employee.emergency_contacts && Array.isArray(employee.emergency_contacts) && employee.emergency_contacts.length > 0) {
             if (ecList) ecList.innerHTML = ''; // Limpar mensagem de vazio
@@ -1243,6 +1263,9 @@ window.handleEmployeeSubmit = async function (e) {
         // Módulos
         modules: Array.from(document.querySelectorAll('input[name="modules"]:checked')).map(cb => cb.value),
 
+        // Role no Inventário (string vazia = remover role inventário existente)
+        inventory_role: rawData.inventory_role || '',
+
         // Cliente Vinculado
         linked_client_id: document.getElementById('linkedClientSelect').value || null,
 
@@ -1304,9 +1327,18 @@ window.handleEmployeeSubmit = async function (e) {
             throw new Error(errorData.error || 'Erro ao salvar');
         }
 
+        // Resposta pode trazer { ...employee, warnings: [...] } — surface ao admin
+        let body = null;
+        try { body = await response.json(); } catch (_) { /* sem corpo */ }
+        const warnings = Array.isArray(body?.warnings) ? body.warnings : [];
+
         window.closeEmployeeModal();
         await loadEmployeesList();
-        alert('Funcionário salvo com sucesso!');
+        if (warnings.length) {
+            alert(`Funcionário salvo, mas com avisos:\n\n• ${warnings.join('\n• ')}`);
+        } else {
+            alert('Funcionário salvo com sucesso!');
+        }
 
     } catch (error) {
         console.error(error);

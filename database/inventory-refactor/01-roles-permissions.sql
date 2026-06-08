@@ -61,18 +61,23 @@ DO $$
 DECLARE
     perm_record RECORD;
 BEGIN
+    -- IMPORTANTE: module_name e action precisam ser tais que
+    -- module_name || ':' || action == name. O middleware constrói a
+    -- string de permissão como `${module_name}:${action}` e as rotas
+    -- chamam requirePermission('inventory', '<action>'). Se você
+    -- alterar essa convenção, atualize também a 90-normalize-permission-names.sql.
     FOR perm_record IN
         SELECT * FROM (VALUES
-            ('inventory:read',              'read',   'INVENTORY', 'all',              'Ler dados do inventário'),
-            ('inventory:create_item',       'create', 'INVENTORY', 'items',            'Cadastrar novos itens'),
-            ('inventory:update_item',       'update', 'INVENTORY', 'items',            'Editar itens existentes'),
-            ('inventory:entry',             'create', 'INVENTORY', 'entries',          'Lançar entradas (recepção de materiais)'),
-            ('inventory:exit',              'create', 'INVENTORY', 'exits',            'Lançar saídas (consumo/avaria/perda…)'),
-            ('inventory:transfer',          'create', 'INVENTORY', 'transfers',        'Transferir itens entre localizações'),
-            ('inventory:adjust',            'create', 'INVENTORY', 'adjustments',      'Ajustes manuais de estoque'),
-            ('inventory:inventory_session', 'manage', 'INVENTORY', 'sessions',         'Abrir/contar/validar sessões de inventário físico'),
-            ('inventory:reports',           'read',   'INVENTORY', 'reports',          'Consultar relatórios do inventário'),
-            ('inventory:financial',         'read',   'INVENTORY', 'financial',        'Acesso a dados financeiros (CMP, valorização, custos)')
+            ('inventory:read',              'read',              'inventory', 'all',         'Ler dados do inventário'),
+            ('inventory:create_item',       'create_item',       'inventory', 'items',       'Cadastrar novos itens'),
+            ('inventory:update_item',       'update_item',       'inventory', 'items',       'Editar itens existentes'),
+            ('inventory:entry',             'entry',             'inventory', 'entries',     'Lançar entradas (recepção de materiais)'),
+            ('inventory:exit',              'exit',              'inventory', 'exits',       'Lançar saídas (consumo/avaria/perda…)'),
+            ('inventory:transfer',          'transfer',          'inventory', 'transfers',   'Transferir itens entre localizações'),
+            ('inventory:adjust',            'adjust',            'inventory', 'adjustments', 'Ajustes manuais de estoque'),
+            ('inventory:inventory_session', 'inventory_session', 'inventory', 'sessions',    'Abrir/contar/validar sessões de inventário físico'),
+            ('inventory:reports',           'reports',           'inventory', 'reports',     'Consultar relatórios do inventário'),
+            ('inventory:financial',         'financial',         'inventory', 'financial',   'Acesso a dados financeiros (CMP, valorização, custos)')
         ) AS t(name, action, module_name, resource, description)
     LOOP
         IF NOT EXISTS (SELECT 1 FROM permissions WHERE name = perm_record.name) THEN
@@ -103,7 +108,7 @@ BEGIN
     SELECT id INTO v_module_id            FROM modules WHERE code = 'INVENTORY';
 
     -- A) Inventory_Admin = TODAS as permissões inventory:*
-    FOR v_perm_id IN SELECT id FROM permissions WHERE module_name = 'INVENTORY' LOOP
+    FOR v_perm_id IN SELECT id FROM permissions WHERE module_name = 'inventory' LOOP
         IF NOT EXISTS (SELECT 1 FROM role_permissions WHERE role_id = v_inv_admin_id AND permission_id = v_perm_id) THEN
             INSERT INTO role_permissions (role_id, permission_id) VALUES (v_inv_admin_id, v_perm_id);
         END IF;
@@ -154,7 +159,7 @@ COMMIT;
 SELECT r.name AS role, COUNT(rp.permission_id) AS qtd_permissoes
 FROM roles r
 LEFT JOIN role_permissions rp ON rp.role_id = r.id
-LEFT JOIN permissions p ON p.id = rp.permission_id AND p.module_name = 'INVENTORY'
+LEFT JOIN permissions p ON p.id = rp.permission_id AND p.module_name = 'inventory'
 WHERE r.name LIKE 'Inventory_%'
 GROUP BY r.name
 ORDER BY r.name;

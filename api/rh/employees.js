@@ -8,14 +8,20 @@ const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY; // Usar Service Role para operações administrativas
 const supabase = createClient(supabaseUrl, supabaseKey);
 
+// Roles do módulo Inventário que o modal HR sabe atribuir.
+// Mantenha em sync com database/inventory-refactor/01-roles-permissions.sql.
+const INVENTORY_ROLE_NAMES = ['Inventory_Admin', 'Inventory_Operador', 'Inventory_Consulta', 'Inventory_Contabilidade'];
+
 /**
  * Helper: Garante que um employee tenha uma conta Auth + public.users + user_profiles.
  * Chamado quando o admin configura senha/módulos para um employee sem user_id.
- * @param {string} email - Email do employee
- * @param {string} name - Nome completo do employee
- * @param {string} password - Senha inicial (obrigatória se criando novo usuário)
- * @param {string} creatorUserId - user_id de quem está executando a ação (para pegar tenant_id)
- * @returns {string|null} - userId criado/encontrado, ou null em caso de falha
+ *
+ * Retorna { userId, tenantId, error }. `error` é uma string descritiva quando
+ * NÃO foi possível garantir um perfil utilizável (ex.: tenant_id do criador
+ * ausente, sem o qual o usuário ficaria sem user_profiles e seria trancado
+ * pelo middleware de auth no primeiro login). Nesse caso, `userId` pode estar
+ * preenchido com o auth.users criado mas a operação como um todo deve ser
+ * tratada como falha pelo caller.
  */
 async function ensureAuthUserAndProfile(email, name, password, creatorUserId) {
     try {
@@ -39,7 +45,7 @@ async function ensureAuthUserAndProfile(email, name, password, creatorUserId) {
                 });
                 if (linkErr || !linkData?.user?.id) {
                     console.error('[RH] Falha ao obter user_id via generateLink:', linkErr?.message);
-                    return null;
+                    return { userId: null, tenantId: null, error: 'Falha ao localizar usuário Auth existente: ' + (linkErr?.message || 'erro desconhecido') };
                 }
                 userId = linkData.user.id;
                 console.log(`[RH] user_id obtido via generateLink: ${userId}`);
@@ -50,7 +56,7 @@ async function ensureAuthUserAndProfile(email, name, password, creatorUserId) {
                 }
             } else {
                 console.error('[RH] Erro ao criar Auth user:', createAuthErr.message);
-                return null;
+                return { userId: null, tenantId: null, error: 'Erro ao criar conta Auth: ' + createAuthErr.message };
             }
         } else {
             userId = newAuthUser.user.id;
@@ -91,26 +97,91 @@ async function ensureAuthUserAndProfile(email, name, password, creatorUserId) {
 
         if (!existProfile) {
             if (!tenantId) {
-                console.error('[RH] tenant_id não encontrado para criador. Não é possível criar user_profiles sem tenant_id.');
-            } else {
-                const { error: profileErr } = await supabase.from('user_profiles').insert([{
-                    user_id: userId,
-                    display_name: name,
-                    first_name: name.split(' ')[0],
-                    tenant_id: tenantId,
-                    is_active: true
-                }]);
-                if (profileErr) console.error('[RH] Erro ao criar user_profiles:', profileErr.message);
-                else console.log(`[RH] user_profiles criado para ${userId}`);
+                // FATAL: sem tenant_id não cria profile, e sem profile o usuário
+                // será 403'd pelo middleware no primeiro login. Falhar a operação.
+                const msg = 'tenant_id do criador é NULL — impossível criar user_profiles. O usuário criado em auth.users ficaria trancado. Garanta que o admin que está criando o usuário tem tenant_id em seu próprio user_profiles.';
+                console.error('[RH] ' + msg);
+                return { userId, tenantId: null, error: msg };
             }
+            const { error: profileErr } = await supabase.from('user_profiles').insert([{
+                user_id: userId,
+                display_name: name,
+                first_name: name.split(' ')[0],
+                tenant_id: tenantId,
+                is_active: true
+            }]);
+            if (profileErr) {
+                console.error('[RH] Erro ao criar user_profiles:', profileErr.message);
+                return { userId, tenantId, error: 'Erro ao criar user_profiles: ' + profileErr.message };
+            }
+            console.log(`[RH] user_profiles criado para ${userId}`);
         } else {
             console.log(`[RH] user_profiles já existia para ${userId}`);
         }
 
-        return userId;
+        return { userId, tenantId, error: null };
     } catch (err) {
         console.error('[RH] Erro inesperado em ensureAuthUserAndProfile:', err.message);
-        return null;
+        return { userId: null, tenantId: null, error: 'Erro inesperado: ' + err.message };
+    }
+}
+
+/**
+ * Helper: aplica a role do Inventário a um usuário. Substitui qualquer role
+ * Inventory_* existente (um usuário tem no máximo UMA role inventário).
+ *
+ * @param {string} userId
+ * @param {string|null} roleName - Nome da role (ex.: 'Inventory_Admin') ou null/'' para remover.
+ * @param {string|null} tenantId - tenant_id a vincular ao user_role (opcional, depende do schema).
+ * @returns {Promise<{ok: boolean, applied: string|null, error: string|null}>}
+ */
+async function assignInventoryRole(userId, roleName, tenantId) {
+    if (!userId) return { ok: false, applied: null, error: 'userId vazio' };
+
+    // Validar role: só aceita as 4 oficiais ou vazio (remove)
+    const wantsRemove = !roleName || roleName === '' || roleName === 'none';
+    if (!wantsRemove && !INVENTORY_ROLE_NAMES.includes(roleName)) {
+        return { ok: false, applied: null, error: `Role inválida: "${roleName}" (esperado: ${INVENTORY_ROLE_NAMES.join('|')} ou vazio)` };
+    }
+
+    try {
+        // 1) Buscar IDs de todas as roles Inventory_* — para remover as outras
+        const { data: invRoles, error: rolesErr } = await supabase
+            .from('roles')
+            .select('id, name')
+            .in('name', INVENTORY_ROLE_NAMES);
+        if (rolesErr) return { ok: false, applied: null, error: 'Erro ao listar roles inventário: ' + rolesErr.message };
+
+        const invRoleIds = (invRoles || []).map(r => r.id);
+        if (invRoleIds.length === 0) {
+            return { ok: false, applied: null, error: 'Nenhuma role Inventory_* encontrada no DB — aplique database/inventory-refactor/01-roles-permissions.sql' };
+        }
+
+        // 2) Remover qualquer role inventário atual
+        const { error: delErr } = await supabase
+            .from('user_roles')
+            .delete()
+            .eq('user_id', userId)
+            .in('role_id', invRoleIds);
+        if (delErr) return { ok: false, applied: null, error: 'Erro ao remover roles antigas: ' + delErr.message };
+
+        if (wantsRemove) {
+            return { ok: true, applied: null, error: null };
+        }
+
+        // 3) Inserir a nova
+        const newRole = (invRoles || []).find(r => r.name === roleName);
+        if (!newRole) return { ok: false, applied: null, error: `Role "${roleName}" não encontrada no DB` };
+
+        const payload = { user_id: userId, role_id: newRole.id, is_active: true };
+        if (tenantId) payload.tenant_id = tenantId;
+
+        const { error: insErr } = await supabase.from('user_roles').insert([payload]);
+        if (insErr) return { ok: false, applied: null, error: 'Erro ao inserir role: ' + insErr.message };
+
+        return { ok: true, applied: roleName, error: null };
+    } catch (err) {
+        return { ok: false, applied: null, error: 'Erro inesperado: ' + err.message };
     }
 }
 
@@ -422,6 +493,20 @@ router.get('/:id', async (req, res) => {
             data.linked_client = linkedClient || null;
         }
 
+        // Buscar role atual do módulo Inventário (no máximo uma Inventory_*)
+        data.inventory_role = null;
+        if (data.user_id) {
+            const { data: userInvRoles } = await supabase
+                .from('user_roles')
+                .select('roles(name)')
+                .eq('user_id', data.user_id)
+                .eq('is_active', true);
+            const found = (userInvRoles || [])
+                .map(ur => ur.roles?.name)
+                .find(n => n && INVENTORY_ROLE_NAMES.includes(n));
+            if (found) data.inventory_role = found;
+        }
+
         res.json(data);
     } catch (error) {
         console.error('Erro ao buscar funcionário:', error);
@@ -454,8 +539,12 @@ router.post('/', requirePermission('HR', 'create'), async (req, res) => {
             payroll_data, // Object with payroll information
             modules, // Array of module IDs
             password, // Optional initial password
-            linked_client_id // ID do cliente para vincular
+            linked_client_id, // ID do cliente para vincular
+            inventory_role // Optional: 'Inventory_Admin' | 'Inventory_Operador' | 'Inventory_Consulta' | 'Inventory_Contabilidade' | '' (none)
         } = req.body;
+
+        // warnings: avisos não-bloqueantes que voltam no response para o admin ver
+        const warnings = [];
 
         // Validações básicas
         if (!name || !email || !nif) {
@@ -463,11 +552,15 @@ router.post('/', requirePermission('HR', 'create'), async (req, res) => {
         }
 
         // 1. Verificar/Criar Usuário no Supabase Auth + public.users + user_profiles
-        // Usa o helper ensureAuthUserAndProfile para lidar com casos onde o usuário já existe
-        const userId = await ensureAuthUserAndProfile(email, name, password || 'Mudar123!', req.user.id);
+        const { userId, tenantId, error: authErr } = await ensureAuthUserAndProfile(
+            email, name, password || 'Mudar123!', req.user.id
+        );
 
-        if (!userId) {
-            return res.status(400).json({ error: 'Erro ao criar conta de usuário. Verifique o email e tente novamente.' });
+        if (authErr || !userId) {
+            return res.status(400).json({
+                error: 'Erro ao criar conta de usuário',
+                details: authErr || 'userId não retornado'
+            });
         }
         console.log(`[RH] userId obtido para ${email}: ${userId}`);
 
@@ -599,75 +692,52 @@ router.post('/', requirePermission('HR', 'create'), async (req, res) => {
                 .from('user_module_access')
                 .upsert(moduleAccessInserts, { onConflict: 'user_id, module_id' });
 
-            if (modulesError) console.error('Erro ao atribuir módulos:', modulesError);
+            if (modulesError) {
+                console.error('Erro ao atribuir módulos:', modulesError);
+                warnings.push(`Erro ao atribuir módulos: ${modulesError.message}`);
+            }
 
-            // --- AUTOMATIC ROLE ASSIGNMENT LOGIC ---
-            try {
-                // 1. Get IDs for HR module and rh_manager role
-                const { data: hrModule } = await supabase.from('modules').select('id').eq('code', 'HR').single();
-                const { data: rhManagerRole } = await supabase.from('roles').select('id').eq('name', 'rh_manager').single();
-                const { data: empRole } = await supabase.from('roles').select('id').eq('name', 'employee').single();
+            // --- Atribuição automática de role baseado em módulo HR ---
+            const { data: hrModule } = await supabase.from('modules').select('id').eq('code', 'HR').single();
+            const { data: rhManagerRole } = await supabase.from('roles').select('id').eq('name', 'rh_manager').single();
+            const { data: empRole } = await supabase.from('roles').select('id').eq('name', 'employee').single();
 
-                if (hrModule && rhManagerRole) {
-                    const hasHRAccess = modules.includes(hrModule.id);
-
-                    // Fetch tenant_id from current user (admin/manager) or the new user's profile if created
-                    // Better to fetch from the creator's profile to propagate correct tenant
-                    const { data: creatorProfile } = await supabase
-                        .from('user_profiles')
-                        .select('tenant_id')
-                        .eq('user_id', req.user.id)
-                        .single();
-
-                    const tenantId = creatorProfile?.tenant_id;
-
-                    if (hasHRAccess) {
-                        console.log(`[RH] Auto-assigning 'rh_manager' to ${userId}`);
-                        const rolePayload = {
-                            user_id: userId,
-                            role_id: rhManagerRole.id
-                        };
-                        if (tenantId) rolePayload.tenant_id = tenantId;
-
-                        await supabase.from('user_roles').insert([rolePayload]);
-                    } else if (empRole) {
-                        // Default to employee if not HR
-                        console.log(`[RH] Auto-assigning 'employee' to ${userId}`);
-                        const rolePayload = {
-                            user_id: userId,
-                            role_id: empRole.id
-                        };
-                        if (tenantId) rolePayload.tenant_id = tenantId;
-
-                        await supabase.from('user_roles').insert([rolePayload]);
+            if (hrModule && rhManagerRole) {
+                const hasHRAccess = modules.includes(hrModule.id);
+                const targetRole = hasHRAccess ? rhManagerRole : empRole;
+                if (targetRole) {
+                    const rolePayload = { user_id: userId, role_id: targetRole.id, is_active: true };
+                    if (tenantId) rolePayload.tenant_id = tenantId;
+                    const { error: roleErr } = await supabase.from('user_roles').insert([rolePayload]);
+                    if (roleErr && roleErr.code !== '23505') {
+                        console.error('Erro na atribuição automática de role:', roleErr);
+                        warnings.push(`Role base não atribuída: ${roleErr.message}`);
                     }
                 }
-            } catch (roleAutoError) {
-                console.error('Erro na atribuição automática de role (POST):', roleAutoError);
             }
-            // ---------------------------------------
         } else {
-            // Default to employee role if no modules selected
-            try {
-                const { data: empRole } = await supabase.from('roles').select('id').eq('name', 'employee').single();
-                if (empRole) {
-                    // Fetch tenant_id
-                    const { data: creatorProfile } = await supabase
-                        .from('user_profiles')
-                        .select('tenant_id')
-                        .eq('user_id', req.user.id)
-                        .single();
-                    const tenantId = creatorProfile?.tenant_id;
-
-                    const rolePayload = {
-                        user_id: userId,
-                        role_id: empRole.id
-                    };
-                    if (tenantId) rolePayload.tenant_id = tenantId;
-
-                    await supabase.from('user_roles').insert([rolePayload]);
+            // Sem módulos: atribuir role 'employee' como padrão
+            const { data: empRole } = await supabase.from('roles').select('id').eq('name', 'employee').single();
+            if (empRole) {
+                const rolePayload = { user_id: userId, role_id: empRole.id, is_active: true };
+                if (tenantId) rolePayload.tenant_id = tenantId;
+                const { error: roleErr } = await supabase.from('user_roles').insert([rolePayload]);
+                if (roleErr && roleErr.code !== '23505') {
+                    console.error('Erro ao atribuir role employee:', roleErr);
+                    warnings.push(`Role 'employee' não atribuída: ${roleErr.message}`);
                 }
-            } catch (e) { console.error(e); }
+            }
+        }
+
+        // 6b. Atribuir role do módulo Inventário (se fornecida no modal)
+        if (inventory_role !== undefined) {
+            const invRes = await assignInventoryRole(userId, inventory_role, tenantId);
+            if (!invRes.ok) {
+                console.error('Erro ao atribuir role inventário:', invRes.error);
+                warnings.push(`Role inventário não aplicada: ${invRes.error}`);
+            } else if (invRes.applied) {
+                console.log(`[RH] Role inventário "${invRes.applied}" atribuída a ${userId}`);
+            }
         }
 
         // 7. Vincular a cliente (se fornecido)
@@ -686,10 +756,13 @@ router.post('/', requirePermission('HR', 'create'), async (req, res) => {
                 .update({ user_id: userId })
                 .eq('id', linked_client_id);
 
-            if (linkError) console.error('Erro ao vincular cliente:', linkError);
+            if (linkError) {
+                console.error('Erro ao vincular cliente:', linkError);
+                warnings.push(`Cliente não vinculado: ${linkError.message}`);
+            }
         }
 
-        res.status(201).json(employee);
+        res.status(201).json({ ...employee, warnings });
     } catch (error) {
         console.error('Erro ao criar funcionário:', error);
         res.status(500).json({ error: 'Erro interno ao criar funcionário', details: error.message });
@@ -701,6 +774,7 @@ router.put('/:id', requirePermission('HR', 'update'), async (req, res) => {
     try {
         const { id } = req.params;
         const updates = { ...req.body };
+        const warnings = [];
 
         // Sanitize fields
         if (updates.employee_number === '') updates.employee_number = null;
@@ -712,12 +786,14 @@ router.put('/:id', requirePermission('HR', 'update'), async (req, res) => {
         const emergency_contacts = updates.emergency_contacts;
         const payroll_data = updates.payroll_data;
         const password = updates.password;
+        const inventoryRoleInput = updates.inventory_role; // pode ser string vazia (remover) ou role válida
 
         delete updates.modules;
         delete updates.salary_base; // Não atualizar diretamente
         delete updates.emergency_contacts;
         delete updates.payroll_data;
         delete updates.password;
+        delete updates.inventory_role;
         delete updates.linked_client_id; // Processar separadamente
 
         // Remover campos que não devem ser atualizados diretamente
@@ -746,39 +822,34 @@ router.put('/:id', requirePermission('HR', 'update'), async (req, res) => {
             const employeeName = req.body.name || currentEmployee.name;
 
             console.log(`[RH] Employee ${id} não tem user_id. Criando conta Auth para ${employeeEmail}...`);
-            const newUserId = await ensureAuthUserAndProfile(employeeEmail, employeeName, password, req.user.id);
+            const { userId: newUserId, tenantId: putTenantId, error: authErr } =
+                await ensureAuthUserAndProfile(employeeEmail, employeeName, password, req.user.id);
 
-            if (newUserId) {
-                // Salvar user_id no employee
-                await supabase.from('rh_employees').update({ user_id: newUserId }).eq('id', id);
-                currentEmployee.user_id = newUserId;
-                console.log(`[RH] user_id ${newUserId} vinculado ao employee ${id}`);
+            if (authErr || !newUserId) {
+                return res.status(400).json({
+                    error: 'Erro ao criar conta de usuário (no UPDATE)',
+                    details: authErr || 'userId não retornado'
+                });
+            }
+            // Salvar user_id no employee
+            await supabase.from('rh_employees').update({ user_id: newUserId }).eq('id', id);
+            currentEmployee.user_id = newUserId;
+            console.log(`[RH] user_id ${newUserId} vinculado ao employee ${id}`);
 
-                // Atribuir role padrão
-                try {
-                    const { data: empRole } = await supabase.from('roles').select('id').eq('name', 'employee').single();
-                    const { data: creatorProfile } = await supabase
-                        .from('user_profiles').select('tenant_id').eq('user_id', req.user.id).maybeSingle();
-                    const tenantId = creatorProfile?.tenant_id;
-
-                    if (empRole && tenantId) {
-                        const { data: existRole } = await supabase
-                            .from('user_roles').select('id').eq('user_id', newUserId).maybeSingle();
-                        if (!existRole) {
-                            await supabase.from('user_roles').insert([{
-                                user_id: newUserId,
-                                role_id: empRole.id,
-                                tenant_id: tenantId,
-                                is_active: true
-                            }]);
-                            console.log(`[RH] Role 'employee' atribuída ao novo user ${newUserId}`);
-                        }
+            // Atribuir role base 'employee' se ainda não tiver nenhuma
+            const { data: empRole } = await supabase.from('roles').select('id').eq('name', 'employee').single();
+            if (empRole) {
+                const { data: existRole } = await supabase
+                    .from('user_roles').select('id').eq('user_id', newUserId).maybeSingle();
+                if (!existRole) {
+                    const rolePayload = { user_id: newUserId, role_id: empRole.id, is_active: true };
+                    if (putTenantId) rolePayload.tenant_id = putTenantId;
+                    const { error: roleErr } = await supabase.from('user_roles').insert([rolePayload]);
+                    if (roleErr && roleErr.code !== '23505') {
+                        console.error('[RH] Erro ao atribuir role padrão:', roleErr);
+                        warnings.push(`Role 'employee' não atribuída: ${roleErr.message}`);
                     }
-                } catch (roleErr) {
-                    console.error('[RH] Erro ao atribuir role padrão:', roleErr.message);
                 }
-            } else {
-                console.error(`[RH] Falha ao criar conta Auth para employee ${id}. Módulos e senha não serão salvos.`);
             }
         }
 
@@ -932,6 +1003,7 @@ router.put('/:id', requirePermission('HR', 'update'), async (req, res) => {
 
                 if (modulesError) {
                     console.error('Erro ao atualizar módulos:', modulesError);
+                    warnings.push(`Erro ao atualizar módulos: ${modulesError.message}`);
                 }
 
                 // --- AUTOMATIC ROLE ASSIGNMENT LOGIC ---
@@ -965,11 +1037,16 @@ router.put('/:id', requirePermission('HR', 'update'), async (req, res) => {
 
                                 const rolePayload = {
                                     user_id: currentEmployee.user_id,
-                                    role_id: rhManagerRole.id
+                                    role_id: rhManagerRole.id,
+                                    is_active: true
                                 };
                                 if (tenantId) rolePayload.tenant_id = tenantId;
 
-                                await supabase.from('user_roles').insert([rolePayload]);
+                                const { error: roleErr } = await supabase.from('user_roles').insert([rolePayload]);
+                                if (roleErr && roleErr.code !== '23505') {
+                                    console.error('Erro ao atribuir rh_manager:', roleErr);
+                                    warnings.push(`Role rh_manager não atribuída: ${roleErr.message}`);
+                                }
                             }
                         } else {
                             // IF user does NOT have HR access -> Remove rh_manager role (if exists)
@@ -1022,11 +1099,28 @@ router.put('/:id', requirePermission('HR', 'update'), async (req, res) => {
                     .update({ user_id: currentEmployee.user_id })
                     .eq('id', linked_client_id);
 
-                if (linkError) console.error('Erro ao vincular cliente:', linkError);
+                if (linkError) {
+                    console.error('Erro ao vincular cliente:', linkError);
+                    warnings.push(`Cliente não vinculado: ${linkError.message}`);
+                }
             }
         }
 
-        res.json(data);
+        // Atualizar role do módulo Inventário (se fornecida)
+        if (inventoryRoleInput !== undefined && currentEmployee.user_id) {
+            // tenant_id do criador para o user_role
+            const { data: creatorProfile } = await supabase
+                .from('user_profiles').select('tenant_id').eq('user_id', req.user.id).maybeSingle();
+            const invRes = await assignInventoryRole(currentEmployee.user_id, inventoryRoleInput, creatorProfile?.tenant_id);
+            if (!invRes.ok) {
+                console.error('Erro ao atualizar role inventário:', invRes.error);
+                warnings.push(`Role inventário não atualizada: ${invRes.error}`);
+            } else {
+                console.log(`[RH] Role inventário ${invRes.applied ? `definida como "${invRes.applied}"` : 'removida'} para ${currentEmployee.user_id}`);
+            }
+        }
+
+        res.json({ ...data, warnings });
     } catch (error) {
         console.error('Erro ao atualizar funcionário:', error);
         res.status(500).json({ error: 'Erro interno ao atualizar funcionário', details: error.message });
