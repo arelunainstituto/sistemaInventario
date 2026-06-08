@@ -177,18 +177,33 @@ async function onItemChange() {
     try {
         const r = await apiCall(`/api/inventory/exits/stock-by-item/${itemId}`);
         currentStock = r.data || [];
+        const seeding = r.seeding_mode === true;
+
+        // Sem stock e sem modo seeding → bloqueia como antes
         if (!currentStock.length) {
             document.getElementById('stockPanel').classList.remove('hidden');
             document.getElementById('stockList').innerHTML = '<p class="text-red-600">Sem stock disponível para este item.</p>';
             document.getElementById('locationSelect').innerHTML = '<option value="">—</option>';
             return;
         }
+
         document.getElementById('stockPanel').classList.remove('hidden');
-        document.getElementById('stockList').innerHTML = currentStock.map(s => `
-            <div class="flex justify-between py-1 border-b border-sky-100 last:border-0">
-                <span>${escapeHtml(s.location?.unit?.name || '')} · ${escapeHtml(s.location?.name || '')} ${s.lot ? `· lote ${escapeHtml(s.lot.lot_number)}${s.lot.expiry_date ? ' (val. '+s.lot.expiry_date+')' : ''}` : ''}</span>
-                <span class="font-bold">${parseFloat(s.quantity).toFixed(2)}</span>
-            </div>`).join('');
+
+        if (seeding) {
+            // Modo seeding: localizações vieram sintéticas (qty=0). Avisar o usuário
+            // e popular o dropdown normalmente para permitir a saída em negativo.
+            document.getElementById('stockList').innerHTML = `
+                <p class="text-amber-800 bg-amber-50 border border-amber-200 rounded px-2 py-1 flex items-start gap-2">
+                    <i class="fas fa-triangle-exclamation mt-0.5"></i>
+                    <span><strong>Modo seeding:</strong> sem stock atual para este item. A saída deixará o saldo negativo na localização escolhida.</span>
+                </p>`;
+        } else {
+            document.getElementById('stockList').innerHTML = currentStock.map(s => `
+                <div class="flex justify-between py-1 border-b border-sky-100 last:border-0">
+                    <span>${escapeHtml(s.location?.unit?.name || '')} · ${escapeHtml(s.location?.name || '')} ${s.lot ? `· lote ${escapeHtml(s.lot.lot_number)}${s.lot.expiry_date ? ' (val. '+s.lot.expiry_date+')' : ''}` : ''}</span>
+                    <span class="font-bold">${parseFloat(s.quantity).toFixed(2)}</span>
+                </div>`).join('');
+        }
 
         // Localizações distintas que enviam (can_send)
         const locMap = new Map();

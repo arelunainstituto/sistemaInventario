@@ -38,6 +38,27 @@ _Nenhuma alteração pendente._
 
 ---
 
+## [1.7.1] — 2026-06-08
+
+> **Fix UX**: o flag `allow_negative_stock` (toggle DB do seeding) destravava o backend mas a UI continuava bloqueando a saída antes mesmo de chegar ao servidor — o dropdown "Localização de origem" só listava locais com stock positivo. Quando o item tinha zero stock, dropdown ficava vazio e o navegador travava no required.
+
+### Adicionado
+- **Endpoint `GET /api/inventory/settings/feature-flags`** ([settings.js](api/inventory/settings.js)) — retorna `{ allow_negative_stock: bool }`. Read-only, exige apenas `inventory:read`. Padrão de extensão pronta para outros flags no futuro.
+- **Banner global "Modo seeding ativo"** no topo do módulo Inventário ([_layout.js](public/inventory/_layout.js)) quando `allow_negative_stock = true`. Lembra o operador/admin de desligar o flag quando terminar.
+
+### Alterado
+- **`GET /api/inventory/exits/stock-by-item/:itemId`** ([exits.js:23-58](api/inventory/exits.js#L23-L58)):
+  - Quando o item não tem stock em parte alguma E `allow_negative_stock = true` → retorna localizações ativas sintéticas (quantity=0) + `seeding_mode: true` no body, permitindo que a UI ofereça opções de destino para a saída em negativo.
+  - Sem o flag, comportamento idêntico ao anterior (retorna array vazio).
+- **`exits.html` → `onItemChange`** — quando `seeding_mode` é true, mostra um aviso âmbar ("**Modo seeding:** sem stock atual…") em vez do erro vermelho "Sem stock disponível", e popula o dropdown de localização normalmente.
+- O endpoint `stock-by-item` é usado também pelas telas de Transferências e Ajustes — todas se beneficiam automaticamente do fallback.
+- [_layout.js:5](public/inventory/_layout.js#L5) bump para `v1.7.1`.
+
+### Notas
+- Mesmo com a UI desbloqueada, a regra de RN03 (item que controla lote exige lote informado) continua valendo. Itens lote-controlados com stock zero não podem ser lançados em negativo via este fluxo — precisam de uma entrada/criação de lote primeiro.
+
+---
+
 ## [1.7.0] — 2026-06-08
 
 > **Marco**: corrige 4 bugs do fluxo de criação de usuários (módulo RH) que faziam "acesso liberado, mas API responde 403". O principal era um case mismatch entre `permissions.module_name` (`'INVENTORY'`) e o que as rotas verificavam (`'inventory:read'`), que silenciosamente bloqueava todos os usuários com roles `Inventory_*`. O modal de RH passa também a expor um dropdown para escolher a role inventária na hora do cadastro.
@@ -515,7 +536,8 @@ f29115a feat(inventory): Sprint 4C - log de acesso + janela de consumo por categ
 
 A partir de 1.0.0, toda alteração deve adicionar uma entrada acima na seção `[Unreleased]` antes do merge.
 
-[Unreleased]: https://github.com/<org>/sistemaInventario/compare/v1.7.0...HEAD
+[Unreleased]: https://github.com/<org>/sistemaInventario/compare/v1.7.1...HEAD
+[1.7.1]: https://github.com/<org>/sistemaInventario/compare/v1.7.0...v1.7.1
 [1.7.0]: https://github.com/<org>/sistemaInventario/compare/v1.6.1...v1.7.0
 [1.6.1]: https://github.com/<org>/sistemaInventario/compare/v1.6.0...v1.6.1
 [1.6.0]: https://github.com/<org>/sistemaInventario/compare/v1.5.1...v1.6.0

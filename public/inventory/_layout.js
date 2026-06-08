@@ -2,7 +2,7 @@
 // Each page calls renderInventoryLayout({ activePage, title, subtitle }).
 
 // Versão exibida no sidebar — manter em sync com CHANGELOG.md
-const INVENTORY_VERSION = 'v1.7.0';
+const INVENTORY_VERSION = 'v1.7.1';
 
 const INVENTORY_NAV = [
     { id: 'dashboard',   label: 'Dashboard',         icon: 'fa-chart-pie',  href: 'index.html' },
@@ -150,9 +150,31 @@ function renderInventoryLayout({ activePage = 'dashboard', title = 'Inventário'
     // Popula user info: tenta localStorage primeiro (fast path), depois /api/auth/me
     populateUserHeader();
     restoreSidebarState();
+    checkFeatureFlags();
 
     // Bind explícito do botão de logout (mais robusto que onclick inline)
     document.getElementById('btnInventoryLogout')?.addEventListener('click', logout);
+}
+
+// Mostra um banner persistente quando algum flag operacional está ligado
+// (ex.: allow_negative_stock durante seeding). Lembra o admin de desligar
+// quando terminar a fase.
+async function checkFeatureFlags() {
+    try {
+        const r = await apiCall('/api/inventory/settings/feature-flags');
+        if (r?.allow_negative_stock) renderSeedingBanner();
+    } catch (_) { /* silencioso — não bloquear o resto da página */ }
+}
+
+function renderSeedingBanner() {
+    if (document.getElementById('seedingBanner')) return;
+    const main = document.querySelector('main');
+    if (!main) return;
+    const banner = document.createElement('div');
+    banner.id = 'seedingBanner';
+    banner.className = 'bg-amber-100 border-b border-amber-300 text-amber-900 text-xs px-4 py-2 flex items-center justify-center gap-2 sticky top-0 z-30';
+    banner.innerHTML = '<i class="fas fa-triangle-exclamation"></i> <strong>Modo seeding ativo:</strong> stock negativo permitido. Lembre de desligar quando terminar (<code>SELECT fn_inv_set_negative_stock(FALSE);</code>).';
+    main.insertBefore(banner, main.firstChild);
 }
 
 async function populateUserHeader() {

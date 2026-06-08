@@ -44,6 +44,9 @@ router.use('/access-log',         require('./access-log'));
 // Importador de planilha XLSX — admin only
 router.use('/import',             require('./import'));
 
+// Feature flags públicos do módulo (read-only, qualquer authenticated)
+router.use('/settings',           require('./settings'));
+
 // Healthcheck do módulo (útil para verificar montagem do router)
 router.get('/_health', (_req, res) => {
     res.json({ ok: true, module: 'inventory', stage: 'fase-0' });

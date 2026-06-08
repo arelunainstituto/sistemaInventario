@@ -20,9 +20,45 @@ const MOVEMENT_SELECT = `
 `;
 
 // GET /stock-by-item/:itemId — usado pela UI para mostrar stock disponível
+//
+// Modo seeding (feature flag inv_system_settings.allow_negative_stock = true):
+// quando o item não tem stock em parte alguma, retorna localizações sintéticas
+// (quantity=0) para que a UI consiga oferecer um dropdown de origem. O
+// backend só vai aceitar a saída se a regra de negócio do DB também permitir
+// (fn_inv_consume respeita o mesmo flag — ver 100-allow-negative-stock-toggle.sql).
 router.get('/stock-by-item/:itemId', requirePermission('inventory', 'read'), async (req, res) => {
     try {
         const data = await getStockByItem(req.params.itemId);
+
+        if (!data.length) {
+            // Checa o flag global; se ON, devolve todas as localizações ativas (sintéticas)
+            const { data: flagRow } = await supabaseAdmin
+                .from('inv_system_settings')
+                .select('value')
+                .eq('key', 'allow_negative_stock')
+                .maybeSingle();
+            const allowNeg = ['true', 't', '1', 'yes', 'on']
+                .includes(String(flagRow?.value || '').trim().toLowerCase());
+
+            if (allowNeg) {
+                const { data: locs } = await supabaseAdmin
+                    .from('inv_locations')
+                    .select('id, name, can_send, unit:inv_units!unit_id(id, name)')
+                    .eq('is_active', true)
+                    .is('deleted_at', null);
+                const synthetic = (locs || [])
+                    .filter(l => l.can_send !== false)
+                    .map(l => ({
+                        quantity:    0,
+                        location_id: l.id,
+                        lot_id:      null,
+                        location:    l,
+                        lot:         null
+                    }));
+                return res.json({ success: true, data: synthetic, seeding_mode: true });
+            }
+        }
+
         res.json({ success: true, data });
     } catch (err) {
         console.error('GET stock-by-item error:', err);
