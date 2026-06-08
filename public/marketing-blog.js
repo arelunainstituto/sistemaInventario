@@ -4,6 +4,7 @@ const BlogManager = {
     limit: 12,
     isLoading: false,
     quill: null,
+    sourceMode: false,
 
     async init() {
         // UI Updates
@@ -48,6 +49,36 @@ const BlogManager = {
         }
     },
 
+
+    /**
+     * Alterna entre o editor visual (Quill) e o modo HTML cru (textarea).
+     * Fix para o bug onde Quill auto-escapa HTML colado (transforma <p> em &lt;p&gt;
+     * e envolve em <span style="color:rgb(206,145,120)">), tornando inutilizável
+     * para conteúdo com <figure>, <table> e classes custom (.article-cta etc.).
+     */
+    toggleSourceMode() {
+        const editor = document.getElementById('editor-container');
+        const source = document.getElementById('postContentSource');
+        const label  = document.getElementById('toggleSourceLabel');
+        if (!editor || !source) return;
+
+        if (!this.sourceMode) {
+            // Entrar em source mode: copia o HTML do Quill para a textarea
+            source.value = this.quill ? this.quill.root.innerHTML
+                                      : (document.getElementById('fallback-textarea')?.value || '');
+            editor.classList.add('hidden');
+            source.classList.remove('hidden');
+            if (label) label.textContent = 'Modo Editor';
+            this.sourceMode = true;
+        } else {
+            // Voltar para Quill: aplica o HTML literal da textarea
+            if (this.quill) this.quill.root.innerHTML = source.value;
+            editor.classList.remove('hidden');
+            source.classList.add('hidden');
+            if (label) label.textContent = 'Modo HTML';
+            this.sourceMode = false;
+        }
+    },
 
     initQuill() {
         if (!document.getElementById('editor-container')) return;
@@ -113,6 +144,7 @@ const BlogManager = {
         // Modal Controls
         document.getElementById('btnCloseModal')?.addEventListener('click', this.closeModal);
         document.getElementById('btnCancel')?.addEventListener('click', this.closeModal);
+        document.getElementById('btnToggleSource')?.addEventListener('click', () => this.toggleSourceMode());
 
         // Form Submit
         document.getElementById('postForm')?.addEventListener('submit', (e) => this.handleSave(e));
@@ -360,6 +392,11 @@ const BlogManager = {
         // Lazy init Quill if needed
         this.initQuill();
 
+        // Reset source mode (sempre abre em modo editor)
+        if (this.sourceMode) this.toggleSourceMode();
+        const srcArea = document.getElementById('postContentSource');
+        if (srcArea) srcArea.value = '';
+
         // Clear file input always on open
         if (document.getElementById('postImageFile')) {
             document.getElementById('postImageFile').value = '';
@@ -435,9 +472,11 @@ const BlogManager = {
     async handleSave(e) {
         e.preventDefault();
 
-        // Get content from Quill OR fallback
+        // Content vem do editor ATIVO no momento (source mode tem prioridade)
         let content = '';
-        if (this.quill) {
+        if (this.sourceMode) {
+            content = document.getElementById('postContentSource').value;
+        } else if (this.quill) {
             content = this.quill.root.innerHTML;
         } else if (document.getElementById('fallback-textarea')) {
             content = document.getElementById('fallback-textarea').value;
