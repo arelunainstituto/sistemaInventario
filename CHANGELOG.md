@@ -38,6 +38,26 @@ _Nenhuma alteração pendente._
 
 ---
 
+## [1.8.1] — 2026-06-08
+
+> **Patch UX**: editor de posts ganha campo de data de publicação selecionável (default hoje), permitindo antedatar artigos.
+
+### Adicionado
+- **Campo "Data de publicação"** no modal de edição ([marketing.html](public/marketing.html), [marketing-blog.js](public/marketing-blog.js)):
+  - `<input type="date">` com `max` = hoje (impede futuro a nível de UI).
+  - Default = hoje em criação; valor atual do post em edição.
+  - Hint inline explicando que pode antedatar.
+
+### Alterado
+- **POST/PUT `/api/marketing/posts`** ([posts.js](api/marketing/posts.js)):
+  - Aceita `published_at` no body (ISO date ou `YYYY-MM-DD`).
+  - String `YYYY-MM-DD` é interpretada como meio-dia UTC (evita drift por fuso).
+  - Valida não-futuro server-side → 400 com mensagem clara.
+  - Prioridade: data enviada pelo admin > NOW se mudou para `status='published'` > preserva existente.
+- [_layout.js:5](public/inventory/_layout.js#L5) bump para `v1.8.1`.
+
+---
+
 ## [1.8.0] — 2026-06-08
 
 > **Marco**: editor de posts ganha 3 features para autoria de qualidade — recorte da imagem de capa (Cropper.js), galeria de imagens por post para uso em `<figure>` no content, e seletor de posts relacionados ("Leia também") com fallback automático para os mais recentes.
@@ -590,7 +610,8 @@ f29115a feat(inventory): Sprint 4C - log de acesso + janela de consumo por categ
 
 A partir de 1.0.0, toda alteração deve adicionar uma entrada acima na seção `[Unreleased]` antes do merge.
 
-[Unreleased]: https://github.com/<org>/sistemaInventario/compare/v1.8.0...HEAD
+[Unreleased]: https://github.com/<org>/sistemaInventario/compare/v1.8.1...HEAD
+[1.8.1]: https://github.com/<org>/sistemaInventario/compare/v1.8.0...v1.8.1
 [1.8.0]: https://github.com/<org>/sistemaInventario/compare/v1.7.3...v1.8.0
 [1.7.3]: https://github.com/<org>/sistemaInventario/compare/v1.7.2...v1.7.3
 [1.7.2]: https://github.com/<org>/sistemaInventario/compare/v1.7.1...v1.7.2

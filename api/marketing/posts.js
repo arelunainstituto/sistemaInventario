@@ -217,7 +217,9 @@ router.post('/', requireRole(['Marketing', 'Admin', 'admin', 'employee']), uploa
             // Campos do blog público (v2)
             slug, subtitle, image_caption, image_object_position,
             // Posts relacionados (v1.8: bloco "Leia também")
-            related_post_ids
+            related_post_ids,
+            // Data de publicação (v1.8.1: admin pode antedatar)
+            published_at
         } = req.body;
 
         // FormData pode enviar related_post_ids como string JSON
@@ -226,6 +228,22 @@ router.post('/', requireRole(['Marketing', 'Admin', 'admin', 'employee']), uploa
             catch (_) { related_post_ids = null; }
         }
         if (!Array.isArray(related_post_ids)) related_post_ids = null;
+
+        // Normaliza published_at: aceita '' como ausência, valida não-futuro.
+        // Se vier '2026-06-08' (date input), interpreta como meio-dia UTC pra
+        // evitar discrepâncias com fuso. Se for ISO completo, usa direto.
+        let publishedAtISO = null;
+        if (published_at && String(published_at).trim()) {
+            const raw = String(published_at).trim();
+            const dt = raw.length === 10 ? new Date(raw + 'T12:00:00Z') : new Date(raw);
+            if (isNaN(dt.getTime())) {
+                return res.status(400).json({ error: 'published_at inválido' });
+            }
+            if (dt > new Date()) {
+                return res.status(400).json({ error: 'Data de publicação não pode ser futura' });
+            }
+            publishedAtISO = dt.toISOString();
+        }
 
         // Only Admins can set a different author
         const isAdmin = req.user.roles?.some(r => r.toLowerCase().includes('admin'));
@@ -275,7 +293,8 @@ router.post('/', requireRole(['Marketing', 'Admin', 'admin', 'employee']), uploa
                 related_post_ids:      related_post_ids || [],
                 author_id,
                 custom_author: isAdmin && custom_author ? custom_author : null,
-                published_at: status === 'published' ? new Date() : null
+                // v1.8.1: usa data do admin se preenchida; senão NOW se publicado, null se rascunho
+                published_at: publishedAtISO ?? (status === 'published' ? new Date().toISOString() : null)
             }])
             .select()
             .single();
@@ -303,12 +322,32 @@ router.put('/:id', requireRole(['Marketing', 'Admin', 'admin', 'employee']), upl
             // Campos do blog público (v2)
             slug, subtitle, image_caption, image_object_position,
             // Posts relacionados (v1.8: bloco "Leia também")
-            related_post_ids
+            related_post_ids,
+            // Data de publicação (v1.8.1)
+            published_at
         } = req.body;
 
         if (typeof related_post_ids === 'string') {
             try { related_post_ids = JSON.parse(related_post_ids); }
             catch (_) { related_post_ids = undefined; }
+        }
+
+        // Normaliza published_at e valida não-futuro (mesma regra do POST)
+        let publishedAtISO; // undefined = não tocar; null = limpar; string = setar
+        if (published_at !== undefined) {
+            const raw = String(published_at ?? '').trim();
+            if (!raw) {
+                publishedAtISO = null;
+            } else {
+                const dt = raw.length === 10 ? new Date(raw + 'T12:00:00Z') : new Date(raw);
+                if (isNaN(dt.getTime())) {
+                    return res.status(400).json({ error: 'published_at inválido' });
+                }
+                if (dt > new Date()) {
+                    return res.status(400).json({ error: 'Data de publicação não pode ser futura' });
+                }
+                publishedAtISO = dt.toISOString();
+            }
         }
 
         // Check for admin
@@ -359,12 +398,16 @@ router.put('/:id', requireRole(['Marketing', 'Admin', 'admin', 'employee']), upl
 
         if (status !== undefined) {
             updates.status = status;
-            if (status === 'published') {
-                // If changing to published, set date if not already set (or always update? usually set once)
-                // Let's check current status first or just update published_at if it was null?
-                // Simple logic: if status is published, update published_at
-                updates.published_at = new Date();
-            }
+        }
+
+        // v1.8.1: prioridade da data de publicação:
+        //   1. Se o admin enviou published_at no body → respeita (publishedAtISO)
+        //   2. Senão, se mudou status para 'published' → usa NOW (comportamento anterior)
+        //   3. Senão → não toca em published_at
+        if (publishedAtISO !== undefined) {
+            updates.published_at = publishedAtISO;
+        } else if (status === 'published') {
+            updates.published_at = new Date().toISOString();
         }
 
         const { data, error } = await supabaseAdmin

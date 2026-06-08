@@ -440,6 +440,11 @@ const BlogManager = {
             }
 
             document.getElementById('postStatus').value = post.status;
+            // Data de publicação — yyyy-mm-dd, com max = hoje
+            const dateInput = document.getElementById('postPublishedAt');
+            const todayStr = new Date().toISOString().slice(0, 10);
+            dateInput.max = todayStr;
+            dateInput.value = post.published_at ? new Date(post.published_at).toISOString().slice(0, 10) : todayStr;
 
             if (isAdmin && post.author_id) {
                 document.getElementById('postAuthor').value = post.author_id;
@@ -467,6 +472,12 @@ const BlogManager = {
 
             document.getElementById('postId').value = '';
             this.updateImagePreview('');
+
+            // Data de publicação — default hoje, sem futuro permitido
+            const dateInput = document.getElementById('postPublishedAt');
+            const todayStr = new Date().toISOString().slice(0, 10);
+            dateInput.max = todayStr;
+            dateInput.value = todayStr;
 
             // For new post, if admin, default to current user if possible or first in list
             // This logic is now handled by the loadAuthors function and the default selection of the select element.
@@ -539,6 +550,10 @@ const BlogManager = {
 
         // Related posts (v1.8) — array de UUIDs como string JSON
         formData.append('related_post_ids', JSON.stringify([...this.selectedRelatedIds]));
+
+        // Data de publicação (v1.8.1) — sempre enviada; backend valida não-futuro
+        const pubDate = document.getElementById('postPublishedAt')?.value;
+        if (pubDate) formData.append('published_at', pubDate);
 
         // Handle File
         const fileInput = document.getElementById('postImageFile');
