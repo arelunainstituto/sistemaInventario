@@ -8,51 +8,44 @@ const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
 /**
- * MIDDLEWARE DE SEGURANÇA MÁXIMA
- * Verifica Origem e API Key
+ * Middleware de acesso público.
+ *
+ * CORS é ABERTO (Allow-Origin: *) — necessário para:
+ *   • prerender estático no build (Vercel/Linux roda a partir de
+ *     127.0.0.1:porta-aleatória; allowlist não cobre)
+ *   • SSR de qualquer cliente que consuma a API server-side
+ *   • crawlers e ferramentas de fetch
+ *
+ * O real perímetro de segurança é o x-api-key, não o CORS:
+ *   • endpoints são GET + read-only
+ *   • só servem posts com status='published'
+ *   • content é o mesmo que aparece no HTML público do site
+ *
+ * Sem credentials (sem cookies), Allow-Origin: * é seguro e permitido
+ * pela spec do CORS.
  */
 const verifySecureAccess = (req, res, next) => {
-    const allowedOrigin = ['https://www.institutoareluna.pt', 'http://localhost:8080'];
-    const apiKey = process.env.BLOG_PUBLIC_API_KEY;
+    // CORS — abrir para qualquer origin
+    res.header('Access-Control-Allow-Origin', '*');
+    res.header('Access-Control-Allow-Methods', 'GET, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, x-api-key');
+    res.header('Access-Control-Max-Age', '86400'); // 24h — reduz volume de preflights
 
-    // 1. Verificar Origin (CORS Manual e Estrito)
-    const origin = req.headers.origin;
-
-    // Permitir requests sem origin (postman/curl server-side) SOMENTE se a flag estrita não estiver ativada?
-    // O usuário pediu "CORS apenas do link...".
-    // Se o backend de consumo for server-side (Next.js SSR), pode não ter Origin.
-    // Mas se for browser-side fetch, terá.
-    // Assumindo chamada browser-side ou server-side que envia Origin.
-
-    // Se for server-to-server, origin pode ser undefined.
-    // Vamos validar Origin SE ele existir. Se não existir, confiamos na API Key.
-    if (origin && !allowedOrigin.includes(origin)) {
-        console.warn(`[Security Block] Blocked request from origin: ${origin}`);
-        return res.status(403).json({ error: 'Forbidden Origin' });
-    }
-
-    // Adicionar headers CORS para permitir o browser
-    if (origin && allowedOrigin.includes(origin)) {
-        res.header('Access-Control-Allow-Origin', origin);
-        res.header('Access-Control-Allow-Methods', 'GET, OPTIONS');
-        res.header('Access-Control-Allow-Headers', 'Content-Type, x-api-key');
-    }
-
-    // Handle Preflight
+    // Preflight
     if (req.method === 'OPTIONS') {
-        return res.status(200).end();
+        return res.status(204).end();
     }
 
-    // 2. Verificar API Key
-    const requestApiKey = req.headers['x-api-key'];
-
+    // API Key — único gating real
+    const apiKey = process.env.BLOG_PUBLIC_API_KEY;
     if (!apiKey) {
         console.error('[Security Error] BLOG_PUBLIC_API_KEY not configured on server');
         return res.status(500).json({ error: 'Server configuration error' });
     }
 
-    if (!requestApiKey || requestApiKey !== apiKey) { // Comparação direta simples é suficiente aqui? Timing attack risk is negligible for this low volume.
-        console.warn(`[Security Block] Invalid or missing API Key`);
+    const requestApiKey = req.headers['x-api-key'];
+    if (!requestApiKey || requestApiKey !== apiKey) {
+        console.warn('[Security Block] Invalid or missing API Key');
         return res.status(401).json({ error: 'Unauthorized' });
     }
 
