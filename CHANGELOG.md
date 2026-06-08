@@ -38,6 +38,47 @@ _Nenhuma alteração pendente._
 
 ---
 
+## [1.8.0] — 2026-06-08
+
+> **Marco**: editor de posts ganha 3 features para autoria de qualidade — recorte da imagem de capa (Cropper.js), galeria de imagens por post para uso em `<figure>` no content, e seletor de posts relacionados ("Leia também") com fallback automático para os mais recentes.
+
+### Adicionado
+- **Recorte (crop) da imagem de capa** ([marketing.html](public/marketing.html), [marketing-blog.js](public/marketing-blog.js)):
+  - Cropper.js via CDN (cropper@1.6.1).
+  - Quando o usuário escolhe um arquivo, abre modal de crop com 16:9 (proporção do hero) por padrão. Botões de proporção 4:3, 1:1 e Livre.
+  - Botão "Recortar" no hover do preview para re-cropar uma imagem já carregada.
+  - O blob recortado vira o arquivo enviado no submit via DataTransfer — backend não muda.
+- **Galeria de imagens por post** — nova tabela [marketing_post_images](database/migrations/20260608_marketing_gallery_related.sql) com CASCADE no delete do post:
+  - Endpoints REST em [api/marketing/post-images.js](api/marketing/post-images.js): GET/POST/PUT/DELETE com `requireRole(['Marketing','Admin','admin','employee'])`.
+  - RLS pública SELECT só para posts publicados; write apenas para Marketing/Admin.
+  - UI no modal: grid de thumbnails com inputs de alt e caption por imagem.
+  - Botão **"Inserir"** automaticamente entra no Modo HTML e insere `<figure><img>...<figcaption></figcaption></figure>` na posição do cursor do textarea — evita Quill estripar `<figure>`.
+- **Posts relacionados (Leia também)** — nova coluna `marketing_posts.related_post_ids UUID[]`:
+  - Seletor multi-checkbox no modal admin com busca em tempo real.
+  - Quando vazio, frontend público recebe automaticamente os 3 posts mais recentes (excluindo o próprio).
+  - `GET /api/public/marketing/posts/:idOrSlug` retorna `related_posts` resolvido preservando a ordem do array.
+- **Galeria no detail público** — mesma chamada retorna `gallery: [{...}]` com as imagens da galeria.
+
+### Alterado
+- **`POST/PUT /api/marketing/posts`** ([posts.js](api/marketing/posts.js)) aceitam `related_post_ids` (array UUID ou string JSON via FormData).
+- [_layout.js:5](public/inventory/_layout.js#L5) bump para `v1.8.0`.
+
+### Notas de aplicação
+1. Aplicar [20260608_marketing_gallery_related.sql](database/migrations/20260608_marketing_gallery_related.sql) (uma vez).
+2. Deploy do código v1.8.0.
+3. Editar cada post: re-recortar capa, subir imagens na galeria, clicar "Inserir" para colocá-las em `<figure>`, selecionar posts relacionados.
+
+---
+
+## [1.7.3] — 2026-06-08
+
+> **Hotfix UX**: categorias não apareciam no dropdown do cadastro de item de Consumo.
+
+### Corrigido
+- **Item form** ([item-form.html:277-285](public/inventory/item-form.html#L277-L285)) — filtro `categoriesAll.filter(c => c.parent_macro === macro)` era case-sensitive. Se alguma linha tivesse `parent_macro = 'Consumo'` ou `'CONSUMO'` (regression possível com seeds/imports), o filtro retornava vazio. Agora lowercase nas duas pontas + tolerância a null.
+
+---
+
 ## [1.7.2] — 2026-06-08
 
 > **Hotfix**: cadastro de item falhava com "base_uom_id é obrigatório" mesmo com UM de compra preenchida na UI.
@@ -549,7 +590,9 @@ f29115a feat(inventory): Sprint 4C - log de acesso + janela de consumo por categ
 
 A partir de 1.0.0, toda alteração deve adicionar uma entrada acima na seção `[Unreleased]` antes do merge.
 
-[Unreleased]: https://github.com/<org>/sistemaInventario/compare/v1.7.2...HEAD
+[Unreleased]: https://github.com/<org>/sistemaInventario/compare/v1.8.0...HEAD
+[1.8.0]: https://github.com/<org>/sistemaInventario/compare/v1.7.3...v1.8.0
+[1.7.3]: https://github.com/<org>/sistemaInventario/compare/v1.7.2...v1.7.3
 [1.7.2]: https://github.com/<org>/sistemaInventario/compare/v1.7.1...v1.7.2
 [1.7.1]: https://github.com/<org>/sistemaInventario/compare/v1.7.0...v1.7.1
 [1.7.0]: https://github.com/<org>/sistemaInventario/compare/v1.6.1...v1.7.0

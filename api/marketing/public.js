@@ -162,9 +162,47 @@ router.get('/posts/:idOrSlug', async (req, res) => {
             }
         }
 
+        // Resolver "Leia também"
+        // 1. Se related_post_ids tiver itens → carrega esses IDs nessa ordem
+        // 2. Senão → carrega os 3 mais recentes publicados, excluindo o próprio
+        const REL_FIELDS = 'id, title, slug, excerpt, image_url, published_at';
+        let related = [];
+        const ids = Array.isArray(post.related_post_ids) ? post.related_post_ids.filter(Boolean) : [];
+        if (ids.length) {
+            const { data: rels } = await supabaseAdmin
+                .from('marketing_posts')
+                .select(REL_FIELDS)
+                .in('id', ids)
+                .eq('status', 'published')
+                .neq('id', post.id);
+            // Preservar a ordem original do array
+            const map = new Map((rels || []).map(r => [r.id, r]));
+            related = ids.map(id => map.get(id)).filter(Boolean);
+        }
+        if (!related.length) {
+            const { data: latest } = await supabaseAdmin
+                .from('marketing_posts')
+                .select(REL_FIELDS)
+                .eq('status', 'published')
+                .neq('id', post.id)
+                .order('published_at', { ascending: false })
+                .limit(3);
+            related = latest || [];
+        }
+
+        // Galeria do post (uso opcional pelo frontend)
+        const { data: gallery } = await supabaseAdmin
+            .from('marketing_post_images')
+            .select('id, url, alt, caption, sort_order')
+            .eq('post_id', post.id)
+            .order('sort_order', { ascending: true })
+            .order('created_at', { ascending: true });
+
         res.json({
             ...post,
-            author_name: authorName || 'Autor'
+            author_name:   authorName || 'Autor',
+            related_posts: related,
+            gallery:       gallery || []
         });
 
     } catch (error) {

@@ -215,8 +215,17 @@ router.post('/', requireRole(['Marketing', 'Admin', 'admin', 'employee']), uploa
             title, content, excerpt, status = 'draft', tags = '[]',
             image_url, author_id, custom_author,
             // Campos do blog público (v2)
-            slug, subtitle, image_caption, image_object_position
+            slug, subtitle, image_caption, image_object_position,
+            // Posts relacionados (v1.8: bloco "Leia também")
+            related_post_ids
         } = req.body;
+
+        // FormData pode enviar related_post_ids como string JSON
+        if (typeof related_post_ids === 'string') {
+            try { related_post_ids = JSON.parse(related_post_ids); }
+            catch (_) { related_post_ids = null; }
+        }
+        if (!Array.isArray(related_post_ids)) related_post_ids = null;
 
         // Only Admins can set a different author
         const isAdmin = req.user.roles?.some(r => r.toLowerCase().includes('admin'));
@@ -263,6 +272,7 @@ router.post('/', requireRole(['Marketing', 'Admin', 'admin', 'employee']), uploa
                 image_url,
                 image_caption:         image_caption || null,
                 image_object_position: image_object_position || null,
+                related_post_ids:      related_post_ids || [],
                 author_id,
                 custom_author: isAdmin && custom_author ? custom_author : null,
                 published_at: status === 'published' ? new Date() : null
@@ -291,8 +301,15 @@ router.put('/:id', requireRole(['Marketing', 'Admin', 'admin', 'employee']), upl
         let {
             title, content, excerpt, status, tags, image_url, author_id, custom_author,
             // Campos do blog público (v2)
-            slug, subtitle, image_caption, image_object_position
+            slug, subtitle, image_caption, image_object_position,
+            // Posts relacionados (v1.8: bloco "Leia também")
+            related_post_ids
         } = req.body;
+
+        if (typeof related_post_ids === 'string') {
+            try { related_post_ids = JSON.parse(related_post_ids); }
+            catch (_) { related_post_ids = undefined; }
+        }
 
         // Check for admin
         const isAdmin = req.user.roles?.some(r => r.toLowerCase().includes('admin'));
@@ -332,6 +349,7 @@ router.put('/:id', requireRole(['Marketing', 'Admin', 'admin', 'employee']), upl
         if (subtitle !== undefined) updates.subtitle = subtitle || null;
         if (image_caption !== undefined) updates.image_caption = image_caption || null;
         if (image_object_position !== undefined) updates.image_object_position = image_object_position || null;
+        if (related_post_ids !== undefined) updates.related_post_ids = Array.isArray(related_post_ids) ? related_post_ids : [];
 
         // Update author if admin and provided
         if (isAdmin) {

@@ -14,6 +14,9 @@
     <!-- Rich Text Editor - Quill.js -->
     <link href="https://cdnjs.cloudflare.com/ajax/libs/quill/1.3.7/quill.snow.min.css" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/quill/1.3.7/quill.min.js"></script>
+    <!-- Cropper.js — crop da imagem principal -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.css" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.js"></script>
     <script>
         // Immediate Auth Check to prevent "development mode" bypass or unauthenticated access
         if (!localStorage.getItem('access_token')) {
@@ -251,6 +254,11 @@
                                     title="Remover imagem">
                                     <i class="fas fa-times"></i>
                                 </button>
+                                <button type="button" id="btnRecrop"
+                                    class="absolute bottom-2 right-2 bg-white/90 text-gray-700 border border-gray-200 px-2 py-1 rounded text-xs font-medium opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1"
+                                    title="Recortar de novo">
+                                    <i class="fas fa-crop-simple text-[10px]"></i> Recortar
+                                </button>
                             </div>
 
                             <div class="mt-3">
@@ -278,6 +286,38 @@
                         </div>
                     </div>
                 </div>
+
+                <!-- ========== Galeria de imagens (para usar em <figure> no content) ========== -->
+                <div class="border-t border-gray-200 pt-6 mt-6">
+                    <div class="flex items-center justify-between mb-3">
+                        <div>
+                            <h4 class="text-sm font-semibold text-gray-800">Galeria de imagens do post</h4>
+                            <p class="text-xs text-gray-500">Imagens para usar em <code>&lt;figure&gt;</code> dentro do corpo. Clique em "Inserir" para adicionar no Modo HTML.</p>
+                        </div>
+                        <label class="cursor-pointer bg-pink-100 hover:bg-pink-200 text-pink-700 px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5">
+                            <i class="fas fa-plus text-[10px]"></i> Subir imagem
+                            <input type="file" id="galleryUploadInput" accept="image/*" class="hidden">
+                        </label>
+                    </div>
+                    <p id="galleryHint" class="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-3 py-2 mb-3 hidden">
+                        <i class="fas fa-circle-info"></i> Salve o post primeiro para começar a subir imagens da galeria.
+                    </p>
+                    <div id="galleryList" class="grid grid-cols-2 md:grid-cols-4 gap-3"></div>
+                </div>
+
+                <!-- ========== Posts relacionados (bloco "Leia também") ========== -->
+                <div class="border-t border-gray-200 pt-6 mt-6">
+                    <h4 class="text-sm font-semibold text-gray-800 mb-1">Posts relacionados (Leia também)</h4>
+                    <p class="text-xs text-gray-500 mb-3">
+                        Selecione manualmente. <b>Se ficar vazio</b>, o blog usa automaticamente os mais recentes (excluindo este post).
+                    </p>
+                    <input type="text" id="relatedSearch" placeholder="Buscar post por título…"
+                        class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm mb-2 focus:ring-2 focus:ring-pink-500 focus:border-transparent">
+                    <div id="relatedList" class="max-h-48 overflow-y-auto border border-gray-200 rounded-lg divide-y divide-gray-100"></div>
+                    <p class="text-[11px] text-gray-500 mt-1.5">
+                        Selecionados: <span id="relatedCount" class="font-semibold text-gray-700">0</span>
+                    </p>
+                </div>
             </form>
 
             <div class="p-6 border-t border-gray-100 bg-gray-50 flex justify-end gap-3 sticky bottom-0">
@@ -289,6 +329,34 @@
                     class="px-6 py-2 bg-pink-600 hover:bg-pink-700 text-white rounded-lg font-medium shadow-sm transition-colors">
                     Salvar
                 </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Cropper Modal -->
+    <div id="cropperModal" class="fixed inset-0 bg-black/70 z-[60] hidden flex items-center justify-center">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-4xl m-4 flex flex-col" style="max-height: 92vh;">
+            <div class="p-4 border-b border-gray-100 flex justify-between items-center">
+                <h3 class="text-base font-bold text-gray-800">Recortar imagem de capa</h3>
+                <button type="button" id="btnCropperClose" class="text-gray-400 hover:text-gray-600"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="p-4 bg-gray-50 overflow-hidden" style="height: 60vh;">
+                <img id="cropperImage" style="max-width: 100%; max-height: 100%;" />
+            </div>
+            <div class="p-4 border-t border-gray-100 bg-gray-50 flex justify-between items-center gap-3 flex-wrap">
+                <div class="flex gap-2 items-center">
+                    <span class="text-xs text-gray-500 mr-1">Proporção:</span>
+                    <button type="button" data-ar="16/9" class="cropper-ar-btn text-xs px-2.5 py-1.5 rounded bg-pink-600 text-white">16:9 (hero)</button>
+                    <button type="button" data-ar="4/3"  class="cropper-ar-btn text-xs px-2.5 py-1.5 rounded bg-gray-100 hover:bg-gray-200 text-gray-700">4:3</button>
+                    <button type="button" data-ar="1/1"  class="cropper-ar-btn text-xs px-2.5 py-1.5 rounded bg-gray-100 hover:bg-gray-200 text-gray-700">1:1</button>
+                    <button type="button" data-ar="free" class="cropper-ar-btn text-xs px-2.5 py-1.5 rounded bg-gray-100 hover:bg-gray-200 text-gray-700">Livre</button>
+                </div>
+                <div class="flex gap-2">
+                    <button type="button" id="btnCropperCancel" class="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">Cancelar</button>
+                    <button type="button" id="btnCropperApply" class="px-4 py-2 bg-pink-600 hover:bg-pink-700 text-white rounded-lg text-sm font-medium flex items-center gap-1.5">
+                        <i class="fas fa-check text-xs"></i> Aplicar recorte
+                    </button>
+                </div>
             </div>
         </div>
     </div>

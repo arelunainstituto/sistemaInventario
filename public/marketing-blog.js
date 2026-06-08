@@ -167,22 +167,39 @@ const BlogManager = {
             e.preventDefault(); // Prevent modal close or form submit
             this.clearImage();
         });
+
+        // Cropper (modal + botão de recortar)
+        this.initCropper();
+
+        // Galeria — upload de imagem para a galeria do post atual
+        document.getElementById('galleryUploadInput')?.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            const postId = document.getElementById('postId').value;
+            if (!file) return;
+            if (!postId) {
+                alert('Salve o post primeiro antes de subir imagens da galeria.');
+                e.target.value = '';
+                return;
+            }
+            this.uploadGalleryFile(postId, file);
+            e.target.value = '';
+        });
     },
 
     handleFileSelect(e) {
         const file = e.target.files[0];
-        if (file) {
-            // Clear URL input usage if file is selected (for preview purposes)
-            // But we keep the input value in case they cancel.
-            // Actually, let's clear it to avoid confusion in submission
-            document.getElementById('postImage').value = '';
+        if (!file) return;
+        // Clear URL input usage to evitar duplicidade no submit
+        document.getElementById('postImage').value = '';
 
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                this.updateImagePreview(e.target.result);
-            };
-            reader.readAsDataURL(file);
-        }
+        // Abre direto o cropper com o arquivo escolhido. O usuário ajusta
+        // o enquadramento (16:9 por padrão) e, ao aplicar, o blob recortado
+        // substitui o arquivo no input — depois o submit envia o cropped.
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+            this.openCropper(ev.target.result);
+        };
+        reader.readAsDataURL(file);
     },
 
     clearImage() {
@@ -434,6 +451,10 @@ const BlogManager = {
             document.getElementById('postImage').value = post.image_url || '';
             document.getElementById('postTags').value = (post.tags || []).join(', ');
             this.updateImagePreview(post.image_url || '');
+
+            // Galeria + Related Posts (edit-mode)
+            this.loadGallery(post.id);
+            this.renderRelatedSelector(post.id, post.related_post_ids || []);
         } else {
             document.getElementById('modalTitle').textContent = 'Novo Post';
             form.reset();
@@ -453,6 +474,10 @@ const BlogManager = {
             if (isAdmin) {
                 document.getElementById('postCustomAuthor').value = '';
             }
+
+            // Galeria + Related Posts (new-mode — galeria desabilitada até salvar)
+            this.loadGallery(null);
+            this.renderRelatedSelector(null, []);
         }
 
         modal.classList.remove('hidden');
@@ -511,6 +536,9 @@ const BlogManager = {
         // Handle Tags array
         const tags = document.getElementById('postTags').value.split(',').map(t => t.trim()).filter(t => t);
         formData.append('tags', JSON.stringify(tags));
+
+        // Related posts (v1.8) — array de UUIDs como string JSON
+        formData.append('related_post_ids', JSON.stringify([...this.selectedRelatedIds]));
 
         // Handle File
         const fileInput = document.getElementById('postImageFile');
@@ -582,8 +610,247 @@ const BlogManager = {
             if (show) overlay.classList.remove('hidden');
             else overlay.classList.add('hidden');
         }
+    },
+
+    // =====================================================
+    // CROPPER (imagem de capa)
+    // =====================================================
+    cropper: null,
+    cropperRatios: { '16/9': 16/9, '4/3': 4/3, '1/1': 1, 'free': NaN },
+
+    initCropper() {
+        if (this._cropperBound) return;
+        this._cropperBound = true;
+
+        document.getElementById('btnCropperClose')?.addEventListener('click', () => this.closeCropper());
+        document.getElementById('btnCropperCancel')?.addEventListener('click', () => this.closeCropper());
+        document.getElementById('btnCropperApply')?.addEventListener('click', () => this.applyCrop());
+        document.getElementById('btnRecrop')?.addEventListener('click', (e) => {
+            e.preventDefault();
+            const url = document.getElementById('postImage').value
+                     || (document.getElementById('imagePreview').style.backgroundImage || '').replace(/^url\(["']?|["']?\)$/g, '');
+            if (url) this.openCropper(url);
+        });
+        document.querySelectorAll('.cropper-ar-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const ar = this.cropperRatios[btn.dataset.ar];
+                if (this.cropper) this.cropper.setAspectRatio(ar);
+                document.querySelectorAll('.cropper-ar-btn').forEach(b => {
+                    b.classList.remove('bg-pink-600','text-white');
+                    b.classList.add('bg-gray-100','text-gray-700');
+                });
+                btn.classList.add('bg-pink-600','text-white');
+                btn.classList.remove('bg-gray-100','text-gray-700');
+            });
+        });
+    },
+
+    openCropper(srcUrl) {
+        const modal = document.getElementById('cropperModal');
+        const img   = document.getElementById('cropperImage');
+        if (!modal || !img) return;
+        img.src = srcUrl;
+        modal.classList.remove('hidden');
+        if (this.cropper) { try { this.cropper.destroy(); } catch (_) {} this.cropper = null; }
+        this.cropper = new Cropper(img, {
+            aspectRatio: 16/9,
+            viewMode: 1,
+            autoCropArea: 0.95,
+            background: false
+        });
+    },
+
+    closeCropper() {
+        if (this.cropper) { try { this.cropper.destroy(); } catch (_) {} this.cropper = null; }
+        document.getElementById('cropperModal')?.classList.add('hidden');
+    },
+
+    applyCrop() {
+        if (!this.cropper) return;
+        this.cropper.getCroppedCanvas({ maxWidth: 1600, imageSmoothingQuality: 'high' })
+            .toBlob((blob) => {
+                if (!blob) return;
+                const fileName = 'cover-' + Date.now() + '.jpg';
+                const file = new File([blob], fileName, { type: 'image/jpeg' });
+                try {
+                    const dt = new DataTransfer();
+                    dt.items.add(file);
+                    document.getElementById('postImageFile').files = dt.files;
+                } catch (e) {
+                    console.warn('DataTransfer não suportado — usando blob URL como preview', e);
+                }
+                const reader = new FileReader();
+                reader.onload = (ev) => this.updateImagePreview(ev.target.result);
+                reader.readAsDataURL(blob);
+                this.closeCropper();
+            }, 'image/jpeg', 0.92);
+    },
+
+    // =====================================================
+    // GALERIA DE IMAGENS DO POST
+    // =====================================================
+    async loadGallery(postId) {
+        const list = document.getElementById('galleryList');
+        const hint = document.getElementById('galleryHint');
+        if (!list) return;
+
+        if (!postId) {
+            list.innerHTML = '';
+            hint?.classList.remove('hidden');
+            return;
+        }
+        hint?.classList.add('hidden');
+
+        try {
+            const r = await authenticatedFetch(`/api/marketing/post-images/${postId}`);
+            const data = await r.json();
+            this.renderGallery(postId, data.data || []);
+        } catch (err) {
+            console.error('Erro ao carregar galeria:', err);
+            list.innerHTML = '<p class="text-xs text-red-600 col-span-full">Falha ao carregar galeria.</p>';
+        }
+    },
+
+    renderGallery(postId, images) {
+        const list = document.getElementById('galleryList');
+        if (!list) return;
+        if (!images.length) {
+            list.innerHTML = '<p class="text-xs text-gray-400 italic col-span-full">Galeria vazia. Clique em "Subir imagem" acima.</p>';
+            return;
+        }
+        list.innerHTML = images.map((img, i) => `
+            <div class="relative group border border-gray-200 rounded-lg overflow-hidden bg-gray-50">
+                <img src="${escapeHtml(img.url)}" alt="${escapeHtml(img.alt || '')}" class="w-full h-32 object-cover">
+                <div class="p-2 space-y-1">
+                    <input type="text" data-gallery-alt="${img.id}" value="${escapeHtml(img.alt || '')}"
+                        placeholder="Texto alternativo (alt)" class="w-full text-[11px] px-1.5 py-1 border border-gray-200 rounded">
+                    <input type="text" data-gallery-caption="${img.id}" value="${escapeHtml(img.caption || '')}"
+                        placeholder="Legenda (italic)" class="w-full text-[11px] px-1.5 py-1 border border-gray-200 rounded">
+                    <div class="flex gap-1">
+                        <button type="button" data-gallery-insert="${img.id}"
+                            class="flex-1 text-[10px] bg-pink-100 hover:bg-pink-200 text-pink-700 px-1.5 py-1 rounded font-semibold flex items-center justify-center gap-1">
+                            <i class="fas fa-plus text-[9px]"></i> Inserir
+                        </button>
+                        <button type="button" data-gallery-delete="${img.id}"
+                            class="text-[10px] bg-red-50 hover:bg-red-100 text-red-700 px-1.5 py-1 rounded">
+                            <i class="fas fa-trash text-[9px]"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `).join('');
+
+        // Wire actions
+        list.querySelectorAll('[data-gallery-insert]').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const id  = btn.dataset.galleryInsert;
+                const img = images.find(x => x.id === id);
+                const alt = list.querySelector(`[data-gallery-alt="${id}"]`)?.value || img.alt || '';
+                const cap = list.querySelector(`[data-gallery-caption="${id}"]`)?.value || img.caption || '';
+                this.insertFigureIntoContent(img.url, alt, cap);
+                // Salva alt/caption no DB também (best-effort, idempotente)
+                this.updateGalleryMeta(postId, id, { alt, caption: cap });
+            });
+        });
+        list.querySelectorAll('[data-gallery-delete]').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                if (!confirm('Apagar essa imagem da galeria?')) return;
+                const id = btn.dataset.galleryDelete;
+                await authenticatedFetch(`/api/marketing/post-images/${postId}/${id}`, { method: 'DELETE' });
+                this.loadGallery(postId);
+            });
+        });
+    },
+
+    async updateGalleryMeta(postId, imageId, patch) {
+        try {
+            await authenticatedFetch(`/api/marketing/post-images/${postId}/${imageId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(patch)
+            });
+        } catch (_) {}
+    },
+
+    async uploadGalleryFile(postId, file) {
+        const fd = new FormData();
+        fd.append('image', file);
+        try {
+            this.showLoading(true);
+            const r = await authenticatedFetch(`/api/marketing/post-images/${postId}`, { method: 'POST', body: fd });
+            const data = await r.json();
+            if (!data.success) throw new Error(data.error || 'Falha no upload');
+            this.loadGallery(postId);
+        } catch (err) {
+            alert('Erro ao subir imagem: ' + err.message);
+        } finally {
+            this.showLoading(false);
+        }
+    },
+
+    insertFigureIntoContent(url, alt, caption) {
+        // Garante modo HTML (raw textarea) — Quill striparia <figure>
+        if (!this.sourceMode) this.toggleSourceMode();
+        const ta = document.getElementById('postContentSource');
+        if (!ta) return;
+        const snippet = `\n<figure>\n  <img src="${url}" alt="${escapeHtml(alt || '')}" loading="lazy" decoding="async" />\n  ${caption ? `<figcaption>${escapeHtml(caption)}</figcaption>` : ''}\n</figure>\n`;
+        // Insere na posição do cursor (ou no final)
+        const start = ta.selectionStart ?? ta.value.length;
+        const end   = ta.selectionEnd   ?? ta.value.length;
+        ta.value = ta.value.slice(0, start) + snippet + ta.value.slice(end);
+        ta.focus();
+        ta.selectionStart = ta.selectionEnd = start + snippet.length;
+    },
+
+    // =====================================================
+    // POSTS RELACIONADOS ("Leia também")
+    // =====================================================
+    selectedRelatedIds: new Set(),
+
+    renderRelatedSelector(currentPostId, selectedIds = []) {
+        this.selectedRelatedIds = new Set(selectedIds);
+        const list = document.getElementById('relatedList');
+        const search = document.getElementById('relatedSearch');
+        if (!list) return;
+
+        const all = (this.posts || []).filter(p => p.id !== currentPostId);
+        const renderList = (term = '') => {
+            const t = (term || '').toLowerCase().trim();
+            const filtered = t ? all.filter(p => (p.title || '').toLowerCase().includes(t)) : all;
+            list.innerHTML = filtered.map(p => {
+                const checked = this.selectedRelatedIds.has(p.id) ? 'checked' : '';
+                return `
+                <label class="flex items-start gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer">
+                    <input type="checkbox" data-related-id="${p.id}" ${checked}
+                        class="mt-0.5 rounded text-pink-600 focus:ring-pink-500">
+                    <div class="flex-1 min-w-0">
+                        <p class="text-sm text-gray-800 truncate">${escapeHtml(p.title || '(sem título)')}</p>
+                        <p class="text-[11px] text-gray-500">${p.status === 'published' ? '🟢 Publicado' : '⚪ Rascunho'}${p.slug ? ' · /' + escapeHtml(p.slug) : ''}</p>
+                    </div>
+                </label>`;
+            }).join('') || '<p class="text-xs text-gray-400 italic px-3 py-3">Nenhum post encontrado.</p>';
+
+            list.querySelectorAll('[data-related-id]').forEach(cb => {
+                cb.addEventListener('change', () => {
+                    const id = cb.dataset.relatedId;
+                    if (cb.checked) this.selectedRelatedIds.add(id);
+                    else this.selectedRelatedIds.delete(id);
+                    document.getElementById('relatedCount').textContent = this.selectedRelatedIds.size;
+                });
+            });
+        };
+
+        renderList();
+        document.getElementById('relatedCount').textContent = this.selectedRelatedIds.size;
+        search.oninput = (e) => renderList(e.target.value);
     }
 };
+
+// Helper global (já existe versão na inventory; aqui usamos a local pra
+// não depender de _layout.js que não é carregado em /marketing.html)
+function escapeHtml(s) {
+    return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
 
 // Expose to window for inline HTML calls
 window.BlogManager = BlogManager;
