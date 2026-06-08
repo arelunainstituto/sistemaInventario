@@ -50,11 +50,39 @@ const BlogManager = {
     },
 
 
+    // Detecta HTML "rico" que o Quill estripa ao normalizar:
+    // <figure>, <table>, <aside> ou qualquer classe começando com
+    // article-/blog- (article-cta, blog-tabela-wrapper, blog-tabela-comparativa…).
+    // Quando isso aparece, o modal abre DIRETO no Modo HTML — nunca
+    // passa pelo innerHTML do Quill.
+    COMPLEX_HTML_RE: /<(figure|table|aside)\b|class\s*=\s*"[^"]*(?:article-|blog-)/i,
+
+    hasComplexHtml(html) {
+        return this.COMPLEX_HTML_RE.test(String(html || ''));
+    },
+
+    /**
+     * Coloca o editor em Modo HTML diretamente, com um HTML inicial fornecido.
+     * Usado pelo openModal quando detecta conteúdo rico — evita o caminho
+     * `quill.root.innerHTML = …` que sanitiza/perde tags.
+     */
+    enterSourceMode(initialHtml) {
+        const editor = document.getElementById('editor-container');
+        const source = document.getElementById('postContentSource');
+        const label  = document.getElementById('toggleSourceLabel');
+        if (!editor || !source) return;
+        source.value = initialHtml != null
+            ? initialHtml
+            : (this.quill ? this.quill.root.innerHTML
+                          : (document.getElementById('fallback-textarea')?.value || ''));
+        editor.classList.add('hidden');
+        source.classList.remove('hidden');
+        if (label) label.textContent = 'Modo Editor';
+        this.sourceMode = true;
+    },
+
     /**
      * Alterna entre o editor visual (Quill) e o modo HTML cru (textarea).
-     * Fix para o bug onde Quill auto-escapa HTML colado (transforma <p> em &lt;p&gt;
-     * e envolve em <span style="color:rgb(206,145,120)">), tornando inutilizável
-     * para conteúdo com <figure>, <table> e classes custom (.article-cta etc.).
      */
     toggleSourceMode() {
         const editor = document.getElementById('editor-container');
@@ -63,16 +91,19 @@ const BlogManager = {
         if (!editor || !source) return;
 
         if (!this.sourceMode) {
-            // Entrar em source mode: copia o HTML do Quill para a textarea
-            source.value = this.quill ? this.quill.root.innerHTML
-                                      : (document.getElementById('fallback-textarea')?.value || '');
-            editor.classList.add('hidden');
-            source.classList.remove('hidden');
-            if (label) label.textContent = 'Modo Editor';
-            this.sourceMode = true;
+            this.enterSourceMode();
         } else {
-            // Voltar para Quill: aplica o HTML literal da textarea
-            if (this.quill) this.quill.root.innerHTML = source.value;
+            // Voltar para Quill — AVISA se o source tem blocos que Quill vai estripar
+            const sourceHtml = source.value || '';
+            if (this.hasComplexHtml(sourceHtml)) {
+                const ok = confirm(
+                    'Atenção: o conteúdo contém <figure>, <table>, <aside> ou classes custom (article-/blog-) ' +
+                    'que o Modo Editor (Quill) vai estripar.\n\n' +
+                    'Recomendo manter no Modo HTML.\n\nContinuar mesmo assim?'
+                );
+                if (!ok) return;
+            }
+            if (this.quill) this.quill.root.innerHTML = sourceHtml;
             editor.classList.remove('hidden');
             source.classList.add('hidden');
             if (label) label.textContent = 'Modo HTML';
@@ -432,11 +463,16 @@ const BlogManager = {
             document.getElementById('postImageCaption').value = post.image_caption || '';
             document.getElementById('postImageObjectPosition').value = post.image_object_position || '';
 
-            if (this.quill) {
-                // Determine if content is HTML or plain text (legacy)
-                this.quill.root.innerHTML = post.content || '';
+            // v1.8.2: se o content tem blocos ricos (figure/table/aside ou
+            // classes article-*/blog-*), abre DIRETO no Modo HTML — sem deixar
+            // Quill sanitizar via innerHTML. Caso contrário, fluxo normal.
+            const _content = post.content || '';
+            if (this.hasComplexHtml(_content)) {
+                this.enterSourceMode(_content);
+            } else if (this.quill) {
+                this.quill.root.innerHTML = _content;
             } else if (document.getElementById('fallback-textarea')) {
-                document.getElementById('fallback-textarea').value = post.content || '';
+                document.getElementById('fallback-textarea').value = _content;
             }
 
             document.getElementById('postStatus').value = post.status;

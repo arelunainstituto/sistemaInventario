@@ -2,7 +2,7 @@
 // Each page calls renderInventoryLayout({ activePage, title, subtitle }).
 
 // Versão exibida no sidebar — manter em sync com CHANGELOG.md
-const INVENTORY_VERSION = 'v1.8.1';
+const INVENTORY_VERSION = 'v1.8.2';
 
 const INVENTORY_NAV = [
     { id: 'dashboard',   label: 'Dashboard',         icon: 'fa-chart-pie',  href: 'index.html' },

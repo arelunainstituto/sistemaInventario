@@ -38,6 +38,23 @@ _Nenhuma alteração pendente._
 
 ---
 
+## [1.8.2] — 2026-06-08
+
+> **Hotfix**: `<figure>`, `<table>` e classes custom (`article-`, `blog-`) sumiam ao reabrir o post para edição. Causa: Quill normaliza o HTML ao receber via `innerHTML` e estripa tags que não conhece. Fix: detecta HTML rico no `openModal` e abre direto no Modo HTML, sem deixar Quill tocar.
+
+### Corrigido
+- **Editor de posts** ([marketing-blog.js](public/marketing-blog.js)):
+  - Nova regex `COMPLEX_HTML_RE` detecta `<figure>`, `<table>`, `<aside>` ou classes `article-*`/`blog-*` no content.
+  - `openModal` em modo edição agora chama `enterSourceMode(content)` direto quando o post tem HTML rico — pula o caminho `quill.root.innerHTML = …`.
+  - `toggleSourceMode` AVISA via confirm se o usuário tentar voltar para o Modo Editor quando o source tem HTML rico (Quill estriparia).
+- Novo helper `enterSourceMode(initialHtml)` separa a entrada em Modo HTML do toggle (permite chamar de fora).
+
+### Notas
+- [_layout.js:5](public/inventory/_layout.js#L5) bump para `v1.8.2`.
+- Posts editados antes desta versão podem ter perdido tags se o admin abriu, mudou para Modo HTML, e salvou. Re-inserir as `<figure>` via galeria + colar as `<table>` no Modo HTML.
+
+---
+
 ## [1.8.1] — 2026-06-08
 
 > **Patch UX**: editor de posts ganha campo de data de publicação selecionável (default hoje), permitindo antedatar artigos.
@@ -610,7 +627,8 @@ f29115a feat(inventory): Sprint 4C - log de acesso + janela de consumo por categ
 
 A partir de 1.0.0, toda alteração deve adicionar uma entrada acima na seção `[Unreleased]` antes do merge.
 
-[Unreleased]: https://github.com/<org>/sistemaInventario/compare/v1.8.1...HEAD
+[Unreleased]: https://github.com/<org>/sistemaInventario/compare/v1.8.2...HEAD
+[1.8.2]: https://github.com/<org>/sistemaInventario/compare/v1.8.1...v1.8.2
 [1.8.1]: https://github.com/<org>/sistemaInventario/compare/v1.8.0...v1.8.1
 [1.8.0]: https://github.com/<org>/sistemaInventario/compare/v1.7.3...v1.8.0
 [1.7.3]: https://github.com/<org>/sistemaInventario/compare/v1.7.2...v1.7.3
