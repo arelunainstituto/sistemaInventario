@@ -135,18 +135,20 @@ router.get('/:id', requirePermission('inventory', 'read'), async (req, res) => {
 // POST / — cria item
 router.post('/', requirePermission('inventory', 'create_item'), async (req, res) => {
     try {
+        // Fase 5.2: a UI pede apenas UM de compra + UM de consumo.
+        // base_uom_id é sempre = purchase_uom_id (coluna NOT NULL no DB).
+        // Espelhamos ANTES da validação para que ela enxergue o campo
+        // já preenchido — caso contrário a validação falha "base_uom_id
+        // é obrigatório" mesmo com purchase_uom_id válido.
+        if (req.body && !req.body.base_uom_id && req.body.purchase_uom_id) {
+            req.body.base_uom_id = req.body.purchase_uom_id;
+        }
+
         const errors = validateItemPayload(req.body, false);
         if (errors.length) return res.status(400).json({ error: errors.join('; ') });
 
         // Não confiar em controls_lot/uses_serial do cliente — trigger define
         const { controls_lot, uses_serial, internal_code, qr_code, patrimony_number, ...rest } = req.body;
-
-        // Fase 5.2: a UI agora pede apenas UM de compra + UM de consumo.
-        // base_uom_id é sempre igual a purchase_uom_id (compat com triggers
-        // e relatórios; coluna NOT NULL no DB).
-        if (!rest.base_uom_id && rest.purchase_uom_id) {
-            rest.base_uom_id = rest.purchase_uom_id;
-        }
 
         const payload = {
             ...rest,

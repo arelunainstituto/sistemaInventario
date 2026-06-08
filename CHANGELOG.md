@@ -38,6 +38,19 @@ _Nenhuma alteração pendente._
 
 ---
 
+## [1.7.2] — 2026-06-08
+
+> **Hotfix**: cadastro de item falhava com "base_uom_id é obrigatório" mesmo com UM de compra preenchida na UI.
+
+### Corrigido
+- **POST `/api/inventory/items`** ([items.js:137](api/inventory/items.js#L137)) — desde a Fase 5.2, a UI só pede `purchase_uom_id` e o backend espelha em `base_uom_id`. Mas o espelhamento estava ocorrendo **depois** da validação `validateItemPayload`, então a validação reclamava do campo vazio antes do fallback rodar. Movido o espelhamento para o início do handler, antes da validação.
+- PUT não era afetado (o validator pula required-checks em update mode).
+
+### Notas
+- [_layout.js:5](public/inventory/_layout.js#L5) bump para `v1.7.2`.
+
+---
+
 ## [1.7.1] — 2026-06-08
 
 > **Fix UX**: o flag `allow_negative_stock` (toggle DB do seeding) destravava o backend mas a UI continuava bloqueando a saída antes mesmo de chegar ao servidor — o dropdown "Localização de origem" só listava locais com stock positivo. Quando o item tinha zero stock, dropdown ficava vazio e o navegador travava no required.
@@ -536,7 +549,8 @@ f29115a feat(inventory): Sprint 4C - log de acesso + janela de consumo por categ
 
 A partir de 1.0.0, toda alteração deve adicionar uma entrada acima na seção `[Unreleased]` antes do merge.
 
-[Unreleased]: https://github.com/<org>/sistemaInventario/compare/v1.7.1...HEAD
+[Unreleased]: https://github.com/<org>/sistemaInventario/compare/v1.7.2...HEAD
+[1.7.2]: https://github.com/<org>/sistemaInventario/compare/v1.7.1...v1.7.2
 [1.7.1]: https://github.com/<org>/sistemaInventario/compare/v1.7.0...v1.7.1
 [1.7.0]: https://github.com/<org>/sistemaInventario/compare/v1.6.1...v1.7.0
 [1.6.1]: https://github.com/<org>/sistemaInventario/compare/v1.6.0...v1.6.1
