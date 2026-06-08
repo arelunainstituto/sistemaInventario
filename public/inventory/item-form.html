@@ -274,8 +274,12 @@ function activateMacro(macro) {
         : '<span class="inline-flex items-center gap-1.5"><span class="w-1.5 h-1.5 rounded-full bg-purple-500"></span>Patrimonial · controla nº de série e depreciação</span>';
     // Categoria com hierarquia: exibe path completo "A / B / C" para o usuário
     // entender o caminho. O API devolve já com path/depth via vw_inv_categories_tree.
+    // Filtro tolerante a case: se algum registo tiver parent_macro='Consumo' ou
+    // 'CONSUMO' ainda funciona. Veja também: SQL UPDATE em inv_categories pra
+    // normalizar a coluna (database/inventory-refactor/52-fase5...).
+    const macroLc = (macro || '').toLowerCase();
     const opts = categoriesAll
-        .filter(c => c.parent_macro === macro)
+        .filter(c => (c.parent_macro || '').toLowerCase() === macroLc)
         .sort((a, b) => (a.path || a.name).localeCompare(b.path || b.name))
         .map(c => {
             const indent = '  '.repeat((c.depth || 1) - 1);
