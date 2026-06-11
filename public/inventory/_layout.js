@@ -201,6 +201,13 @@ async function populateUserHeader() {
         const roles  = Array.isArray(data.roles) ? data.roles : [];
         const isAdmin = roles.some(r => ['Inventory_Admin','Admin','admin'].includes(r));
         window.isInventoryAdmin = isAdmin;
+        // Espelha requirePermission('inventory', action) do backend: role
+        // 'admin' (case-insensitive) faz bypass; as demais precisam da
+        // permissão explícita. Só controla visibilidade de UI — a
+        // autorização real continua no servidor.
+        const perms = Array.isArray(data.permissions) ? data.permissions : [];
+        window.hasInventoryPermission = action =>
+            roles.some(r => String(r).toLowerCase() === 'admin') || perms.includes('inventory:' + action);
         // Notifica páginas que dependem da flag (ex.: botões de cancelar
         // movimento que aparecem após o auth/me resolver).
         document.dispatchEvent(new CustomEvent('inventory:admin-resolved', { detail: { isAdmin } }));
