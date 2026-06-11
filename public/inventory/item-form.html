@@ -234,6 +234,8 @@ document.getElementById('btnChangeType').addEventListener('click', () => {
 let categoriesAll = [];
 let uomsAll = [];
 let locationsAll = [];
+let bootstrapPromise = null;
+let categoriesLoaded = false;
 
 async function bootstrap() {
     try {
@@ -244,6 +246,7 @@ async function bootstrap() {
             apiCall('/api/inventory/suppliers')
         ]);
         categoriesAll = cats.data;
+        categoriesLoaded = true;
         uomsAll       = uoms.data;
         locationsAll  = (locs.data || []).filter(l => l.is_active);
         // Fase 5.2: a UI agora só pede UM de compra e UM de consumo.
@@ -266,12 +269,24 @@ async function bootstrap() {
     } catch (err) { toast(err.message, 'error'); }
 }
 
-function activateMacro(macro) {
+async function activateMacro(macro) {
     macroField.value = macro;
     const isConsumo = macro === 'consumo';
     document.getElementById('formMacroLabel').innerHTML = isConsumo
         ? '<span class="inline-flex items-center gap-1.5"><span class="w-1.5 h-1.5 rounded-full bg-sky-500"></span>Consumo · controla lote e validade</span>'
         : '<span class="inline-flex items-center gap-1.5"><span class="w-1.5 h-1.5 rounded-full bg-purple-500"></span>Patrimonial · controla nº de série e depreciação</span>';
+    patrimonyFieldset.classList.toggle('hidden', macro !== 'patrimonial');
+    // Overrides por localização só fazem sentido para consumo
+    document.getElementById('locationParamsFieldset').classList.toggle('hidden', !isConsumo);
+    step1.classList.add('hidden');
+    step2.classList.remove('hidden');
+    // O usuário pode escolher o tipo antes de o bootstrap() terminar de buscar
+    // as categorias; sem esta espera o select era montado vazio e nada o
+    // repopulava quando a resposta chegava (só um refresh resolvia).
+    if (!categoriesLoaded && bootstrapPromise) {
+        subcategorySelect.innerHTML = '<option value="">Carregando categorias…</option>';
+        try { await bootstrapPromise; } catch (_) { /* erro já notificado via toast */ }
+    }
     // Categoria com hierarquia: exibe path completo "A / B / C" para o usuário
     // entender o caminho. O API devolve já com path/depth via vw_inv_categories_tree.
     // Filtro tolerante a case: se algum registo tiver parent_macro='Consumo' ou
@@ -288,11 +303,6 @@ function activateMacro(macro) {
             return `<option value="${c.id}"${title}>${escapeHtml(label)}</option>`;
         }).join('');
     subcategorySelect.innerHTML = '<option value="">—</option>' + opts;
-    patrimonyFieldset.classList.toggle('hidden', macro !== 'patrimonial');
-    // Overrides por localização só fazem sentido para consumo
-    document.getElementById('locationParamsFieldset').classList.toggle('hidden', !isConsumo);
-    step1.classList.add('hidden');
-    step2.classList.remove('hidden');
 }
 
 // Renderiza a tabela de overrides por localização (apenas no modo edit)
@@ -405,7 +415,7 @@ async function loadForEdit() {
     try {
         const res = await apiCall(`/api/inventory/items/${editingId}`);
         const it = res.data;
-        activateMacro(it.macro_category);
+        await activateMacro(it.macro_category);
         const f = document.getElementById('itemForm');
         for (const [k, v] of Object.entries(it)) {
             const el = f.elements[k];
@@ -485,7 +495,7 @@ function escapeHtml(s) {
     return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 
-bootstrap();
+bootstrapPromise = bootstrap();
 </script>
 </body>
 </html>
