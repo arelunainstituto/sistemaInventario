@@ -35,11 +35,14 @@
     ];
 
     document.getElementById('pageContent').innerHTML = `
-        <div id="locationTabs" class="flex flex-wrap gap-2 mb-4">
-            <button data-loc="" class="loc-tab active px-3 py-1.5 rounded-lg text-sm font-medium border border-sky-200 bg-sky-50 text-sky-700">
-                <i class="fas fa-globe text-[10px] mr-1"></i> Todas as unidades
-            </button>
-            <!-- Tabs por unidade injetadas em bootstrap -->
+        <div class="flex flex-wrap items-center gap-3 mb-5">
+            <div class="flex items-center gap-2">
+                <i class="fas fa-location-dot text-gray-400 text-xs"></i>
+                <select id="locFilter" class="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-sky-500/30 focus:border-sky-500 transition">
+                    <option value="">Todas as unidades</option>
+                </select>
+            </div>
+            <span id="locFilterHint" class="text-[11px] text-gray-400"></span>
         </div>
 
         <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
@@ -47,8 +50,14 @@
         </div>
 
         <div id="byLocationSection" class="hidden mb-6">
-            <p class="text-[10px] uppercase tracking-wider font-bold text-gray-500 mb-2">Itens abaixo do mínimo por localização</p>
-            <div id="byLocationGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3"></div>
+            <div class="flex items-center justify-between mb-2">
+                <p class="text-[10px] uppercase tracking-wider font-bold text-gray-500">Itens abaixo do mínimo por localização</p>
+                <div class="flex items-center gap-3 text-[11px]">
+                    <button onclick="expandAllUnits()" class="text-sky-600 hover:text-sky-700">Expandir tudo</button>
+                    <button onclick="collapseAllUnits()" class="text-gray-400 hover:text-gray-600">Recolher tudo</button>
+                </div>
+            </div>
+            <div id="byLocationList" class="space-y-2"></div>
         </div>
 
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
@@ -59,8 +68,8 @@
         </div>
     `;
 
-    let currentLoc = '';   // '' = todas
-    let locationsByUnit = {};
+    let currentLoc = '';      // '' = todas
+    let allByLocation = [];   // cache do breakdown por localização (1º load "Todas")
 
     function kpiCard({ key, label, icon, color, prefix }) {
         return `<div class="group bg-white rounded-xl border border-gray-200/70 shadow-sm hover:shadow hover:border-gray-300 transition-all p-4">
@@ -111,29 +120,22 @@
             setCard('avg_coverage',   stats.data.avg_coverage !== null ? stats.data.avg_coverage : '—');
             setCard('expiring_count', stats.data.expiring_count);
 
-            // Tabs de unidade (apenas no primeiro load)
-            if (stats.data.by_location && !document.querySelector('.loc-tab[data-loc]:not([data-loc=""])')) {
-                renderLocationTabs(stats.data.by_location);
+            // Cache do breakdown (vem no load "Todas") e popula o filtro 1x
+            if (stats.data.by_location) allByLocation = stats.data.by_location;
+            const filterSel = document.getElementById('locFilter');
+            if (allByLocation.length && !filterSel.dataset.populated) {
+                renderLocationFilter(allByLocation);
+                filterSel.dataset.populated = '1';
             }
+            updateLocHint();
 
-            // Breakdown by_location é mostrado apenas na visão "Todas"
+            // Breakdown por localização: LISTA ANINHADA (Unidade → Localizações),
+            // mostrada apenas na visão "Todas".
             const byLocSection = document.getElementById('byLocationSection');
-            if (!currentLoc && stats.data.by_location) {
+            if (!currentLoc && allByLocation.length) {
                 byLocSection.classList.remove('hidden');
-                document.getElementById('byLocationGrid').innerHTML = stats.data.by_location.map(g => `
-                    <button data-loc="${g.location_id}" class="loc-card text-left bg-white rounded-xl border border-gray-200/70 hover:border-sky-300 shadow-sm hover:shadow p-4 transition-all">
-                        <p class="text-[10px] uppercase tracking-wider font-semibold text-gray-500 truncate">${escapeHtml(g.unit_name || '')} · ${escapeHtml(g.location_name)}</p>
-                        <div class="flex items-end justify-between mt-2 gap-2">
-                            <div>
-                                <p class="text-2xl font-bold ${g.below_min > 0 ? 'text-amber-600' : 'text-gray-900'} tabular-nums">${g.below_min}</p>
-                                <p class="text-[10px] text-gray-400">abaixo do mín. (de ${g.items_total})</p>
-                            </div>
-                            <i class="fas fa-arrow-right text-gray-300"></i>
-                        </div>
-                    </button>
-                `).join('');
-                // delegação de click → vira filtro
-                document.querySelectorAll('#byLocationGrid .loc-card').forEach(b => {
+                document.getElementById('byLocationList').innerHTML = renderByLocation(allByLocation);
+                document.querySelectorAll('#byLocationList .loc-row').forEach(b => {
                     b.addEventListener('click', () => switchLoc(b.dataset.loc));
                 });
             } else {
@@ -185,48 +187,99 @@
         }
     }
 
-    function renderLocationTabs(byLoc) {
-        const tabsBar = document.getElementById('locationTabs');
-        // Agrupa por unit_name para tabs hierárquicas (apenas unidades, sem sublocais)
-        const byUnit = new Map();
+    // Agrupa o breakdown por unidade, com totais por unidade, ordenado pelos
+    // que têm mais itens abaixo do mínimo.
+    function groupByUnit(byLoc) {
+        const m = new Map();
         for (const g of byLoc) {
-            if (!byUnit.has(g.unit_name)) byUnit.set(g.unit_name, []);
-            byUnit.get(g.unit_name).push(g);
+            const u = g.unit_name || '—';
+            if (!m.has(u)) m.set(u, []);
+            m.get(u).push(g);
         }
-        // Render tabs por unidade — clicar exibe as sublocs como sub-tabs (opção simples: lista plana)
-        let html = `<button data-loc="" class="loc-tab ${currentLoc === '' ? 'active border-sky-300 bg-sky-50 text-sky-700' : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'} px-3 py-1.5 rounded-lg text-sm font-medium border">
-            <i class="fas fa-globe text-[10px] mr-1"></i> Todas as unidades
-        </button>`;
-        for (const g of byLoc) {
-            const isActive = currentLoc === g.location_id;
-            const stateClass = isActive
-                ? 'active border-sky-300 bg-sky-50 text-sky-700'
-                : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50';
-            html += `<button data-loc="${g.location_id}" class="loc-tab ${stateClass} px-3 py-1.5 rounded-lg text-sm font-medium border">
-                <i class="fas fa-map-marker-alt text-[10px] mr-1"></i> ${escapeHtml(g.unit_name || '')} · ${escapeHtml(g.location_name)}
-                ${g.below_min > 0 ? `<span class="ml-1 inline-flex items-center justify-center px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 text-[10px] font-bold">${g.below_min}</span>` : ''}
-            </button>`;
+        return [...m.entries()].map(([unit, locs]) => ({
+            unit, locs,
+            totalBelow: locs.reduce((a, l) => a + (l.below_min || 0), 0),
+            totalItems: locs.reduce((a, l) => a + (l.items_total || 0), 0)
+        })).sort((a, b) => b.totalBelow - a.totalBelow);
+    }
+
+    // Filtro: select nativo agrupado por unidade (<optgroup>) — compacto e
+    // escala para qualquer número de localizações.
+    function renderLocationFilter(byLoc) {
+        const sel = document.getElementById('locFilter');
+        let html = '<option value="">Todas as unidades</option>';
+        for (const { unit, locs } of groupByUnit(byLoc)) {
+            html += `<optgroup label="${escapeHtml(unit)}">`
+                + locs.map(l => `<option value="${l.location_id}">${escapeHtml(l.location_name)}${l.below_min > 0 ? ` — ${l.below_min} abaixo` : ''}</option>`).join('')
+                + '</optgroup>';
         }
-        tabsBar.innerHTML = html;
-        tabsBar.querySelectorAll('.loc-tab').forEach(b => {
-            b.addEventListener('click', () => switchLoc(b.dataset.loc));
-        });
+        sel.innerHTML = html;
+        sel.value = currentLoc;
+        sel.onchange = () => switchLoc(sel.value);
+    }
+
+    // Breakdown como LISTA ANINHADA: cada unidade é um cartão recolhível com as
+    // suas localizações listadas dentro (cada uma clicável → vira filtro).
+    function renderByLocation(byLoc) {
+        return groupByUnit(byLoc).map((u, idx) => `
+            <div class="bg-white rounded-xl border border-gray-200/70 shadow-sm overflow-hidden">
+                <button type="button" onclick="toggleUnit(${idx})" class="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition text-left">
+                    <i class="fas fa-chevron-down text-[10px] text-gray-400 transition-transform" data-unit-chevron="${idx}"></i>
+                    <i class="fas fa-building text-gray-400 text-sm"></i>
+                    <span class="font-semibold text-gray-800 text-sm flex-1">${escapeHtml(u.unit)}</span>
+                    <span class="text-[11px] text-gray-400">${u.locs.length} localizaç${u.locs.length === 1 ? 'ão' : 'ões'}</span>
+                    ${u.totalBelow > 0
+                        ? `<span class="inline-flex items-center justify-center min-w-[1.75rem] px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 text-[11px] font-bold tabular-nums">${u.totalBelow}</span>`
+                        : '<span class="text-[11px] text-emerald-600 font-medium">OK</span>'}
+                </button>
+                <div data-unit-body="${idx}" class="divide-y divide-gray-50 border-t border-gray-100">
+                    ${u.locs.map(l => `
+                        <button type="button" data-loc="${l.location_id}" class="loc-row w-full flex items-center gap-3 px-4 py-2.5 pl-11 hover:bg-sky-50/40 transition text-left">
+                            <span class="flex-1 text-sm text-gray-700 truncate">${escapeHtml(l.location_name)}</span>
+                            <span class="text-[11px] text-gray-400 tabular-nums">de ${l.items_total}</span>
+                            <span class="w-10 text-right text-sm font-bold tabular-nums ${l.below_min > 0 ? 'text-amber-600' : 'text-gray-300'}">${l.below_min}</span>
+                            <i class="fas fa-arrow-right text-gray-300 text-xs"></i>
+                        </button>`).join('')}
+                </div>
+            </div>`).join('');
+    }
+
+    function updateLocHint() {
+        const hint = document.getElementById('locFilterHint');
+        if (!hint) return;
+        if (currentLoc) {
+            const g = allByLocation.find(x => x.location_id === currentLoc);
+            hint.innerHTML = g
+                ? `Filtrado: <b class="text-gray-600">${escapeHtml(g.unit_name || '')} · ${escapeHtml(g.location_name)}</b>`
+                : '';
+        } else if (allByLocation.length) {
+            const units = new Set(allByLocation.map(g => g.unit_name || '—')).size;
+            hint.textContent = `${allByLocation.length} localizações em ${units} unidade${units === 1 ? '' : 's'}`;
+        } else {
+            hint.textContent = '';
+        }
+    }
+
+    function toggleUnit(idx) {
+        const body = document.querySelector(`[data-unit-body="${idx}"]`);
+        if (!body) return;
+        const hidden = body.classList.toggle('hidden');
+        const chev = document.querySelector(`[data-unit-chevron="${idx}"]`);
+        if (chev) chev.classList.toggle('-rotate-90', hidden);
+    }
+    function expandAllUnits() {
+        document.querySelectorAll('#byLocationList [data-unit-body]').forEach(b => b.classList.remove('hidden'));
+        document.querySelectorAll('#byLocationList [data-unit-chevron]').forEach(c => c.classList.remove('-rotate-90'));
+    }
+    function collapseAllUnits() {
+        document.querySelectorAll('#byLocationList [data-unit-body]').forEach(b => b.classList.add('hidden'));
+        document.querySelectorAll('#byLocationList [data-unit-chevron]').forEach(c => c.classList.add('-rotate-90'));
     }
 
     function switchLoc(loc) {
         currentLoc = loc;
-        // Atualiza visual das tabs
-        document.querySelectorAll('.loc-tab').forEach(b => {
-            const isActive = b.dataset.loc === loc;
-            b.classList.toggle('active', isActive);
-            b.classList.toggle('border-sky-300', isActive);
-            b.classList.toggle('bg-sky-50', isActive);
-            b.classList.toggle('text-sky-700', isActive);
-            b.classList.toggle('border-gray-200', !isActive);
-            b.classList.toggle('bg-white', !isActive);
-            b.classList.toggle('text-gray-600', !isActive);
-            b.classList.toggle('hover:bg-gray-50', !isActive);
-        });
+        const sel = document.getElementById('locFilter');
+        if (sel && sel.value !== loc) sel.value = loc;
         loadDashboard();
     }
 

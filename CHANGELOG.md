@@ -38,6 +38,22 @@ _Nenhuma alteração pendente._
 
 ---
 
+## [1.11.0] — 2026-06-15
+
+> Documentação do módulo Patrimônio acessível dentro do sistema, sidebar com grupos retráteis e dashboard reorganizado em listas aninhadas para escalar com muitas localizações.
+
+### Adicionado
+- **Aba "Documentação" na sidebar** ([_layout.js](public/inventory/_layout.js)) → nova tela [docs-patrimonio.html](public/inventory/docs-patrimonio.html) que renderiza a documentação do patrimônio (conteúdo de [documentacao/INVENTARIO_PATRIMONIO.md](documentacao/INVENTARIO_PATRIMONIO.md) embutido + render com `marked`), bem formatada e no layout do inventário. Apenas esta documentação é exposta na UI.
+
+### Alterado
+- **Sidebar — grupos Consumo/Patrimônio retráteis** ([_layout.js](public/inventory/_layout.js)): o cabeçalho de cada grupo agora usa o mesmo estilo dos itens principais (ícone + label + hover) com um chevron para abrir/fechar. Recolhidos por padrão; abre só o grupo da página ativa. No modo ícone da sidebar os filhos continuam visíveis (lista plana de ícones).
+- **Dashboard — listas aninhadas por localização** ([index.html](public/inventory/index.html)): com muitas localizações a barra de chips e o grid de cards ficavam bagunçados. Agora o filtro é um **select agrupado por unidade** (`<optgroup>`) e o "abaixo do mínimo por localização" é uma **lista aninhada Unidade → Localizações** (cartões recolhíveis com totais por unidade, localizações clicáveis para filtrar, e "Expandir/Recolher tudo"). Mesma API/dados (`stats/summary` · `by_location`).
+
+### Notas
+- [_layout.js:5](public/inventory/_layout.js#L5) bump para `v1.11.0`.
+
+---
+
 ## [1.10.0] — 2026-06-15
 
 ### Épico: Módulo Patrimônio (separação Consumo/Patrimônio + controle por nº de série)
