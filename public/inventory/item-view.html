@@ -108,18 +108,19 @@ function render(it) {
                 <h3 class="font-bold text-gray-900 mb-3 text-sm flex items-center gap-2"><i class="fas fa-ruler text-gray-600"></i> Unidades e custo</h3>
                 ${infoRow('UM compra', it.purchase_uom ? `${it.purchase_uom.name} (${it.purchase_uom.code})` : null)}
                 ${infoRow('UM consumo', it.consumption_uom ? `${it.consumption_uom.name} (${it.consumption_uom.code})` : null)}
-                ${infoRow('Fator de conversão', it.conversion_factor)}
+                ${!isPatrimonial ? infoRow('Fator de conversão', it.conversion_factor) : ''}
                 ${infoRow('Custo Médio', `€ ${parseFloat(it.cmp || 0).toFixed(4)}`)}
             </div>
 
             <!-- Parâmetros de stock -->
             <div class="bg-white rounded-xl border border-gray-200/70 shadow-sm p-6">
-                <h3 class="font-bold text-gray-900 mb-3 text-sm flex items-center gap-2"><i class="fas fa-warehouse text-gray-600"></i> Stock & reposição</h3>
+                <h3 class="font-bold text-gray-900 mb-3 text-sm flex items-center gap-2"><i class="fas fa-warehouse text-gray-600"></i> ${isPatrimonial ? 'Controle' : 'Stock & reposição'}</h3>
+                ${!isPatrimonial ? `
                 ${infoRow('Stock mínimo', it.min_stock)}
                 ${infoRow('Stock máximo', it.max_stock)}
                 ${infoRow('Lead time (dias)', it.lead_time_days)}
                 ${infoRow('Ponto de reposição', it.reorder_point)}
-                ${infoRow('Consumo médio diário', parseFloat(it.avg_daily_consumption || 0).toFixed(4))}
+                ${infoRow('Consumo médio diário', parseFloat(it.avg_daily_consumption || 0).toFixed(4))}` : ''}
                 ${infoRow('Controla lote', it.controls_lot ? 'Sim' : 'Não')}
                 ${infoRow('Usa nº de série', it.uses_serial ? 'Sim' : 'Não')}
             </div>
@@ -174,8 +175,42 @@ function render(it) {
             </div>
             ` : ''}
 
-            <!-- Stock por localização -->
-            <div class="bg-white rounded-xl border border-gray-200/70 shadow-sm p-6 ${isPatrimonial ? 'lg:col-span-2' : 'lg:col-span-3'}">
+            ${isPatrimonial ? `
+            <!-- Unidades por número de série (patrimônio) -->
+            <div class="bg-white rounded-xl border border-gray-200/70 shadow-sm p-6 lg:col-span-2">
+                <h3 class="font-bold text-gray-900 mb-3 text-sm flex items-center gap-2"><i class="fas fa-barcode text-purple-600"></i> Unidades (números de série) <span class="text-xs text-gray-500 font-normal">(${(it.serial_units || []).length})</span></h3>
+                ${(it.serial_units || []).length ? `
+                <div class="overflow-x-auto -mx-6 -mb-6">
+                <table class="w-full text-sm">
+                    <thead class="bg-gray-50/50 text-[10px] uppercase tracking-wider text-gray-500 border-y border-gray-200">
+                        <tr>
+                            <th class="text-left px-6 py-2.5 font-semibold">Nº de série</th>
+                            <th class="text-left px-3 py-2.5 font-semibold">Localização</th>
+                            <th class="text-left px-3 py-2.5 font-semibold">Colaborador</th>
+                            <th class="text-right px-3 py-2.5 font-semibold">Valor aquis.</th>
+                            <th class="text-center px-6 py-2.5 font-semibold">Estado</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-50">
+                        ${(it.serial_units || []).map(u => `
+                            <tr class="hover:bg-purple-50/30 transition">
+                                <td class="px-6 py-2.5 font-mono text-xs text-gray-700">${escapeHtml(u.serial_number)}</td>
+                                <td class="px-3 py-2.5 text-gray-800"><span class="text-gray-400 text-xs">${escapeHtml(u.location?.unit?.name || '')} ·</span> ${escapeHtml(u.location?.name || '—')}</td>
+                                <td class="px-3 py-2.5 text-gray-700">${u.holder ? escapeHtml(u.holder.name) : '—'}</td>
+                                <td class="px-3 py-2.5 text-right tabular-nums">${u.acquisition_value != null ? '€ ' + parseFloat(u.acquisition_value).toFixed(2) : '—'}</td>
+                                <td class="px-6 py-2.5 text-center">${unitStatusBadge(u.status)}</td>
+                            </tr>`).join('')}
+                    </tbody>
+                </table>
+                </div>` : `<div class="py-8 text-center">
+                    <div class="inline-flex w-9 h-9 rounded-full bg-purple-50 items-center justify-center text-purple-400 mb-2"><i class="fas fa-barcode"></i></div>
+                    <p class="text-sm text-gray-500">Sem unidades cadastradas.</p>
+                    <a href="patrimony-entry.html" class="text-xs text-purple-600 hover:underline">Cadastrar entrada de patrimônio</a>
+                </div>`}
+            </div>
+            ` : `
+            <!-- Stock por localização (consumo) -->
+            <div class="bg-white rounded-xl border border-gray-200/70 shadow-sm p-6 lg:col-span-3">
                 <h3 class="font-bold text-gray-900 mb-3 text-sm flex items-center gap-2"><i class="fas fa-map-marker-alt text-sky-600"></i> Stock por localização <span class="text-xs text-gray-500 font-normal">(total: ${totalStock.toFixed(2)})</span></h3>
                 ${stockByLoc.length ? `
                 <div class="overflow-x-auto -mx-6 -mb-6">
@@ -205,11 +240,22 @@ function render(it) {
                     <p class="text-sm text-gray-500">Sem stock registado.</p>
                 </div>`}
             </div>
+            `}
         </div>
     `;
 }
 
 function escapeHtml(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+function unitStatusBadge(s) {
+    const map = {
+        em_uso:  ['Em uso',  'bg-emerald-50 text-emerald-700 border-emerald-100'],
+        inativo: ['Inativo', 'bg-gray-100 text-gray-600 border-gray-200'],
+        baixado: ['Baixado', 'bg-red-50 text-red-600 border-red-100']
+    };
+    const [label, cls] = map[s] || [s || '—', 'bg-gray-100 text-gray-600 border-gray-200'];
+    return `<span class="px-2 py-0.5 rounded text-[10px] border ${cls}">${escapeHtml(label)}</span>`;
+}
 
 loadItem();
 </script>

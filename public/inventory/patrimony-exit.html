@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Inventário · Patrimônio · Saída</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/styles.css">
+    <script>if (!localStorage.getItem('access_token')) { const r = encodeURIComponent(location.pathname + location.search); window.location.href = '/login.html?redirect=' + r; }</script>
+</head>
+<body class="bg-white">
+<div id="layoutRoot"></div>
+<script src="_layout.js"></script>
+<script>
+renderInventoryLayout({ activePage: 'patrimony-exit', title: 'Patrimônio · Saída', subtitle: 'Baixa de unidade com motivo' });
+
+document.getElementById('pageContent').innerHTML = `
+    <div class="max-w-2xl mx-auto bg-white border border-gray-200/70 rounded-xl shadow-sm p-8 text-center">
+        <div class="inline-flex w-14 h-14 rounded-full bg-purple-50 items-center justify-center text-purple-600 text-2xl mb-4">
+            <i class="fas fa-arrow-right-from-bracket"></i>
+        </div>
+        <h3 class="text-lg font-bold text-gray-900 mb-2">Saída (baixa) de Patrimônio</h3>
+        <p class="text-sm text-gray-600 leading-relaxed">
+            Aqui uma unidade (número de série) receberá <b>baixa</b> com um <b>motivo</b>
+            (ex.: "Queima do CPU. Fora da Garantia"), passando ao estado <b>baixado</b>.
+        </p>
+        <p class="mt-4 inline-flex items-center gap-2 text-xs text-purple-700 bg-purple-50 border border-purple-100 rounded-lg px-3 py-1.5">
+            <i class="fas fa-screwdriver-wrench"></i> Em construção — Fase 4 (baixa com motivo)
+        </p>
+    </div>
+`;
+</script>
+</body>
+</html>

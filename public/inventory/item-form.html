@@ -133,7 +133,7 @@ document.getElementById('pageContent').innerHTML = `
                         <label class="field-label">UM de consumo</label>
                         <select name="consumption_uom_id" id="consumptionUomSelect" class="field-input"></select>
                     </div>
-                    <div>
+                    <div id="conversionFactorWrap">
                         <label class="field-label">Fator de conversão</label>
                         <input name="conversion_factor" type="number" step="0.0001" value="1" class="field-input">
                         <p class="text-[11px] text-gray-400 mt-1.5">Ex.: 1 caixa = 100 unidades → 100</p>
@@ -276,7 +276,10 @@ async function activateMacro(macro) {
         ? '<span class="inline-flex items-center gap-1.5"><span class="w-1.5 h-1.5 rounded-full bg-sky-500"></span>Consumo · controla lote e validade</span>'
         : '<span class="inline-flex items-center gap-1.5"><span class="w-1.5 h-1.5 rounded-full bg-purple-500"></span>Patrimonial · controla nº de série e depreciação</span>';
     patrimonyFieldset.classList.toggle('hidden', macro !== 'patrimonial');
-    // Overrides por localização só fazem sentido para consumo
+    // Patrimônio não usa parâmetros de stock (mín/máx/lead), fator de conversão
+    // nem overrides por localização — são conceitos de consumo.
+    document.getElementById('stockFieldset').classList.toggle('hidden', !isConsumo);
+    document.getElementById('conversionFactorWrap').classList.toggle('hidden', !isConsumo);
     document.getElementById('locationParamsFieldset').classList.toggle('hidden', !isConsumo);
     step1.classList.add('hidden');
     step2.classList.remove('hidden');

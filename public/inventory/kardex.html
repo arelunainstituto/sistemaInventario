@@ -85,7 +85,7 @@ let currentDateTo     = null;
 async function bootstrap() {
     try {
         const [items, locs] = await Promise.all([
-            apiCall('/api/inventory/items?limit=1000'),
+            apiCall('/api/inventory/items?macro_category=consumo&limit=1000'),  // kardex de stock é só consumo
             apiCall('/api/inventory/locations')
         ]);
         document.getElementById('itemSelect').innerHTML = '<option value="">— selecione —</option>' +

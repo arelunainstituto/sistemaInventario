@@ -14,7 +14,7 @@
 <script src="_layout.js"></script>
 <script src="_searchable-select.js"></script>
 <script>
-renderInventoryLayout({ activePage: 'transfers', title: 'Transferências Internas', subtitle: 'Movimentação entre localizações (gera 2 movimentos)' });
+renderInventoryLayout({ activePage: 'transfers', title: 'Consumo · Transferências', subtitle: 'Movimentação de stock de consumo entre localizações (gera 2 movimentos)' });
 
 document.getElementById('pageContent').innerHTML = `
     <div class="flex justify-between items-center mb-4">
@@ -42,7 +42,6 @@ document.getElementById('pageContent').innerHTML = `
                     <select name="item_id" required onchange="onItemChange()" id="itemSelect" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
                         <option value="">— selecione —</option>
                     </select>
-                    <p id="patrimonialNotice" class="hidden mt-2 text-xs text-purple-700"><i class="fas fa-info-circle"></i> Item patrimonial — a localização do bem será atualizada para a localização de destino.</p>
                 </div>
 
                 <div id="stockPanel" class="md:col-span-3 hidden border border-indigo-200 bg-indigo-50 rounded-lg p-3 text-xs">
@@ -93,7 +92,7 @@ let items = [], allLocations = [], currentStock = [];
 async function bootstrap() {
     try {
         const [it, lo] = await Promise.all([
-            apiCall('/api/inventory/items?limit=1000'),
+            apiCall('/api/inventory/items?macro_category=consumo&limit=1000'),
             apiCall('/api/inventory/locations')
         ]);
         items = it.data || [];
@@ -126,7 +125,6 @@ async function load() {
 function openModal() {
     document.getElementById('form').reset();
     document.getElementById('stockPanel').classList.add('hidden');
-    document.getElementById('patrimonialNotice').classList.add('hidden');
     document.getElementById('fromSelect').innerHTML = '<option value="">—</option>';
     document.getElementById('toSelect').innerHTML = '<option value="">—</option>';
     document.getElementById('lotSelect').innerHTML = '<option value="">— Sugestão FEFO automática —</option>';
@@ -139,8 +137,6 @@ function closeModal() { document.getElementById('modal').classList.add('hidden')
 async function onItemChange() {
     const itemId = document.getElementById('itemSelect').value;
     if (!itemId) return;
-    const itemOpt = document.getElementById('itemSelect').selectedOptions[0];
-    document.getElementById('patrimonialNotice').classList.toggle('hidden', itemOpt.dataset.macro !== 'patrimonial');
 
     try {
         const r = await apiCall(`/api/inventory/exits/stock-by-item/${itemId}`);

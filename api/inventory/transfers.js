@@ -50,6 +50,14 @@ router.post('/', requirePermission('inventory', 'transfer'), async (req, res) =>
         if (from_location_id === to_location_id)
             return res.status(400).json({ error: 'Localizações origem e destino não podem ser iguais' });
 
+        // Fronteira de macro: transferência de stock de CONSUMO. Patrimônio é
+        // movido pelo módulo Patrimônio › Movimentação — bloqueia aqui via API.
+        const { data: itemMeta } = await supabaseAdmin
+            .from('inv_items').select('name, macro_category').eq('id', item_id).single();
+        if (!itemMeta) return res.status(400).json({ error: 'Item não encontrado' });
+        if (itemMeta.macro_category !== 'consumo')
+            return res.status(400).json({ error: `"${itemMeta.name}" é patrimonial — use Patrimônio › Movimentação` });
+
         const { data, error } = await supabaseAdmin.rpc('fn_inv_transfer', {
             p_item: item_id,
             p_from: from_location_id,

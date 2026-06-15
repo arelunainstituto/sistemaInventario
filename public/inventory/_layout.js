@@ -4,11 +4,22 @@
 // Versão exibida no sidebar — manter em sync com CHANGELOG.md
 const INVENTORY_VERSION = 'v1.9.0';
 
+// Operações separadas por macro_category como "módulos" (Consumo / Patrimônio).
+// Itens com type:'group' viram um cabeçalho + sub-itens indentados (ver
+// navGroupHtml). A separação é só de UX/navegação — a fronteira real é o
+// backend, que valida o macro_category de cada item em cada endpoint.
 const INVENTORY_NAV = [
     { id: 'dashboard',   label: 'Dashboard',         icon: 'fa-chart-pie',  href: 'index.html' },
     { id: 'items',       label: 'Itens',             icon: 'fa-boxes-stacked', href: 'items.html' },
-    { id: 'entries',     label: 'Entradas',          icon: 'fa-arrow-right-to-bracket', href: 'entries.html' },
-    { id: 'exits',       label: 'Saídas',            icon: 'fa-arrow-right-from-bracket', href: 'exits.html' },
+    { type: 'group', id: 'grp-consumo', label: 'Consumo', icon: 'fa-prescription-bottle', children: [
+        { id: 'entries', label: 'Entrada', icon: 'fa-arrow-right-to-bracket',   href: 'entries.html' },
+        { id: 'exits',   label: 'Saída',   icon: 'fa-arrow-right-from-bracket', href: 'exits.html' },
+    ]},
+    { type: 'group', id: 'grp-patrimonio', label: 'Patrimônio', icon: 'fa-laptop-medical', children: [
+        { id: 'patrimony-entry',    label: 'Entrada',      icon: 'fa-arrow-right-to-bracket',   href: 'patrimony-entry.html' },
+        { id: 'patrimony-movement', label: 'Movimentação', icon: 'fa-right-left',                href: 'patrimony-movement.html' },
+        { id: 'patrimony-exit',     label: 'Saída',        icon: 'fa-arrow-right-from-bracket',  href: 'patrimony-exit.html' },
+    ]},
     { id: 'transfers',   label: 'Transferências',    icon: 'fa-right-left',  href: 'transfers.html' },
     { id: 'adjustments', label: 'Ajustes',           icon: 'fa-sliders',     href: 'adjustments.html', adminOnly: true },
     { id: 'inventory-session', label: 'Inventário Físico', icon: 'fa-list-check', href: 'inventory-session.html' },
@@ -27,9 +38,21 @@ const INVENTORY_NAV_SETUP = [
     { id: 'uoms',        label: 'Unidades de medida', icon: 'fa-ruler',         href: 'uoms.html' },
 ];
 
-function navItemHtml(item, active) {
+// Cabeçalho de grupo (Consumo/Patrimônio) + sub-itens indentados. O cabeçalho
+// usa a classe sidebar-label, então some no modo recolhido — restando apenas os
+// ícones dos filhos (como uma lista plana), sem quebrar o layout colapsado.
+function navGroupHtml(group, active) {
+    const childActive = group.children.some(c => c.id === active);
+    const header = `<p class="sidebar-label text-[10px] uppercase font-bold tracking-wider px-3 mt-3 mb-1 flex items-center gap-2 ${childActive ? 'text-sky-600' : 'text-gray-400'}">
+        <i class="fas ${group.icon} text-[11px]"></i> ${group.label}
+    </p>`;
+    return header + group.children.map(c => navItemHtml(c, active, true)).join('');
+}
+
+function navItemHtml(item, active, nested = false) {
     const isActive = item.id === active;
-    const base = 'sidebar-nav-item w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg transition-colors relative';
+    const pad = nested ? 'pl-9 pr-3' : 'px-3';
+    const base = `sidebar-nav-item w-full flex items-center gap-3 ${pad} py-2.5 text-sm font-medium rounded-lg transition-colors relative`;
     const state = isActive
         ? 'text-sky-700 bg-sky-50'
         : item.disabled
@@ -66,7 +89,7 @@ function renderInventoryLayout({ activePage = 'dashboard', title = 'Inventário'
 
             <nav class="flex-1 overflow-y-auto overflow-x-hidden p-4 space-y-0.5">
                 <p class="sidebar-label text-[10px] uppercase font-bold text-gray-400 tracking-wider px-3 mt-2 mb-2">Operações</p>
-                ${INVENTORY_NAV.map(i => navItemHtml(i, activePage)).join('')}
+                ${INVENTORY_NAV.map(i => i.type === 'group' ? navGroupHtml(i, activePage) : navItemHtml(i, activePage)).join('')}
 
                 <p class="sidebar-label text-[10px] uppercase font-bold text-gray-400 tracking-wider px-3 mt-5 mb-2">Cadastros</p>
                 ${INVENTORY_NAV_SETUP.map(i => navItemHtml(i, activePage)).join('')}

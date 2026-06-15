@@ -15,7 +15,7 @@
 <script src="_searchable-select.js"></script>
 <script src="_supplier-modal.js"></script>
 <script>
-renderInventoryLayout({ activePage: 'entries', title: 'Entradas', subtitle: 'Recepção de materiais com documento fiscal' });
+renderInventoryLayout({ activePage: 'entries', title: 'Consumo · Entradas', subtitle: 'Recepção de materiais de consumo com documento fiscal' });
 
 document.getElementById('pageContent').innerHTML = `
     <div class="flex justify-between items-center mb-4">
@@ -82,7 +82,7 @@ let items = [], locations = [], suppliers = [];
 async function bootstrap() {
     try {
         const [it, lo, su] = await Promise.all([
-            apiCall('/api/inventory/items?limit=1000'),
+            apiCall('/api/inventory/items?macro_category=consumo&limit=1000'),
             apiCall('/api/inventory/locations'),
             apiCall('/api/inventory/suppliers')
         ]);

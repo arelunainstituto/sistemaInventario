@@ -22,6 +22,12 @@ router.use('/items',      require('./items'));
 router.use('/entries',    require('./entries'));
 router.use('/scan',       require('./scan'));
 
+// Épico Patrimônio — unidades por número de série, colaboradores (RH) e
+// operações patrimoniais (entrada/movimentação/baixa).
+router.use('/serial-units', require('./serial-units'));
+router.use('/employees',    require('./employees'));
+router.use('/patrimony',    require('./patrimony'));
+
 // Fase 2 — Saídas + Movimentações + Ajustes
 router.use('/exits',              require('./exits'));
 router.use('/transfers',          require('./transfers'));

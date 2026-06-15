@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Inventário · Patrimônio · Movimentação</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/styles.css">
+    <script>if (!localStorage.getItem('access_token')) { const r = encodeURIComponent(location.pathname + location.search); window.location.href = '/login.html?redirect=' + r; }</script>
+</head>
+<body class="bg-white">
+<div id="layoutRoot"></div>
+<script src="_layout.js"></script>
+<script src="_searchable-select.js"></script>
+<script>
+renderInventoryLayout({ activePage: 'patrimony-movement', title: 'Patrimônio · Movimentação', subtitle: 'Reatribuição de origem → destino (localização e/ou colaborador)' });
+
+document.getElementById('pageContent').innerHTML = `
+    <div class="flex justify-between items-center mb-4">
+        <h3 class="text-base font-bold text-gray-900">Histórico de movimentações</h3>
+        <button onclick="openModal()" class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg text-sm font-medium shadow-sm shadow-purple-500/20 transition flex items-center gap-2"><i class="fas fa-right-left"></i> Nova movimentação</button>
+    </div>
+    <div class="bg-white rounded-xl border border-gray-200/70 shadow-sm overflow-hidden">
+        <table class="w-full text-sm">
+            <thead class="bg-gray-50/50 text-[10px] uppercase tracking-wider text-gray-500 border-b border-gray-200">
+                <tr>
+                    <th class="text-left p-3">Data/hora</th>
+                    <th class="text-left p-3">Nº série · Produto</th>
+                    <th class="text-left p-3">Origem</th>
+                    <th class="text-left p-3">Destino</th>
+                    <th class="text-left p-3">Justificação</th>
+                </tr>
+            </thead>
+            <tbody id="tbody" class="divide-y divide-gray-50"></tbody>
+        </table>
+    </div>
+
+    <div id="modal" class="hidden fixed inset-0 bg-gray-900/40 backdrop-blur-[2px] z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-xl border border-gray-200 shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
+            <div class="flex justify-between items-center p-4 border-b">
+                <h3 class="font-bold text-gray-800">Nova movimentação</h3>
+                <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600"><i class="fas fa-times"></i></button>
+            </div>
+            <form id="form" class="p-6 space-y-4">
+                <div>
+                    <label class="text-xs text-gray-500">Unidade (número de série) *</label>
+                    <select name="serial_unit_id" required onchange="onUnitChange()" id="unitSelect" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                        <option value="">— selecione —</option>
+                    </select>
+                </div>
+
+                <div id="originBox" class="hidden border border-gray-200 bg-gray-50 rounded-lg p-3 text-xs">
+                    <p class="font-bold text-gray-600 mb-1.5"><i class="fas fa-location-dot"></i> Origem atual</p>
+                    <div class="grid grid-cols-2 gap-2">
+                        <div><span class="text-gray-400">Localização:</span> <span id="originLocation" class="text-gray-800"></span></div>
+                        <div><span class="text-gray-400">Colaborador:</span> <span id="originHolder" class="text-gray-800"></span></div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="text-xs text-gray-500">Localização de destino *</label>
+                        <select name="to_location_id" id="toLocationSelect" required class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                            <option value="">—</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="text-xs text-gray-500">Colaborador de destino</label>
+                        <select name="to_employee_id" id="toHolderSelect" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                            <option value="">— sem colaborador —</option>
+                        </select>
+                        <p class="text-[11px] text-gray-400 mt-1">Pré-preenchido com o atual. Deixe "sem colaborador" para desvincular.</p>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="text-xs text-gray-500">Justificação (recomendada)</label>
+                    <textarea name="justification" rows="2" placeholder="Motivo da movimentação…" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"></textarea>
+                </div>
+
+                <div class="flex justify-end gap-2 border-t pt-4">
+                    <button type="button" onclick="closeModal()" class="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">Cancelar</button>
+                    <button type="submit" class="px-5 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-medium shadow-sm shadow-purple-500/20 transition flex items-center gap-2"><i class="fas fa-save"></i> Movimentar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+`;
+
+let units = [], locations = [], employees = [];
+
+async function bootstrap() {
+    try {
+        const [lo, em] = await Promise.all([
+            apiCall('/api/inventory/locations'),
+            apiCall('/api/inventory/employees')
+        ]);
+        locations = (lo.data || []).filter(l => l.is_active !== false);
+        employees = em.data || [];
+    } catch (err) { toast('Falha ao carregar dados: ' + err.message, 'error'); }
+}
+
+async function load() {
+    try {
+        const r = await apiCall('/api/inventory/patrimony/movements?limit=100');
+        const rows = r.data || [];
+        document.getElementById('tbody').innerHTML = rows.length ? rows.map(m => `
+            <tr class="hover:bg-purple-50/30 transition">
+                <td class="p-3 text-xs">${new Date(m.occurred_at).toLocaleString('pt-PT')}</td>
+                <td class="p-3"><span class="font-mono text-[11px] text-gray-700">${escapeHtml(m.serial_unit?.serial_number || '')}</span><br><span class="text-[11px] text-gray-500">${escapeHtml(m.serial_unit?.item?.name || '')}</span></td>
+                <td class="p-3 text-xs text-gray-600">${locHolder(m.from_location, m.from_employee)}</td>
+                <td class="p-3 text-xs text-gray-600">${locHolder(m.to_location, m.to_employee)}</td>
+                <td class="p-3 text-xs text-gray-600 max-w-[220px] truncate" title="${escapeHtml(m.justification || '')}">${escapeHtml(m.justification || '—')}</td>
+            </tr>`).join('') : '<tr><td colspan="5" class="p-6 text-center text-gray-400">Nenhuma movimentação registada.</td></tr>';
+    } catch (err) { toast(err.message, 'error'); }
+}
+
+function locHolder(loc, emp) {
+    const l = loc ? `${escapeHtml(loc.unit?.name || '')} · ${escapeHtml(loc.name)}` : '—';
+    const e = emp ? ` <span class="text-purple-600">· ${escapeHtml(emp.name)}</span>` : '';
+    return l + e;
+}
+
+function populateModalSelects() {
+    document.getElementById('unitSelect').innerHTML = '<option value="">— selecione —</option>' +
+        units.map(u => `<option value="${u.id}">${escapeHtml(u.serial_number)} · ${escapeHtml(u.item?.internal_code || '')} ${escapeHtml(u.item?.name || '')}</option>`).join('');
+    document.getElementById('toLocationSelect').innerHTML = '<option value="">—</option>' +
+        locations.filter(l => l.can_receive !== false).map(l => `<option value="${l.id}">${escapeHtml(l.unit?.name || '')} · ${escapeHtml(l.name)}</option>`).join('');
+    document.getElementById('toHolderSelect').innerHTML = '<option value="">— sem colaborador —</option>' +
+        employees.map(e => `<option value="${e.id}">${escapeHtml(e.name)}${e.department ? ' · ' + escapeHtml(e.department) : ''}</option>`).join('');
+}
+
+async function openModal() {
+    document.getElementById('form').reset();
+    document.getElementById('originBox').classList.add('hidden');
+    // Recarrega as unidades para refletir a localização/colaborador atuais.
+    try {
+        const r = await apiCall('/api/inventory/serial-units?limit=1000');
+        units = (r.data || []).filter(u => u.status !== 'baixado');
+    } catch (err) { units = []; toast(err.message, 'error'); }
+    if (!units.length) toast('Nenhuma unidade disponível para movimentar', 'warn');
+    populateModalSelects();
+    document.getElementById('modal').classList.remove('hidden');
+    // Só a busca de unidade é combobox (lista grande). Destino fica em selects
+    // nativos para o pré-preenchimento por .value funcionar de forma confiável.
+    makeSearchable('unitSelect', { placeholder: 'Buscar unidade por número de série ou produto…' });
+}
+
+function closeModal() { document.getElementById('modal').classList.add('hidden'); }
+
+// Garante que um id seja selecionável: se a localização/colaborador ATUAL não
+// estiver na lista (ex.: colaborador inativo, localização não-recebedora), o
+// pré-preenchimento falharia em silêncio e o submit desvincularia/zeraria. Aqui
+// injetamos a opção do estado atual para que o .value "pegue".
+function ensureOption(selectId, id, label) {
+    if (!id) return;
+    const sel = document.getElementById(selectId);
+    if (![...sel.options].some(o => o.value === id)) {
+        const opt = document.createElement('option');
+        opt.value = id; opt.textContent = label;
+        sel.appendChild(opt);
+    }
+}
+
+function onUnitChange() {
+    const u = units.find(x => x.id === document.getElementById('unitSelect').value);
+    const box = document.getElementById('originBox');
+    if (!u) { box.classList.add('hidden'); return; }
+    document.getElementById('originLocation').textContent = u.location ? `${u.location.unit?.name || ''} · ${u.location.name}` : '—';
+    document.getElementById('originHolder').textContent   = u.holder ? u.holder.name : '—';
+    box.classList.remove('hidden');
+    // Garante que origem atual seja selecionável no destino antes de pré-preencher.
+    if (u.location) ensureOption('toLocationSelect', u.location.id, `${u.location.unit?.name || ''} · ${u.location.name} (atual)`);
+    if (u.holder)   ensureOption('toHolderSelect',   u.holder.id,   `${u.holder.name} (atual)`);
+    document.getElementById('toLocationSelect').value = u.location?.id || '';
+    document.getElementById('toHolderSelect').value   = u.holder?.id || '';
+}
+
+document.getElementById('form').addEventListener('submit', async e => {
+    e.preventDefault();
+    const f = e.target;
+    const btn = f.querySelector('button[type=submit]');
+    const payload = {
+        serial_unit_id: f.serial_unit_id.value,
+        to_location_id: f.to_location_id.value,
+        to_employee_id: f.to_employee_id.value || null,
+        justification:  f.justification.value || null
+    };
+    if (btn) btn.disabled = true; // evita duplo envio (movimento duplicado com origem defasada)
+    try {
+        await apiCall('/api/inventory/patrimony/movements', { method: 'POST', body: JSON.stringify(payload) });
+        toast('Movimentação registada');
+        closeModal();
+        load();
+    } catch (err) {
+        toast(err.message, 'error');
+    } finally {
+        if (btn) btn.disabled = false;
+    }
+});
+
+function escapeHtml(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+(async () => { await bootstrap(); await load(); })();
+</script>
+</body>
+</html>

@@ -120,6 +120,14 @@ router.post('/', requirePermission('inventory', 'exit'), async (req, res) => {
             });
         }
 
+        // Fronteira de macro: saída de CONSUMO. Item patrimonial recebe baixa
+        // pelo módulo Patrimônio › Saída — bloqueia aqui mesmo via API direta.
+        const { data: itemMeta } = await supabaseAdmin
+            .from('inv_items').select('name, macro_category').eq('id', item_id).single();
+        if (!itemMeta) return res.status(400).json({ error: 'Item não encontrado' });
+        if (itemMeta.macro_category !== 'consumo')
+            return res.status(400).json({ error: `"${itemMeta.name}" é patrimonial — use Patrimônio › Saída` });
+
         const { data, error } = await supabaseAdmin.rpc('fn_inv_consume', {
             p_item: item_id,
             p_location: location_id,

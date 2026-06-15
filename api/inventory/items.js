@@ -132,7 +132,20 @@ router.get('/:id', requirePermission('inventory', 'read'), async (req, res) => {
             location_params = ep || [];
         }
 
-        res.json({ success: true, data: { ...item, stock: stock || [], location_params } });
+        // Patrimônio: as unidades por número de série substituem o conceito de
+        // stock (cada unidade = 1 ativo, com localização e colaborador atuais).
+        let serial_units = [];
+        if (item.macro_category === 'patrimonial') {
+            const { data: su } = await supabaseAdmin
+                .from('inv_serial_units')
+                .select('id, serial_number, status, acquisition_date, acquisition_value, location:inv_locations!current_location_id(id, name, unit:inv_units(id, name)), holder:rh_employees!current_holder_id(id, name, department)')
+                .eq('item_id', id)
+                .is('deleted_at', null)
+                .order('serial_number', { ascending: true });
+            serial_units = su || [];
+        }
+
+        res.json({ success: true, data: { ...item, stock: stock || [], location_params, serial_units } });
     } catch (err) {
         console.error('GET inv_items/:id error:', err);
         res.status(500).json({ error: err.message || 'Erro ao obter item' });

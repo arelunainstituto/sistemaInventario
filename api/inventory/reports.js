@@ -348,6 +348,15 @@ router.get('/kardex/:itemId', requirePermission('inventory', 'reports'), async (
         const { itemId } = req.params;
         const { location_id, from, to } = req.query;
 
+        // Kardex é um livro-razão de STOCK (consumo). Patrimônio não usa
+        // inv_stock — seus movimentos por unidade não fecham saldo aqui (a view
+        // leria a movimentação como −1 sem +1), então bloqueamos e apontamos
+        // para o histórico de unidades na ficha do item.
+        const { data: itemRow } = await supabaseAdmin
+            .from('inv_items').select('macro_category').eq('id', itemId).single();
+        if (itemRow && itemRow.macro_category === 'patrimonial')
+            return res.status(400).json({ error: 'Kardex de stock aplica-se apenas a itens de consumo. Para patrimônio, veja o histórico de unidades na ficha do item.' });
+
         const viewName = location_id ? 'vw_inv_kardex_by_location' : 'vw_inv_kardex';
         let q = supabaseAdmin.from(viewName).select('*').eq('item_id', itemId);
         if (location_id) q = q.eq('location_id', location_id);

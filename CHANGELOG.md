@@ -34,7 +34,42 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e
 
 ## [Unreleased]
 
-_Nenhuma alteração pendente._
+### Épico: Módulo Patrimônio (separação Consumo/Patrimônio + controle por nº de série)
+
+> Trabalho faseado. Consolidar numa versão (provável `1.10.0`) ao subir para produção.
+
+#### Fase 1 — Separação Consumo/Patrimônio na sidebar + fronteira de macro no servidor
+- **Adicionado**
+  - Sidebar agora separa as operações em dois "módulos" por `macro_category` ([_layout.js](public/inventory/_layout.js)): grupo **Consumo** (Entrada · Saída) e grupo **Patrimônio** (Entrada · Movimentação · Saída). Novo `navGroupHtml` renderiza cabeçalho de grupo + sub-itens indentados; some corretamente no modo recolhido.
+  - Páginas stub de Patrimônio ([patrimony-entry.html](public/inventory/patrimony-entry.html), [patrimony-movement.html](public/inventory/patrimony-movement.html), [patrimony-exit.html](public/inventory/patrimony-exit.html)) — placeholders que descrevem o que cada tela fará nas Fases 2–4.
+- **Alterado**
+  - [entries.html](public/inventory/entries.html), [exits.html](public/inventory/exits.html) e [transfers.html](public/inventory/transfers.html) passam a carregar **apenas itens de consumo** (`?macro_category=consumo`) e foram retituladas "Consumo · …". Removido o aviso de item patrimonial das Transferências (agora consumo-only).
+  - [item-form.html](public/inventory/item-form.html): no cadastro **patrimonial**, escondidos os campos de **stock mínimo/máximo, lead time** e **fator de conversão** (conceitos de consumo).
+  - [item-view.html](public/inventory/item-view.html): na ficha **patrimonial**, escondidos **fator de conversão** e os parâmetros de stock de consumo (mín/máx/lead/ponto de reposição/consumo médio).
+- **Segurança** (Média)
+  - Fronteira de `macro_category` movida para o **backend**: [entries.js](api/inventory/entries.js), [exits.js](api/inventory/exits.js) e [transfers.js](api/inventory/transfers.js) agora **rejeitam itens patrimoniais** (HTTP 400). A separação por tela é só UX — manipular a URL/o request não contorna mais a validação. (Patrimônio terá endpoints próprios validando `patrimonial`.)
+
+#### Fase 2 — Modelo de número de série + colaborador nas movimentações
+- **Banco** (`requer migração`: [110-patrimonio-serie.sql](database/inventory-refactor/110-patrimonio-serie.sql))
+  - Nova tabela **`inv_serial_units`**: cada número de série é uma **unidade física identificável** de um produto patrimonial, com localização e colaborador atuais, valor de aquisição e estado (`em_uso`/`inativo`/`baixado`). NS único por produto (`UNIQUE(item_id, serial_number)`). Patrimônio **não usa `inv_stock`** — as unidades são o "stock". RLS + índices no padrão do módulo.
+  - `inv_movements` ganha `serial_unit_id`, `from_employee_id`, `to_employee_id` (usadas já na entrada; movimentação e baixa nas Fases 3–4).
+- **Adicionado**
+  - Endpoints: `GET /api/inventory/serial-units` (+ `/:id` com histórico) ([serial-units.js](api/inventory/serial-units.js)); `GET /api/inventory/employees` — lista enxuta do RH (`rh_employees`) para seletores, sob permissão de inventário ([employees.js](api/inventory/employees.js)); `POST /api/inventory/patrimony/entries` — aquisição que cadastra 1..N unidades por NS e gera um movimento `entrada` por unidade ([patrimony.js](api/inventory/patrimony.js)).
+  - Tela **Patrimônio › Entrada** ([patrimony-entry.html](public/inventory/patrimony-entry.html)) seguindo o mesmo padrão das telas de consumo (lista de registos + botão "Nova entrada" → modal): a tabela lista as unidades cadastradas (NS, produto, localização, colaborador, valor, estado) e o modal cadastra 1..N unidades de um produto (localização inicial, colaborador e fornecedor opcionais; NS, data e valor por unidade).
+- **Alterado**
+  - Ficha do item ([item-view.html](public/inventory/item-view.html), [items.js](api/inventory/items.js)): para patrimônio, o painel "Stock por localização" dá lugar a **"Unidades (números de série)"** — NS, localização, colaborador, valor e estado. `GET /items/:id` passa a devolver `serial_units` para itens patrimoniais.
+
+#### Fase 3 — Movimentação de patrimônio (origem → destino, localização + colaborador)
+- **Adicionado**
+  - `POST /api/inventory/patrimony/movements` — reatribui uma unidade: origem (localização/colaborador atuais) → destino (nova localização e/ou colaborador). Atualiza o estado da unidade e grava **um** movimento (`transferencia_saida` · subtype `movimentacao_patrimonial`) com `from/to_location_id` + `from/to_employee_id` e `serial_unit_id`; reverte a unidade se o movimento falhar. Bloqueia unidades `baixado` e movimentos sem mudança real. `GET /api/inventory/patrimony/movements` lista o histórico ([patrimony.js](api/inventory/patrimony.js)).
+  - Tela **Patrimônio › Movimentação** ([patrimony-movement.html](public/inventory/patrimony-movement.html)) no padrão das Transferências (lista + modal): escolhe a unidade (busca por NS/produto), mostra a **origem atual** (local + colaborador) e define o **destino** (localização obrigatória + colaborador opcional, pré-preenchidos com o atual).
+- **Corrigido / endurecido** (revisão adversarial)
+  - Movimentação não desvincula colaborador por engano: o local/colaborador atuais são injetados como opção no destino mesmo quando estão inativos/não-recebedores (antes o pré-preenchimento falhava em silêncio e o submit zerava o vínculo).
+  - Guarda de concorrência otimista no `POST /movements` (só atualiza se a origem ainda for a lida; 409 caso outra operação já tenha movido) + botão de submit desabilitado durante o envio — evita movimento duplicado com origem defasada.
+  - Reversão da unidade agora é checada: se a gravação do movimento e a reversão falharem, retorna mensagem clara (NS afetado) em vez de 500 genérico.
+  - Kardex de stock passa a recusar itens patrimoniais ([reports.js](api/inventory/reports.js)) e some do seletor do [kardex.html](public/inventory/kardex.html) — patrimônio não usa `inv_stock`, então seus movimentos não fechavam saldo ali. (As views `vw_inv_kardex*` ainda contemplam só consumo na prática; limpeza nas views fica como melhoria futura.)
+- **Notas**
+  - As telas de Patrimônio (Entrada, Movimentação) seguem o mesmo layout das equivalentes de Consumo; a diferença é só a lógica (unidades por número de série vs documento/lote). Saída (baixa) segue na Fase 4.
 
 ---
 

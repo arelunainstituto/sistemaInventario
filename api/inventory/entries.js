@@ -89,6 +89,21 @@ router.post('/', requirePermission('inventory', 'entry'), async (req, res) => {
                 return res.status(400).json({ error: `Linha ${idx + 1}: unit_cost deve ser >= 0` });
         }
 
+        // Fronteira de macro: esta entrada é só de CONSUMO. Bloqueia itens
+        // patrimoniais mesmo que a chamada venha direto à API — a tela é só UX,
+        // o controle é aqui. (Patrimônio entra por Patrimônio › Entrada.)
+        const itemIds = [...new Set(lines.map(l => l.item_id))];
+        const { data: itemsMeta, error: metaErr } = await supabaseAdmin
+            .from('inv_items').select('id, name, macro_category').in('id', itemIds);
+        if (metaErr) throw metaErr;
+        const metaById = new Map((itemsMeta || []).map(i => [i.id, i]));
+        for (const [idx, l] of lines.entries()) {
+            const m = metaById.get(l.item_id);
+            if (!m) return res.status(400).json({ error: `Linha ${idx + 1}: item não encontrado` });
+            if (m.macro_category !== 'consumo')
+                return res.status(400).json({ error: `Linha ${idx + 1}: "${m.name}" é patrimonial — use Patrimônio › Entrada` });
+        }
+
         // 1) Cria cabeçalho
         const { data: entry, error: entryErr } = await supabaseAdmin
             .from('inv_entries')
