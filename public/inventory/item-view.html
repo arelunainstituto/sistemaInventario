@@ -57,6 +57,9 @@ function render(it) {
     const isPatrimonial = it.macro_category === 'patrimonial';
     const stockByLoc = it.stock || [];
     const totalStock = stockByLoc.reduce((acc, s) => acc + parseFloat(s.quantity || 0), 0);
+    const serialUnits = it.serial_units || [];
+    const totalBook   = serialUnits.reduce((a, u) => a + (parseFloat(u.book_value) || 0), 0);
+    const activeUnits = serialUnits.filter(u => u.status !== 'baixado').length;
 
     document.getElementById('content').innerHTML = `
         <!-- Header -->
@@ -109,7 +112,7 @@ function render(it) {
                 ${infoRow('UM compra', it.purchase_uom ? `${it.purchase_uom.name} (${it.purchase_uom.code})` : null)}
                 ${infoRow('UM consumo', it.consumption_uom ? `${it.consumption_uom.name} (${it.consumption_uom.code})` : null)}
                 ${!isPatrimonial ? infoRow('Fator de conversão', it.conversion_factor) : ''}
-                ${infoRow('Custo Médio', `€ ${parseFloat(it.cmp || 0).toFixed(4)}`)}
+                ${!isPatrimonial ? infoRow('Custo Médio', `€ ${parseFloat(it.cmp || 0).toFixed(4)}`) : ''}
             </div>
 
             <!-- Parâmetros de stock -->
@@ -129,10 +132,10 @@ function render(it) {
             <!-- Patrimoniais -->
             <div class="bg-white rounded-xl border border-gray-200/70 shadow-sm p-6 lg:col-span-1">
                 <h3 class="font-bold text-gray-900 mb-3 text-sm flex items-center gap-2"><i class="fas fa-laptop-medical text-purple-600"></i> Dados patrimoniais</h3>
-                ${infoRow('Data aquisição', it.acquisition_date)}
-                ${infoRow('Valor de aquisição', it.acquisition_value ? `€ ${parseFloat(it.acquisition_value).toFixed(2)}` : null)}
                 ${infoRow('Taxa depreciação anual', it.depreciation_rate ? `${it.depreciation_rate}%` : null)}
-                ${infoRow('Estado patrimonial', it.asset_status)}
+                ${infoRow('Unidades (ativas)', `${serialUnits.length} (${activeUnits})`)}
+                ${infoRow('Valor contábil total', `€ ${totalBook.toFixed(2)}`)}
+                <p class="text-[11px] text-gray-400 mt-2 leading-relaxed">Valor e data de aquisição são <b>por unidade</b> (ver tabela). A depreciação anual corre por unidade usando esta taxa.</p>
             </div>` : ''}
 
             ${!isPatrimonial && (it.location_params || []).length ? `
@@ -188,6 +191,7 @@ function render(it) {
                             <th class="text-left px-3 py-2.5 font-semibold">Localização</th>
                             <th class="text-left px-3 py-2.5 font-semibold">Colaborador</th>
                             <th class="text-right px-3 py-2.5 font-semibold">Valor aquis.</th>
+                            <th class="text-right px-3 py-2.5 font-semibold">Valor contábil</th>
                             <th class="text-center px-6 py-2.5 font-semibold">Estado</th>
                         </tr>
                     </thead>
@@ -198,6 +202,7 @@ function render(it) {
                                 <td class="px-3 py-2.5 text-gray-800"><span class="text-gray-400 text-xs">${escapeHtml(u.location?.unit?.name || '')} ·</span> ${escapeHtml(u.location?.name || '—')}</td>
                                 <td class="px-3 py-2.5 text-gray-700">${u.holder ? escapeHtml(u.holder.name) : '—'}</td>
                                 <td class="px-3 py-2.5 text-right tabular-nums">${u.acquisition_value != null ? '€ ' + parseFloat(u.acquisition_value).toFixed(2) : '—'}</td>
+                                <td class="px-3 py-2.5 text-right tabular-nums ${u.book_value != null ? 'text-gray-700' : 'text-gray-300'}">${u.book_value != null ? '€ ' + parseFloat(u.book_value).toFixed(2) : '—'}</td>
                                 <td class="px-6 py-2.5 text-center">${unitStatusBadge(u.status)}</td>
                             </tr>`).join('')}
                     </tbody>

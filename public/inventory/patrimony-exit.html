@@ -12,24 +12,149 @@
 <body class="bg-white">
 <div id="layoutRoot"></div>
 <script src="_layout.js"></script>
+<script src="_searchable-select.js"></script>
 <script>
 renderInventoryLayout({ activePage: 'patrimony-exit', title: 'Patrimônio · Saída', subtitle: 'Baixa de unidade com motivo' });
 
 document.getElementById('pageContent').innerHTML = `
-    <div class="max-w-2xl mx-auto bg-white border border-gray-200/70 rounded-xl shadow-sm p-8 text-center">
-        <div class="inline-flex w-14 h-14 rounded-full bg-purple-50 items-center justify-center text-purple-600 text-2xl mb-4">
-            <i class="fas fa-arrow-right-from-bracket"></i>
+    <div class="flex justify-between items-center mb-4">
+        <h3 class="text-base font-bold text-gray-900">Histórico de baixas</h3>
+        <button onclick="openModal()" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm font-medium shadow-sm shadow-red-500/20 transition flex items-center gap-2"><i class="fas fa-ban"></i> Nova baixa</button>
+    </div>
+    <div class="bg-white rounded-xl border border-gray-200/70 shadow-sm overflow-hidden">
+        <table class="w-full text-sm">
+            <thead class="bg-gray-50/50 text-[10px] uppercase tracking-wider text-gray-500 border-b border-gray-200">
+                <tr>
+                    <th class="text-left p-3">Data/hora</th>
+                    <th class="text-left p-3">Nº série · Produto</th>
+                    <th class="text-left p-3">Última localização</th>
+                    <th class="text-left p-3">Colaborador</th>
+                    <th class="text-left p-3">Motivo</th>
+                </tr>
+            </thead>
+            <tbody id="tbody" class="divide-y divide-gray-50"></tbody>
+        </table>
+    </div>
+
+    <div id="modal" class="hidden fixed inset-0 bg-gray-900/40 backdrop-blur-[2px] z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-xl border border-gray-200 shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div class="flex justify-between items-center p-4 border-b">
+                <h3 class="font-bold text-gray-800">Nova baixa</h3>
+                <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600"><i class="fas fa-times"></i></button>
+            </div>
+            <form id="form" class="p-6 space-y-4">
+                <div>
+                    <label class="text-xs text-gray-500">Unidade (número de série) *</label>
+                    <select name="serial_unit_id" required onchange="onUnitChange()" id="unitSelect" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                        <option value="">— selecione —</option>
+                    </select>
+                </div>
+
+                <div id="infoBox" class="hidden border border-gray-200 bg-gray-50 rounded-lg p-3 text-xs">
+                    <div class="grid grid-cols-2 gap-2">
+                        <div><span class="text-gray-400">Localização:</span> <span id="infoLocation" class="text-gray-800"></span></div>
+                        <div><span class="text-gray-400">Colaborador:</span> <span id="infoHolder" class="text-gray-800"></span></div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div class="md:col-span-2">
+                        <label class="text-xs text-gray-500">Motivo da baixa *</label>
+                        <textarea name="reason" rows="2" required placeholder="Ex.: Queima do CPU. Fora da Garantia." class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"></textarea>
+                    </div>
+                    <div>
+                        <label class="text-xs text-gray-500">Data da baixa</label>
+                        <input name="write_off_date" type="date" id="writeOffDate" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                    </div>
+                </div>
+
+                <div class="bg-red-50 border border-red-100 rounded-lg p-3 text-[11px] text-red-700 flex items-start gap-2">
+                    <i class="fas fa-triangle-exclamation mt-0.5"></i>
+                    <span>A baixa marca a unidade como <b>baixado</b> e é registada no histórico. A unidade deixa de aparecer para movimentação.</span>
+                </div>
+
+                <div class="flex justify-end gap-2 border-t pt-4">
+                    <button type="button" onclick="closeModal()" class="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">Cancelar</button>
+                    <button type="submit" class="px-5 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium shadow-sm shadow-red-500/20 transition flex items-center gap-2"><i class="fas fa-ban"></i> Dar baixa</button>
+                </div>
+            </form>
         </div>
-        <h3 class="text-lg font-bold text-gray-900 mb-2">Saída (baixa) de Patrimônio</h3>
-        <p class="text-sm text-gray-600 leading-relaxed">
-            Aqui uma unidade (número de série) receberá <b>baixa</b> com um <b>motivo</b>
-            (ex.: "Queima do CPU. Fora da Garantia"), passando ao estado <b>baixado</b>.
-        </p>
-        <p class="mt-4 inline-flex items-center gap-2 text-xs text-purple-700 bg-purple-50 border border-purple-100 rounded-lg px-3 py-1.5">
-            <i class="fas fa-screwdriver-wrench"></i> Em construção — Fase 4 (baixa com motivo)
-        </p>
     </div>
 `;
+
+let units = [];
+
+async function load() {
+    try {
+        const r = await apiCall('/api/inventory/patrimony/write-offs?limit=100');
+        const rows = r.data || [];
+        document.getElementById('tbody').innerHTML = rows.length ? rows.map(m => `
+            <tr class="hover:bg-red-50/30 transition">
+                <td class="p-3 text-xs">${new Date(m.occurred_at).toLocaleString('pt-PT')}</td>
+                <td class="p-3"><span class="font-mono text-[11px] text-gray-700">${escapeHtml(m.serial_unit?.serial_number || '')}</span><br><span class="text-[11px] text-gray-500">${escapeHtml(m.serial_unit?.item?.name || '')}</span></td>
+                <td class="p-3 text-xs text-gray-600">${m.from_location ? `${escapeHtml(m.from_location.unit?.name || '')} · ${escapeHtml(m.from_location.name)}` : '—'}</td>
+                <td class="p-3 text-xs text-gray-600">${m.from_employee ? escapeHtml(m.from_employee.name) : '—'}</td>
+                <td class="p-3 text-xs text-gray-700 max-w-[280px] truncate" title="${escapeHtml(m.justification || '')}">${escapeHtml(m.justification || '—')}</td>
+            </tr>`).join('') : '<tr><td colspan="5" class="p-6 text-center text-gray-400">Nenhuma baixa registada.</td></tr>';
+    } catch (err) { toast(err.message, 'error'); }
+}
+
+function populateUnitSelect() {
+    document.getElementById('unitSelect').innerHTML = '<option value="">— selecione —</option>' +
+        units.map(u => `<option value="${u.id}">${escapeHtml(u.serial_number)} · ${escapeHtml(u.item?.internal_code || '')} ${escapeHtml(u.item?.name || '')}</option>`).join('');
+}
+
+async function openModal() {
+    document.getElementById('form').reset();
+    document.getElementById('infoBox').classList.add('hidden');
+    // Só unidades não baixadas podem ser baixadas.
+    try {
+        const r = await apiCall('/api/inventory/serial-units?limit=1000');
+        units = (r.data || []).filter(u => u.status !== 'baixado');
+    } catch (err) { units = []; toast(err.message, 'error'); }
+    if (!units.length) toast('Nenhuma unidade disponível para baixa', 'warn');
+    populateUnitSelect();
+    document.getElementById('writeOffDate').value = new Date().toISOString().slice(0, 10);
+    document.getElementById('modal').classList.remove('hidden');
+    makeSearchable('unitSelect', { placeholder: 'Buscar unidade por número de série ou produto…' });
+}
+
+function closeModal() { document.getElementById('modal').classList.add('hidden'); }
+
+function onUnitChange() {
+    const u = units.find(x => x.id === document.getElementById('unitSelect').value);
+    const box = document.getElementById('infoBox');
+    if (!u) { box.classList.add('hidden'); return; }
+    document.getElementById('infoLocation').textContent = u.location ? `${u.location.unit?.name || ''} · ${u.location.name}` : '—';
+    document.getElementById('infoHolder').textContent   = u.holder ? u.holder.name : '—';
+    box.classList.remove('hidden');
+}
+
+document.getElementById('form').addEventListener('submit', async e => {
+    e.preventDefault();
+    const f = e.target;
+    const btn = f.querySelector('button[type=submit]');
+    const payload = {
+        serial_unit_id: f.serial_unit_id.value,
+        reason:         f.reason.value.trim(),
+        write_off_date: f.write_off_date.value || null
+    };
+    if (btn) btn.disabled = true;
+    try {
+        await apiCall('/api/inventory/patrimony/write-offs', { method: 'POST', body: JSON.stringify(payload) });
+        toast('Baixa registada');
+        closeModal();
+        load();
+    } catch (err) {
+        toast(err.message, 'error');
+    } finally {
+        if (btn) btn.disabled = false;
+    }
+});
+
+function escapeHtml(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+load();
 </script>
 </body>
 </html>

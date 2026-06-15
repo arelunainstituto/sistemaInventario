@@ -45,6 +45,7 @@ router.post('/entries', requirePermission('inventory', 'entry'), async (req, res
                 serial_number:       sn,
                 acquisition_date:    u.acquisition_date || null,
                 acquisition_value:   val,
+                book_value:          val,   // valor contábil inicial = valor de aquisição (depreciação por unidade)
                 supplier_id:         supplier_id || null,
                 acquisition_doc:     acquisition_doc || null,
                 current_location_id: location_id,
@@ -214,6 +215,89 @@ router.post('/movements', requirePermission('inventory', 'transfer'), async (req
     } catch (err) {
         console.error('POST patrimony/movements error:', err);
         res.status(500).json({ error: err.message || 'Erro ao movimentar patrimônio' });
+    }
+});
+
+// Embeds para a listagem de baixas (origem = última localização/colaborador).
+const WRITEOFF_SELECT = `
+    id, occurred_at, justification,
+    serial_unit:inv_serial_units!serial_unit_id(id, serial_number, status, write_off_date, item:inv_items!item_id(id, internal_code, name)),
+    from_location:inv_locations!from_location_id(id, name, unit:inv_units(id, name)),
+    from_employee:rh_employees!from_employee_id(id, name)
+`;
+
+// GET /write-offs — histórico de baixas de patrimônio.
+router.get('/write-offs', requirePermission('inventory', 'read'), async (req, res) => {
+    try {
+        const { data, error } = await supabaseAdmin
+            .from('inv_movements')
+            .select(WRITEOFF_SELECT)
+            .eq('subtype', 'baixa')
+            .order('occurred_at', { ascending: false })
+            .limit(parseInt(req.query.limit) || 100);
+        if (error) throw error;
+        res.json({ success: true, data });
+    } catch (err) {
+        console.error('GET patrimony/write-offs error:', err);
+        res.status(500).json({ error: err.message || 'Erro ao listar baixas' });
+    }
+});
+
+// POST /write-offs — baixa de uma unidade com motivo. Marca status='baixado',
+// grava motivo/data e registra um movimento 'saida' subtype 'baixa'.
+// Body: { serial_unit_id, reason, write_off_date? }
+router.post('/write-offs', requirePermission('inventory', 'exit'), async (req, res) => {
+    try {
+        const { serial_unit_id, reason, write_off_date } = req.body || {};
+        if (!serial_unit_id)        return res.status(400).json({ error: 'serial_unit_id é obrigatório' });
+        if (!reason || !reason.trim()) return res.status(400).json({ error: 'Motivo da baixa é obrigatório' });
+
+        const { data: unit } = await supabaseAdmin
+            .from('inv_serial_units')
+            .select('id, item_id, current_location_id, current_holder_id, status, serial_number')
+            .eq('id', serial_unit_id).is('deleted_at', null).single();
+        if (!unit) return res.status(404).json({ error: 'Unidade não encontrada' });
+        if (unit.status === 'baixado') return res.status(400).json({ error: 'Unidade já está baixada' });
+
+        const wDate = write_off_date || new Date().toISOString().slice(0, 10);
+
+        // 1) Baixa com guarda otimista: não baixa de novo se já mudou (concorrência).
+        const { data: updated, error: upErr } = await supabaseAdmin
+            .from('inv_serial_units')
+            .update({ status: 'baixado', write_off_reason: reason.trim(), write_off_date: wDate, updated_by: req.user?.id || null })
+            .eq('id', unit.id).neq('status', 'baixado').select('id');
+        if (upErr) throw upErr;
+        if (!updated || !updated.length)
+            return res.status(409).json({ error: 'A unidade já foi baixada por outra operação.' });
+
+        // 2) Movimento 'saida'/'baixa'. Reverte a baixa se falhar.
+        const { error: movErr } = await supabaseAdmin.from('inv_movements').insert({
+            type:             'saida',
+            subtype:          'baixa',
+            item_id:          unit.item_id,
+            serial_unit_id:   unit.id,
+            from_location_id: unit.current_location_id,
+            from_employee_id: unit.current_holder_id,
+            quantity:         1,
+            justification:    reason.trim(),
+            user_id:          req.user?.id || null
+        });
+        if (movErr) {
+            const { error: revErr } = await supabaseAdmin.from('inv_serial_units')
+                .update({ status: unit.status, write_off_reason: null, write_off_date: null }).eq('id', unit.id);
+            if (revErr) {
+                console.error('Reversão da baixa falhou:', unit.id, revErr.message);
+                return res.status(500).json({
+                    error: `Falha ao registar a baixa e a reversão também falhou. A unidade ${unit.serial_number} pode estar inconsistente — contacte o suporte.`
+                });
+            }
+            throw movErr;
+        }
+
+        res.status(201).json({ success: true, data: { serial_unit_id: unit.id } });
+    } catch (err) {
+        console.error('POST patrimony/write-offs error:', err);
+        res.status(500).json({ error: err.message || 'Erro ao dar baixa' });
     }
 });
 

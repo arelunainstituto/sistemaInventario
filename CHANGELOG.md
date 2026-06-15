@@ -34,9 +34,16 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e
 
 ## [Unreleased]
 
+_Nenhuma alteração pendente._
+
+---
+
+## [1.10.0] — 2026-06-15
+
 ### Épico: Módulo Patrimônio (separação Consumo/Patrimônio + controle por nº de série)
 
-> Trabalho faseado. Consolidar numa versão (provável `1.10.0`) ao subir para produção.
+> Controle de bens patrimoniais por **unidade (número de série)**: separação Consumo/Patrimônio na sidebar, cadastro de unidades, movimentação com localização + colaborador, baixa com motivo e depreciação por unidade. Documentação: [documentacao/INVENTARIO_PATRIMONIO.md](documentacao/INVENTARIO_PATRIMONIO.md).
+> **Requer migrações manuais (nessa ordem):** [110-patrimonio-serie.sql](database/inventory-refactor/110-patrimonio-serie.sql) e [111-patrimonio-depreciacao-unidade.sql](database/inventory-refactor/111-patrimonio-depreciacao-unidade.sql).
 
 #### Fase 1 — Separação Consumo/Patrimônio na sidebar + fronteira de macro no servidor
 - **Adicionado**
@@ -69,7 +76,27 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e
   - Reversão da unidade agora é checada: se a gravação do movimento e a reversão falharem, retorna mensagem clara (NS afetado) em vez de 500 genérico.
   - Kardex de stock passa a recusar itens patrimoniais ([reports.js](api/inventory/reports.js)) e some do seletor do [kardex.html](public/inventory/kardex.html) — patrimônio não usa `inv_stock`, então seus movimentos não fechavam saldo ali. (As views `vw_inv_kardex*` ainda contemplam só consumo na prática; limpeza nas views fica como melhoria futura.)
 - **Notas**
-  - As telas de Patrimônio (Entrada, Movimentação) seguem o mesmo layout das equivalentes de Consumo; a diferença é só a lógica (unidades por número de série vs documento/lote). Saída (baixa) segue na Fase 4.
+  - As telas de Patrimônio (Entrada, Movimentação) seguem o mesmo layout das equivalentes de Consumo; a diferença é só a lógica (unidades por número de série vs documento/lote).
+
+#### Fase 4 — Saída / baixa de patrimônio com motivo
+- **Adicionado**
+  - `POST /api/inventory/patrimony/write-offs` — baixa uma unidade: marca `status='baixado'`, grava `write_off_reason`/`write_off_date` e registra um movimento `saida` · subtype `baixa`. Guarda otimista contra baixa concorrente (409) e reversão checada se o movimento falhar. `GET /api/inventory/patrimony/write-offs` lista o histórico ([patrimony.js](api/inventory/patrimony.js)).
+  - Tela **Patrimônio › Saída** ([patrimony-exit.html](public/inventory/patrimony-exit.html)) no padrão das Saídas (lista + modal): escolhe a unidade (busca por NS/produto, só não-baixadas), mostra a localização/colaborador atuais e exige o **motivo da baixa** (ex.: "Queima do CPU. Fora da Garantia") + data. Unidades baixadas saem das telas de Movimentação e Saída.
+- **Corrigido**
+  - Histórico de Saídas de consumo não mostra mais baixas de patrimônio: a baixa é `type='saida'` e apareceria lá — [exits.js](api/inventory/exits.js) passa a excluir movimentos com `serial_unit_id` (que só patrimônio tem). (Transferências não vazam: patrimônio grava `transferencia_saida` e a tela lista `transferencia_entrada`.)
+
+#### Fase 6 — Depreciação POR UNIDADE
+- **Banco** (`requer migração`: [111-patrimonio-depreciacao-unidade.sql](database/inventory-refactor/111-patrimonio-depreciacao-unidade.sql), aplicar após a 110)
+  - Nova coluna `inv_serial_units.book_value` (valor contábil por unidade, inicializado com o valor de aquisição).
+  - **`fn_inv_run_depreciation` reescrita para iterar UNIDADES** (não mais itens): a **taxa** vem do item (modelo) e o **valor/data de aquisição** e o **valor contábil** vêm da unidade. Pro-rata pela data de aquisição da unidade, reduz o `book_value`, baixa a unidade (`status='baixado'`) quando zera, e grava um movimento `depreciacao` por unidade (com `serial_unit_id`). A API (`POST /depreciation/run`) e a tela continuam idênticas — `items_processed` agora conta unidades.
+- **Alterado**
+  - Aquisição passa a ser **só por unidade**: o cadastro do item ([item-form.html](public/inventory/item-form.html)) deixa de pedir data/valor de aquisição no patrimonial (mantém só a **taxa do modelo**); valor/data são informados em Patrimônio › Entrada por número de série. `book_value` inicial = valor de aquisição da unidade ([patrimony.js](api/inventory/patrimony.js)).
+  - Ficha do item ([item-view.html](public/inventory/item-view.html), [items.js](api/inventory/items.js)): a tabela de unidades ganha **Valor contábil**; o painel patrimonial mostra **taxa**, **nº de unidades (ativas)** e **valor contábil total**. Tela de Depreciação relabela para "unidades".
+- **Corrigido** (revisão adversarial)
+  - Baixa por depreciação total entra no histórico de Baixas: quando a depreciação zera o `book_value`, o movimento usa `subtype='baixa'` (antes ficava só na história da unidade, fora da lista de Baixas).
+  - Patrimônio não mostra mais "Custo Médio € 0,00" obsoleto: `inv_items.cmp` nunca é populado para patrimônio (e a depreciação agora atualiza `book_value`, não `cmp`) — o Custo Médio é escondido na ficha ([item-view.html](public/inventory/item-view.html)) e a coluna na lista ([items.html](public/inventory/items.html)) mostra "—".
+- **Notas**
+  - Os campos `inv_items.acquisition_date/value` ficam vestigiais para patrimônio (não mais coletados/usados na depreciação). Um relatório de valuation patrimonial por `book_value` fica como melhoria futura.
 
 ---
 

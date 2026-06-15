@@ -138,7 +138,7 @@ router.get('/:id', requirePermission('inventory', 'read'), async (req, res) => {
         if (item.macro_category === 'patrimonial') {
             const { data: su } = await supabaseAdmin
                 .from('inv_serial_units')
-                .select('id, serial_number, status, acquisition_date, acquisition_value, location:inv_locations!current_location_id(id, name, unit:inv_units(id, name)), holder:rh_employees!current_holder_id(id, name, department)')
+                .select('id, serial_number, status, acquisition_date, acquisition_value, book_value, location:inv_locations!current_location_id(id, name, unit:inv_units(id, name)), holder:rh_employees!current_holder_id(id, name, department)')
                 .eq('item_id', id)
                 .is('deleted_at', null)
                 .order('serial_number', { ascending: true });

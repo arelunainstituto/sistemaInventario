@@ -20,6 +20,8 @@ router.get('/', requirePermission('inventory', 'read'), async (req, res) => {
         let q = supabaseAdmin
             .from('inv_movements')
             .select(MOVEMENT_SELECT, { count: 'exact' })
+            // Patrimônio nunca usa transferencia_entrada (a movimentação grava um
+            // único transferencia_saida), então este histórico já é só consumo.
             .eq('type', 'transferencia_entrada')
             .order('occurred_at', { ascending: false })
             .range(offset, offset + parseInt(limit) - 1);

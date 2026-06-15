@@ -190,7 +190,7 @@ async function loadItems() {
                     </span>
                 </td>
                 <td class="px-4 py-3 text-gray-600 text-xs">${escapeHtml(it.subcategory?.name || '—')}</td>
-                <td class="px-4 py-3 text-right text-gray-700 tabular-nums font-medium">€ ${(parseFloat(it.cmp) || 0).toFixed(2)}</td>
+                <td class="px-4 py-3 text-right text-gray-700 tabular-nums font-medium">${it.macro_category === 'patrimonial' ? '<span class="text-gray-300">—</span>' : '€ ' + (parseFloat(it.cmp) || 0).toFixed(2)}</td>
                 <td class="px-4 py-3 text-right text-gray-600 tabular-nums">${parseFloat(it.min_stock) || 0}</td>
                 <td class="px-4 py-3 text-center">
                     ${it.is_active

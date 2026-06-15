@@ -26,8 +26,8 @@ document.getElementById('pageContent').innerHTML = `
                 <i class="fas fa-play-circle text-purple-600"></i> Executar depreciação
             </h3>
             <p class="text-xs text-gray-500 mb-4">
-                Aplica a taxa de depreciação anual em cada bem patrimonial <strong>em uso</strong>.
-                Cada ano só pode ser executado <strong>uma vez</strong>.
+                Aplica a taxa de depreciação anual em cada <strong>unidade</strong> patrimonial (número de série) <strong>em uso</strong>,
+                pela própria data e valor de aquisição. Cada ano só pode ser executado <strong>uma vez</strong>.
                 Há também execução automática em 1 de janeiro às 04h00.
             </p>
             <form id="runForm" class="space-y-3">
@@ -57,8 +57,8 @@ document.getElementById('pageContent').innerHTML = `
                         <th class="text-left p-2">Ano</th>
                         <th class="text-left p-2">Executado em</th>
                         <th class="text-left p-2">Origem</th>
-                        <th class="text-right p-2">Processados</th>
-                        <th class="text-right p-2">Baixados</th>
+                        <th class="text-right p-2">Unidades</th>
+                        <th class="text-right p-2">Baixadas</th>
                         <th class="text-right p-2">Valor depreciado</th>
                         <th class="text-center p-2">Estado</th>
                     </tr>
@@ -97,7 +97,7 @@ async function loadRuns() {
 document.getElementById('runForm').addEventListener('submit', async e => {
     e.preventDefault();
     const year = parseInt(new FormData(e.target).get('year'));
-    const msg = `Executar depreciação anual para ${year}?\n\nA operação:\n• Aplica taxa em cada bem patrimonial em uso\n• Atualiza Custo Médio e baixa quem zerou\n• Não pode ser desfeita\n• Não pode ser repetida no mesmo ano`;
+    const msg = `Executar depreciação anual para ${year}?\n\nA operação:\n• Aplica a taxa em cada unidade patrimonial em uso\n• Atualiza o valor contábil e baixa as unidades que zeraram\n• Não pode ser desfeita\n• Não pode ser repetida no mesmo ano`;
     if (!confirm(msg)) return;
 
     try {

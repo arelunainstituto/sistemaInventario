@@ -76,6 +76,9 @@ router.get('/', requirePermission('inventory', 'read'), async (req, res) => {
             .from('inv_movements')
             .select(MOVEMENT_SELECT, { count: 'exact' })
             .eq('type', 'saida')
+            // Exclui movimentos de patrimônio: as baixas (subtype 'baixa') também
+            // são type='saida', mas carregam serial_unit_id — que consumo nunca tem.
+            .is('serial_unit_id', null)
             .order('occurred_at', { ascending: false })
             .range(offset, offset + parseInt(limit) - 1);
         if (item_id)     q = q.eq('item_id', item_id);
