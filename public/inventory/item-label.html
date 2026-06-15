@@ -10,16 +10,20 @@
     <style>
         body { font-family: 'Inter', sans-serif; }
 
-        /* ===== Tamanho do papel para Brother QL-810W (DK-1202: 62×100 mm) ===== */
-        /* Para outros rolos, basta trocar a constante --label-w/--label-h.
-           Tamanhos comuns Brother DK:
-             DK-1202  62 × 100 mm   (padrão recomendado para QR + texto)
+        /* ===== Tamanho do papel para Brother QL-810W ===== */
+        /* Padrão: DK-2205 — fita CONTÍNUA de 62 mm × 30.48 m. A impressora faz
+           o corte automático a cada etiqueta, no comprimento da página. Por isso
+           a altura segue o conteúdo (medida por JS e gravada no @page abaixo),
+           gerando uma etiqueta justa em vez de desperdiçar fita.
+           Rolos die-cut (tamanho fixo) também são suportados no seletor:
+             DK-2205  62 mm contínuo  (padrão — corte automático)
+             DK-1202  62 × 100 mm
              DK-1208  38 ×  90 mm
-             DK-1209  29 ×  62 mm
-             DK-2205  62 mm contínuo (ajustar altura conforme conteúdo) */
+             DK-1209  29 ×  62 mm */
         :root {
             --label-w: 62mm;
-            --label-h: 100mm;
+            --label-h: auto;     /* 'auto' = fita contínua: altura segue o conteúdo */
+            --qr-size: 50mm;     /* lado do QR; ajustado por JS conforme a largura do rolo */
         }
 
         /* Pré-visualização na tela imita o tamanho real */
@@ -29,10 +33,11 @@
         }
 
         /* ===== Modo impressão ===== */
-        @page {
-            size: var(--label-w) var(--label-h);
-            margin: 0;            /* sem cabeçalho/rodapé/margem do navegador */
-        }
+        /* O tamanho REAL da página é injetado por JS em #pageStyle com valores
+           concretos em mm (para contínuo = largura × altura medida do conteúdo).
+           var() em descritores @page não é confiável entre navegadores, então
+           aqui fica só a margem; o size vem do #pageStyle. */
+        @page { margin: 0; }     /* sem cabeçalho/rodapé/margem do navegador */
         @media print {
             html, body {
                 margin: 0 !important;
@@ -70,10 +75,10 @@
             <div>
                 <label class="block text-[10px] uppercase tracking-wider text-gray-500 font-semibold">Formato Brother DK</label>
                 <select id="rollSize" class="px-3 py-1.5 border border-gray-300 rounded-lg text-sm bg-white mt-1">
-                    <option value="62,100">DK-1202 — 62 × 100 mm (padrão)</option>
-                    <option value="38,90">DK-1208 — 38 × 90 mm</option>
-                    <option value="29,62">DK-1209 — 29 × 62 mm</option>
-                    <option value="62,30">DK-2205 — 62 mm contínuo (30 mm)</option>
+                    <option value="dk2205" selected>DK-2205 — 62 mm contínuo (corte automático)</option>
+                    <option value="dk1202">DK-1202 — 62 × 100 mm</option>
+                    <option value="dk1208">DK-1208 — 38 × 90 mm</option>
+                    <option value="dk1209">DK-1209 — 29 × 62 mm</option>
                 </select>
             </div>
             <button onclick="window.print()" class="bg-sky-600 hover:bg-sky-700 text-white px-5 py-2 rounded-lg text-sm font-medium shadow-sm shadow-sky-500/20 transition flex items-center gap-2">
@@ -83,9 +88,11 @@
     </div>
     <div class="bg-amber-50 border border-amber-200 rounded-lg p-3 text-[11px] text-amber-800 mb-4">
         <i class="fas fa-circle-info"></i>
-        No diálogo de impressão do navegador, em <b>Mais configurações</b>:
-        ative <b>Margens: Nenhuma</b> e desative <b>Cabeçalhos e rodapés</b>.
-        Selecione a impressora <b>Brother QL-810W</b> e o rolo correspondente.
+        Rolo padrão <b>DK-2205 (62 mm contínuo)</b> — a impressora corta cada etiqueta automaticamente
+        no comprimento do conteúdo. No driver da <b>Brother QL-810W</b>, selecione a fita
+        <b>“Contínuo 62 mm”</b> com <b>corte automático</b> ligado.
+        No diálogo do navegador, em <b>Mais configurações</b>: <b>Margens: Nenhuma</b> e
+        <b>Cabeçalhos e rodapés</b> desativados.
     </div>
 </div>
 
@@ -98,12 +105,49 @@
 const id = new URLSearchParams(location.search).get('id');
 const token = localStorage.getItem('access_token');
 
-// Atualiza CSS var em runtime para refletir o rolo escolhido
-document.getElementById('rollSize').addEventListener('change', (e) => {
-    const [w, h] = e.target.value.split(',').map(n => `${n}mm`);
-    document.documentElement.style.setProperty('--label-w', w);
-    document.documentElement.style.setProperty('--label-h', h);
-});
+// Rolos Brother DK suportados. h:'auto' = fita contínua (a impressora corta
+// automaticamente no comprimento da página — medimos o conteúdo); número = die-cut.
+const ROLLS = {
+    dk2205: { w: 62, h: 'auto' },  // 62 mm × 30.48 m contínuo (padrão)
+    dk1202: { w: 62, h: 100 },
+    dk1208: { w: 38, h: 90 },
+    dk1209: { w: 29, h: 62 },
+};
+
+function pxToMm(px) { return px / 96 * 25.4; }
+
+// Injeta o tamanho real da página (valores concretos em mm). Para a fita
+// contínua, a altura = comprimento de corte automático.
+function setPageSize(wmm, hmm) {
+    let st = document.getElementById('pageStyle');
+    if (!st) { st = document.createElement('style'); st.id = 'pageStyle'; document.head.appendChild(st); }
+    st.textContent = `@page { size: ${wmm}mm ${hmm}mm; margin: 0; }`;
+}
+
+// Aplica o rolo escolhido: largura da etiqueta, lado do QR (cabe na largura
+// útil do rolo) e, no contínuo, mede o conteúdo para definir o comprimento.
+function applyRoll() {
+    const roll = ROLLS[document.getElementById('rollSize').value] || ROLLS.dk2205;
+    document.documentElement.style.setProperty('--label-w', roll.w + 'mm');
+    // QR ocupa a largura útil (largura − ~12 mm de margens), entre 18 e 55 mm.
+    const qr = Math.max(18, Math.min(roll.w - 12, 55));
+    document.documentElement.style.setProperty('--qr-size', qr + 'mm');
+
+    if (roll.h === 'auto') {
+        document.documentElement.style.setProperty('--label-h', 'auto');
+        const el = document.querySelector('.label-preview');
+        const hmm = el && el.scrollHeight ? Math.ceil(pxToMm(el.scrollHeight)) + 2 : 80; // +2 mm de folga
+        setPageSize(roll.w, hmm);
+    } else {
+        document.documentElement.style.setProperty('--label-h', roll.h + 'mm');
+        setPageSize(roll.w, roll.h);
+    }
+}
+
+document.getElementById('rollSize').addEventListener('change', applyRoll);
+// Recalcula o comprimento do corte imediatamente antes de imprimir (garante
+// que reflete o conteúdo atual mesmo se algo mudou após o carregamento).
+window.addEventListener('beforeprint', applyRoll);
 
 async function load() {
     if (!id) { document.getElementById('labelContainer').textContent = 'ID não fornecido.'; return; }
@@ -143,7 +187,8 @@ async function load() {
                           color: #111; line-height: 1.15; max-height: 9mm; overflow: hidden;">
                     ${escapeHtml(it.name)}
                 </p>
-                <img src="${qrUrl}" alt="QR" style="width: 55mm; height: 55mm; margin-top: 1.5mm; image-rendering: pixelated;"
+                <img src="${qrUrl}" alt="QR" style="width: var(--qr-size); height: var(--qr-size); margin-top: 1.5mm; image-rendering: pixelated;"
+                     onload="applyRoll()"
                      onerror="this.parentElement.innerHTML='<p style=&quot;color:red;font-size:2.5mm&quot;>Erro QR</p>'">
                 <p style="font-size: 2.8mm; font-family: 'Courier New', monospace; font-weight: 700; margin-top: 1.5mm;">
                     ${escapeHtml(it.internal_code)}
@@ -153,6 +198,7 @@ async function load() {
                     ${escapeHtml(it.patrimony_number)}
                 </p>` : ''}
             </div>`;
+        applyRoll(); // define largura/QR e mede o comprimento do corte (contínuo)
     } catch (err) {
         document.getElementById('labelContainer').innerHTML = `<p class="text-red-500">${err.message}</p>`;
     }

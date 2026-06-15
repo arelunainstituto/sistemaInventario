@@ -60,12 +60,12 @@ document.getElementById('pageContent').innerHTML = `
             <table class="w-full text-sm">
                 <thead class="bg-gray-50/50 text-gray-500 text-[10px] uppercase tracking-wider border-b border-gray-200">
                     <tr>
-                        <th class="px-4 py-3 text-left font-semibold">Código</th>
-                        <th class="px-4 py-3 text-left font-semibold">Item</th>
-                        <th class="px-4 py-3 text-left font-semibold">Categoria</th>
+                        <th class="px-4 py-3 text-left font-semibold cursor-pointer select-none hover:text-gray-700 transition" data-sort="internal_code">Código <i class="sort-icon fas fa-sort text-gray-300 text-[9px] ml-0.5"></i></th>
+                        <th class="px-4 py-3 text-left font-semibold cursor-pointer select-none hover:text-gray-700 transition" data-sort="name">Item <i class="sort-icon fas fa-sort text-gray-300 text-[9px] ml-0.5"></i></th>
+                        <th class="px-4 py-3 text-left font-semibold cursor-pointer select-none hover:text-gray-700 transition" data-sort="macro_category">Categoria <i class="sort-icon fas fa-sort text-gray-300 text-[9px] ml-0.5"></i></th>
                         <th class="px-4 py-3 text-left font-semibold">Subcategoria</th>
-                        <th class="px-4 py-3 text-right font-semibold">Custo M.</th>
-                        <th class="px-4 py-3 text-right font-semibold">Stock mín.</th>
+                        <th class="px-4 py-3 text-right font-semibold cursor-pointer select-none hover:text-gray-700 transition" data-sort="cmp">Custo M. <i class="sort-icon fas fa-sort text-gray-300 text-[9px] ml-0.5"></i></th>
+                        <th class="px-4 py-3 text-right font-semibold cursor-pointer select-none hover:text-gray-700 transition" data-sort="min_stock">Stock mín. <i class="sort-icon fas fa-sort text-gray-300 text-[9px] ml-0.5"></i></th>
                         <th class="px-4 py-3 text-center font-semibold">Estado</th>
                         <th class="px-4 py-3 text-center font-semibold w-32">Ações</th>
                     </tr>
@@ -83,6 +83,9 @@ const filterSearch = document.getElementById('filterSearch');
 const filterMacro = document.getElementById('filterMacro');
 const filterSubcategory = document.getElementById('filterSubcategory');
 
+// Estado de listagem: paginação + ordenação (backend aceita page/limit/sort/dir)
+const state = { page: 1, limit: 50, sort: 'name', dir: 'asc' };
+
 (async () => {
     try {
         const cats = await apiCall('/api/inventory/categories');
@@ -91,22 +94,75 @@ const filterSubcategory = document.getElementById('filterSubcategory');
     } catch (e) {}
 })();
 
-document.getElementById('btnFilter').addEventListener('click', loadItems);
-filterSearch.addEventListener('keypress', e => { if (e.key === 'Enter') loadItems(); });
-filterMacro.addEventListener('change', loadItems);
-filterSubcategory.addEventListener('change', loadItems);
+// Filtros: qualquer mudança volta para a página 1
+function reload() { state.page = 1; loadItems(); }
+document.getElementById('btnFilter').addEventListener('click', reload);
+filterSearch.addEventListener('keypress', e => { if (e.key === 'Enter') reload(); });
+filterMacro.addEventListener('change', reload);
+filterSubcategory.addEventListener('change', reload);
+
+// Ordenação por clique no cabeçalho: mesma coluna alterna asc/desc; nova coluna começa asc.
+document.querySelectorAll('th[data-sort]').forEach(th => {
+    th.addEventListener('click', () => {
+        const col = th.dataset.sort;
+        if (state.sort === col) state.dir = state.dir === 'asc' ? 'desc' : 'asc';
+        else { state.sort = col; state.dir = 'asc'; }
+        state.page = 1;
+        loadItems();
+    });
+});
+
+function applySortIndicators() {
+    document.querySelectorAll('th[data-sort]').forEach(th => {
+        const icon = th.querySelector('.sort-icon');
+        if (!icon) return;
+        icon.className = th.dataset.sort === state.sort
+            ? `sort-icon fas ${state.dir === 'asc' ? 'fa-sort-up' : 'fa-sort-down'} text-sky-500 text-[9px] ml-0.5`
+            : 'sort-icon fas fa-sort text-gray-300 text-[9px] ml-0.5';
+    });
+}
+
+function renderFooter(pg, shown) {
+    const page = pg.page || 1, limit = pg.limit || state.limit;
+    const total = pg.total || 0, totalPages = pg.totalPages || 1;
+    const from = total === 0 ? 0 : (page - 1) * limit + 1;
+    const to   = (page - 1) * limit + shown;
+    const footer = document.getElementById('itemsFooter');
+    footer.innerHTML = `
+        <div class="flex items-center justify-between gap-3 flex-wrap">
+            <span>Mostrando <b class="text-gray-700">${from}–${to}</b> de <b class="text-gray-700">${total}</b> ${total === 1 ? 'item' : 'itens'}</span>
+            <div class="flex items-center gap-2">
+                <label class="flex items-center gap-1.5 mr-1">Por página
+                    <select id="pageSize" class="border border-gray-300 rounded px-1.5 py-1 text-[11px] bg-white focus:outline-none focus:ring-2 focus:ring-sky-500/30">
+                        ${[25, 50, 100, 200].map(n => `<option value="${n}" ${n === limit ? 'selected' : ''}>${n}</option>`).join('')}
+                    </select>
+                </label>
+                <button id="prevPage" class="px-2.5 py-1 rounded border border-gray-300 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition" ${page <= 1 ? 'disabled' : ''}><i class="fas fa-chevron-left text-[9px]"></i> Anterior</button>
+                <span class="tabular-nums">Página <b class="text-gray-700">${page}</b> de <b class="text-gray-700">${totalPages}</b></span>
+                <button id="nextPage" class="px-2.5 py-1 rounded border border-gray-300 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition" ${page >= totalPages ? 'disabled' : ''}>Próxima <i class="fas fa-chevron-right text-[9px]"></i></button>
+            </div>
+        </div>`;
+    footer.querySelector('#prevPage').addEventListener('click', () => { if (state.page > 1) { state.page--; loadItems(); } });
+    footer.querySelector('#nextPage').addEventListener('click', () => { if (state.page < totalPages) { state.page++; loadItems(); } });
+    footer.querySelector('#pageSize').addEventListener('change', e => { state.limit = parseInt(e.target.value, 10); state.page = 1; loadItems(); });
+}
 
 async function loadItems() {
+    applySortIndicators();
     const params = new URLSearchParams();
     if (filterSearch.value)       params.set('search', filterSearch.value);
     if (filterMacro.value)        params.set('macro_category', filterMacro.value);
     if (filterSubcategory.value)  params.set('subcategory_id', filterSubcategory.value);
-    params.set('limit', '200');
+    params.set('sort', state.sort);
+    params.set('dir', state.dir);
+    params.set('limit', String(state.limit));
+    params.set('page', String(state.page));
 
     const tbody = document.getElementById('itemsTbody');
     tbody.innerHTML = '<tr><td colspan="8" class="px-4 py-10 text-center text-gray-400 text-xs">Carregando…</td></tr>';
     try {
         const res = await apiCall(`/api/inventory/items?${params}`);
+        const pg = res.pagination || { page: 1, limit: state.limit, total: res.data.length, totalPages: 1 };
         if (!res.data.length) {
             tbody.innerHTML = `<tr><td colspan="8" class="px-4 py-12 text-center">
                 <div class="inline-flex w-10 h-10 rounded-full bg-gray-100 items-center justify-center text-gray-400 mb-2">
@@ -115,7 +171,7 @@ async function loadItems() {
                 <p class="text-sm text-gray-600">Nenhum item encontrado.</p>
                 <p class="text-xs text-gray-400 mt-1">Ajuste os filtros ou adicione um novo item.</p>
             </td></tr>`;
-            document.getElementById('itemsFooter').textContent = '';
+            renderFooter(pg, 0);
             return;
         }
         tbody.innerHTML = res.data.map(it => {
@@ -156,9 +212,10 @@ async function loadItems() {
                 </td>
             </tr>`;
         }).join('');
-        document.getElementById('itemsFooter').textContent = `${res.data.length} itens · página ${res.pagination?.page || 1} de ${res.pagination?.totalPages || 1}`;
+        renderFooter(pg, res.data.length);
     } catch (err) {
         tbody.innerHTML = `<tr><td colspan="8" class="px-4 py-10 text-center text-red-500 text-xs">${err.message}</td></tr>`;
+        document.getElementById('itemsFooter').textContent = '';
     }
 }
 

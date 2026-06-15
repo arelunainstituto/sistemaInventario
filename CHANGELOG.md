@@ -38,6 +38,43 @@ _Nenhuma alteração pendente._
 
 ---
 
+## [1.9.0] — 2026-06-15
+
+> **Inventário**: importação de planilha mais inteligente (auto-atribui ID e atualiza itens já cadastrados), cadastro de fornecedor sem sair das entradas, e impressão de etiqueta/QR adaptada ao rolo contínuo DK-2205 (62 mm × 30.48 m) com corte automático.
+
+### Adicionado
+- **Importação de planilha — auto-ID e atualização** ([api/inventory/import.js](api/inventory/import.js), [public/inventory/import.html](public/inventory/import.html)):
+  - Linhas com **ID em branco** recebem o próximo código de Uso e Consumo (`1XXXXXX`): sugerido na pré-visualização e **re-derivado no `/execute`** no momento de gravar (não confia na sugestão, que pode envelhecer entre as etapas).
+  - Linhas com **ID já cadastrado** viram **atualização** — exibidas num container com checkbox por SKU (todos marcados, desmarcáveis). Atualização não-destrutiva: célula em branco nunca apaga valor existente; colunas imutáveis (`internal_code`, `macro_category`, lote/série) intocadas; fornecedor só preenchido se vazio; item removido é reativado.
+  - Permite importar apenas fornecedores (planilha sem itens / todos os updates desmarcados).
+- **Cadastro de fornecedor inline nas entradas** ([public/inventory/entries.html](public/inventory/entries.html), [public/inventory/_supplier-modal.js](public/inventory/_supplier-modal.js)):
+  - Botão `+` ao lado do select de fornecedor abre o mesmo modal da tela de Fornecedores; ao salvar, o select é repopulado já com o novo selecionado.
+  - Modal extraído para componente partilhado, reutilizado por Fornecedores e Entradas.
+  - Botão visível só para quem tem permissão real de criação (`window.hasInventoryPermission('create_item')` espelha o `requirePermission` do backend) ([public/inventory/_layout.js](public/inventory/_layout.js)).
+- **Itens — paginação e ordenação** ([public/inventory/items.html](public/inventory/items.html), [api/inventory/items.js](api/inventory/items.js)):
+  - Controles de página no rodapé: "Mostrando X–Y de N", seletor de tamanho de página (25/50/100/200) e botões Anterior/Próxima (desabilitados nos limites). Antes a lista trazia 200 itens fixos sem navegação.
+  - Ordenação clicável por coluna (Código, Item, Categoria, Custo médio, Stock mínimo) — server-side sobre o conjunto filtrado inteiro, com whitelist de colunas e desempate estável por `internal_code` para paginação consistente. Mudança de filtro ou de ordenação volta para a página 1.
+
+### Alterado
+- **Etiqueta/QR — rolo contínuo DK-2205** ([public/inventory/item-label.html](public/inventory/item-label.html)):
+  - Padrão passa de DK-1202 (62 × 100 mm die-cut) para **DK-2205 (62 mm × 30.48 m contínuo)** com **corte automático**: a altura segue o conteúdo (medida em runtime e gravada no `@page`), gerando uma etiqueta justa em vez de desperdiçar fita.
+  - Tamanho da página real injetado por JS em `#pageStyle` com valores concretos em mm (`var()` em descritores `@page` não é confiável entre navegadores).
+  - Lado do QR escala com a largura do rolo (cabe na largura útil); recálculo do comprimento de corte no `beforeprint`.
+
+### Corrigido
+- **Importação — robustez de IDs e stock** (revisão adversarial em duas rodadas, [api/inventory/import.js](api/inventory/import.js)):
+  - A sequence de consumo passa a alinhar-se ao **maior código global** após gravar (nunca para trás) — antes o `setval` podia recuar e fazer cadastros manuais futuros colidirem.
+  - `maxConsumoNum()` via `ORDER DESC LIMIT 1` (imune ao teto de linhas do PostgREST); checagem de existência em lotes de 500.
+  - Validação bloqueante de stock na pré-visualização (`min >= 0`, `max >= 0`, `max >= min`, considerando o valor já gravado em updates parciais) — evita 500 opaco por violação de CHECK.
+  - IDs `2XXXXXX` (patrimônio) rejeitados no importador de consumo; `is_active` deixa de tratar `"Inativo"` como ativo.
+- **Formulário de item — corrida na Categoria** ([public/inventory/item-form.html](public/inventory/item-form.html)): o select de Categoria ficava vazio quando o clique em "Consumo" chegava antes do fetch de categorias (servidor frio). `activateMacro()` agora aguarda o `bootstrap()` antes de montar as opções.
+
+### Notas
+- [_layout.js:5](public/inventory/_layout.js#L5) bump para `v1.9.0`.
+- Sem migração de DB. O importador usa a RPC existente `fn_inv_set_code_sequences` e o trigger de `internal_code` já presentes.
+
+---
+
 ## [1.8.2] — 2026-06-08
 
 > **Hotfix**: `<figure>`, `<table>` e classes custom (`article-`, `blog-`) sumiam ao reabrir o post para edição. Causa: Quill normaliza o HTML ao receber via `innerHTML` e estripa tags que não conhece. Fix: detecta HTML rico no `openModal` e abre direto no Modo HTML, sem deixar Quill tocar.

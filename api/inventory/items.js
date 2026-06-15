@@ -63,15 +63,22 @@ async function uploadFile(file, folder) {
 // GET /  — lista itens com filtros
 router.get('/', requirePermission('inventory', 'read'), async (req, res) => {
     try {
-        const { macro_category, subcategory_id, search, include_inactive, limit = 100, page = 1 } = req.query;
+        const { macro_category, subcategory_id, search, include_inactive, sort, dir, limit = 100, page = 1 } = req.query;
         const offset = (parseInt(page) - 1) * parseInt(limit);
+
+        // Whitelist de colunas ordenáveis — evita injeção no .order()
+        const SORTABLE  = ['internal_code', 'name', 'macro_category', 'cmp', 'min_stock', 'is_active', 'created_at'];
+        const sortCol   = SORTABLE.includes(sort) ? sort : 'name';
+        const ascending = String(dir).toLowerCase() !== 'desc';
 
         let q = supabaseAdmin
             .from('inv_items')
             .select(ITEM_SELECT, { count: 'exact' })
             .is('deleted_at', null)
-            .order('name', { ascending: true })
-            .range(offset, offset + parseInt(limit) - 1);
+            .order(sortCol, { ascending });
+        // Desempate estável por internal_code → paginação consistente
+        if (sortCol !== 'internal_code') q = q.order('internal_code', { ascending: true });
+        q = q.range(offset, offset + parseInt(limit) - 1);
 
         if (!include_inactive)       q = q.eq('is_active', true);
         if (macro_category)          q = q.eq('macro_category', macro_category);
