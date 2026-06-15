@@ -29,6 +29,7 @@ const INVENTORY_NAV = [
     { id: 'movements',   label: 'Histórico',         icon: 'fa-history',     href: 'movements.html' },
     { id: 'access-log',  label: 'Log de Acesso',     icon: 'fa-shield-halved', href: 'access-log.html' },
     { id: 'scan',        label: 'Ler QR Code',       icon: 'fa-qrcode',      href: 'scan.html' },
+    { id: 'docs-patrimonio', label: 'Documentação',  icon: 'fa-book',        href: 'docs-patrimonio.html' },
 ];
 
 const INVENTORY_NAV_SETUP = [
@@ -38,15 +39,35 @@ const INVENTORY_NAV_SETUP = [
     { id: 'uoms',        label: 'Unidades de medida', icon: 'fa-ruler',         href: 'uoms.html' },
 ];
 
-// Cabeçalho de grupo (Consumo/Patrimônio) + sub-itens indentados. O cabeçalho
-// usa a classe sidebar-label, então some no modo recolhido — restando apenas os
-// ícones dos filhos (como uma lista plana), sem quebrar o layout colapsado.
+// Cabeçalho de grupo (Consumo/Patrimônio) RETRÁTIL — usa o MESMO estilo dos
+// itens principais da sidebar (ícone + label + hover), só que com um chevron à
+// direita para abrir/fechar. Recolhido por padrão; abre só o grupo da página
+// ativa, para o item ativo ficar visível. O botão tem sidebar-label, então some
+// no modo ícone da sidebar; nesse modo o CSS força os filhos visíveis (lista
+// plana de ícones) — ver sidebarCollapsedStyle.
 function navGroupHtml(group, active) {
     const childActive = group.children.some(c => c.id === active);
-    const header = `<p class="sidebar-label text-[10px] uppercase font-bold tracking-wider px-3 mt-3 mb-1 flex items-center gap-2 ${childActive ? 'text-sky-600' : 'text-gray-400'}">
-        <i class="fas ${group.icon} text-[11px]"></i> ${group.label}
-    </p>`;
-    return header + group.children.map(c => navItemHtml(c, active, true)).join('');
+    const expanded = childActive; // por padrão recolhido; abre só o grupo ativo
+    const base = 'sidebar-nav-item sidebar-label w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg transition-colors text-gray-600 hover:bg-gray-50 hover:text-gray-900';
+    const header = `
+        <button type="button" onclick="toggleNavGroup('${group.id}')" class="${base}" title="${group.label}">
+            <i class="fas ${group.icon} w-5 text-center ${childActive ? 'text-sky-600' : ''}"></i>
+            <span class="flex-1 text-left whitespace-nowrap">${group.label}</span>
+            <i class="fas fa-chevron-down text-[10px] text-gray-400 transition-transform ${expanded ? '' : '-rotate-90'}" data-navgroup-chevron="${group.id}"></i>
+        </button>
+        <div id="navgrp-${group.id}" class="nav-group-children ${expanded ? '' : 'hidden'} space-y-0.5">
+            ${group.children.map(c => navItemHtml(c, active, true)).join('')}
+        </div>`;
+    return header;
+}
+
+// Abre/fecha um grupo da sidebar (Consumo/Patrimônio).
+function toggleNavGroup(id) {
+    const box = document.getElementById('navgrp-' + id);
+    if (!box) return;
+    const nowHidden = box.classList.toggle('hidden');
+    const chevron = document.querySelector(`[data-navgroup-chevron="${id}"]`);
+    if (chevron) chevron.classList.toggle('-rotate-90', nowHidden);
 }
 
 function navItemHtml(item, active, nested = false) {
@@ -275,6 +296,9 @@ function restoreSidebarState() {
             html.sidebar-collapsed #inventorySidebar .sidebar-label { display: none; }
             html.sidebar-collapsed #inventorySidebar .sidebar-nav-item { justify-content: center; padding-left: 0; padding-right: 0; }
             html.sidebar-collapsed #inventorySidebar nav { padding-left: 0.5rem; padding-right: 0.5rem; }
+            /* No modo ícone não há cabeçalho para abrir os grupos — força os
+               filhos visíveis (lista plana de ícones), ignorando o recolhimento. */
+            html.sidebar-collapsed #inventorySidebar .nav-group-children { display: block !important; }
         `;
         document.head.appendChild(style);
     }

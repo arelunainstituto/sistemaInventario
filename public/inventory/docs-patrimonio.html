@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Inventário · Documentação · Patrimônio</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/marked@12/marked.min.js"></script>
+    <script>if (!localStorage.getItem('access_token')) { const r = encodeURIComponent(location.pathname + location.search); window.location.href = '/login.html?redirect=' + r; }</script>
+    <style>
+        body { font-family: 'Inter', system-ui, sans-serif; }
+        /* Tipografia do conteúdo renderizado a partir do Markdown */
+        .doc h1 { font-size: 1.6rem; font-weight: 700; color: #0f172a; line-height: 1.2; margin: 0 0 .4rem; }
+        .doc h2 { font-size: 1.15rem; font-weight: 700; color: #0f172a; margin: 2rem 0 .7rem; padding-bottom: .4rem; border-bottom: 1px solid #eef2f7; }
+        .doc h3 { font-size: .98rem; font-weight: 700; color: #1f2937; margin: 1.2rem 0 .45rem; }
+        .doc p  { color: #374151; line-height: 1.75; margin: .55rem 0; font-size: .9rem; }
+        .doc ul, .doc ol { margin: .5rem 0 .6rem 1.3rem; color: #374151; font-size: .9rem; line-height: 1.75; }
+        .doc ul { list-style: disc; } .doc ol { list-style: decimal; }
+        .doc li { margin: .22rem 0; } .doc li::marker { color: #94a3b8; }
+        .doc a  { color: #0284c7; text-decoration: none; }
+        .doc a:hover { text-decoration: underline; }
+        .doc strong { color: #111827; font-weight: 600; }
+        .doc code { background: #f1f5f9; color: #0f172a; padding: .12rem .38rem; border-radius: .3rem; font-size: .82em; font-family: ui-monospace, 'SFMono-Regular', monospace; }
+        .doc pre  { background: #0f172a; color: #e2e8f0; padding: 1rem 1.1rem; border-radius: .6rem; overflow-x: auto; margin: .9rem 0; line-height: 1.55; }
+        .doc pre code { background: transparent; color: inherit; padding: 0; font-size: .8rem; }
+        .doc blockquote { border-left: 3px solid #a78bfa; background: #faf5ff; padding: .65rem .95rem; margin: .9rem 0; border-radius: 0 .45rem .45rem 0; color: #4b5563; font-size: .88rem; }
+        .doc blockquote p { margin: .25rem 0; color: #4b5563; }
+        .doc table { width: 100%; border-collapse: collapse; margin: .9rem 0; font-size: .85rem; }
+        .doc th, .doc td { border: 1px solid #e5e7eb; padding: .5rem .7rem; text-align: left; vertical-align: top; }
+        .doc thead { background: #f8fafc; } .doc th { font-weight: 600; color: #334155; }
+        .doc hr { border: 0; border-top: 1px solid #eef2f7; margin: 1.6rem 0; }
+    </style>
+</head>
+<body class="bg-white">
+<div id="layoutRoot"></div>
+<script src="_layout.js"></script>
+
+<!-- Fonte: documentacao/INVENTARIO_PATRIMONIO.md (mantido em sincronia).
+     Em <script type="text/markdown"> o conteúdo é texto puro: crases e blocos
+     de código não são interpretados como JS nem como HTML. -->
+<script type="text/markdown" id="docSource">
+# Inventário · Módulo Patrimônio
+
+Como funciona o controle de **itens de patrimônio** (equipamentos duradouros:
+notebooks, mobiliário, informática) no sistema de inventário.
+
+> **Resumo:** consumo é controlado por **quantidade/lote**; patrimônio é
+> controlado por **unidade individual (número de série)**. Cada bem físico é
+> rastreado um a um — onde está, com quem está, quanto vale e em que estado.
+
+---
+
+## 1. Conceito central: Produto (modelo) × Unidade (número de série)
+
+- **Produto / item** = o *modelo* (ex.: "Macbook Air v2025"). É cadastrado em
+  **Itens** com `Tipo de cadastro = Patrimônio`, sua **Categoria > Subcategoria**
+  (ex.: MacBooks > Macbook Air) e a **taxa de depreciação anual** do modelo.
+- **Unidade** = cada *exemplar físico*, identificado pelo **número de série**
+  (ex.: `31346546-22`). Um mesmo produto tem N unidades, cada uma com:
+  - localização atual e colaborador responsável (opcional);
+  - valor e data de aquisição **próprios**;
+  - valor contábil (depreciação) **próprio**;
+  - estado: `em uso`, `inativo` ou `baixado`.
+
+A tabela no banco que guarda as unidades é a **`inv_serial_units`**.
+
+---
+
+## 2. Onde fica na interface
+
+Na barra lateral, as operações são separadas em dois "módulos" por tipo:
+
+```
+Consumo
+  › Entrada        (recepção com documento fiscal, por quantidade/lote)
+  › Saída          (consumo de stock)
+Patrimônio
+  › Entrada        (aquisição: cadastra unidades por número de série)
+  › Movimentação   (reatribui origem → destino: localização e/ou colaborador)
+  › Saída          (baixa de uma unidade com motivo)
+Depreciação        (execução anual — corre por unidade)
+```
+
+Cada tela de Patrimônio tem o **mesmo layout** da equivalente de Consumo
+(lista de registos + botão "Novo…" que abre um modal). O que muda é só a lógica.
+
+> **Importante (segurança):** a separação por tela é só conveniência. A regra
+> real é no servidor: cada endpoint valida o `macro_category` do item. Itens de
+> patrimônio são **rejeitados** nas telas de consumo (entrada/saída/transferência)
+> e vice-versa — mudar a URL ou o pedido não contorna isso.
+
+---
+
+## 3. Ciclo de vida de uma unidade
+
+### 3.1 Entrada (aquisição) — `Patrimônio › Entrada`
+Escolhe-se o **produto patrimonial**, a **localização inicial** (e, opcional, o
+**colaborador** e o **fornecedor**), e cadastram-se **uma ou mais unidades**,
+cada uma com seu **número de série**, **data** e **valor de aquisição**.
+
+- Cria uma linha em `inv_serial_units` por número de série.
+- O **valor contábil** (`book_value`) começa igual ao valor de aquisição.
+- Registra um movimento `entrada` por unidade (trilha de auditoria).
+- Número de série é **único por produto** — não dá para repetir o mesmo NS no
+  mesmo modelo.
+
+### 3.2 Movimentação — `Patrimônio › Movimentação`
+Reatribui uma unidade de uma **origem** (localização/colaborador atuais) para um
+**destino** (nova localização **e/ou** novo colaborador).
+
+- Exemplo: `Dep. de Tecnologia` → `Dep. de Vendas` com o colaborador *Felipe*;
+  ou `Home Office` com o colaborador *Igor*.
+- Atualiza `current_location_id` / `current_holder_id` da unidade e grava um
+  movimento (`transferencia_saida`, subtype `movimentacao_patrimonial`) com
+  origem e destino (local + colaborador).
+- Unidades **baixadas** não podem ser movimentadas.
+
+### 3.3 Saída / baixa — `Patrimônio › Saída`
+Dá **baixa** de uma unidade, com um **motivo** obrigatório
+(ex.: "Queima do CPU. Fora da Garantia").
+
+- Marca a unidade como `baixado`, grava `write_off_reason` e `write_off_date`.
+- Registra um movimento `saida` (subtype `baixa`).
+- A unidade some das telas de Movimentação e Saída.
+
+### 3.4 Depreciação — `Depreciação`
+Execução **anual** (uma vez por ano; também automática em 1/jan às 04h00).
+Corre **por unidade**:
+
+- A **taxa** vem do item (modelo); o **valor/data de aquisição** e o **valor
+  contábil** vêm da unidade.
+- Cálculo *pro rata* no ano de aquisição (proporcional aos meses restantes) e
+  cheio nos anos seguintes.
+- Reduz o `book_value` da unidade. Quando chega a **zero**, a unidade é
+  **baixada** automaticamente (aparece também no histórico de Baixas).
+- Grava um movimento `depreciacao` por unidade.
+
+---
+
+## 4. Diferenças em relação ao Consumo
+
+| Aspecto | Consumo | Patrimônio |
+|---|---|---|
+| Unidade de controle | quantidade / lote | **unidade individual (nº de série)** |
+| "Stock" | `inv_stock` (qtd por local/lote) | `inv_serial_units` (1 linha por unidade) |
+| Cadastro do item | mín/máx, lead time, fator de conversão | **só taxa de depreciação** (sem mín/máx/lead/conversão) |
+| Aquisição | documento fiscal + linhas | **por unidade** (NS, data, valor) |
+| Destino de movimento | localização | localização **e/ou colaborador** |
+| Saída | consumo de stock | **baixa com motivo** |
+| Depreciação | — | **por unidade** (book_value) |
+
+Por isso, na **ficha do item** patrimonial: o painel "Stock por localização" dá
+lugar a **"Unidades (números de série)"** (NS, localização, colaborador, valor de
+aquisição, **valor contábil**, estado), e o Kardex de stock **não se aplica** a
+patrimônio (use o histórico de unidades / movimentos).
+
+---
+
+## 5. Modelo de dados (resumo)
+
+**`inv_serial_units`** — a unidade física:
+`item_id` (→ produto), `serial_number`, `acquisition_date`, `acquisition_value`,
+`book_value` (valor contábil), `supplier_id`, `current_location_id` (→ localização),
+`current_holder_id` (→ `rh_employees`, o colaborador), `status`
+(`em_uso`/`inativo`/`baixado`), `write_off_reason`, `write_off_date`.
+
+**`inv_movements`** — trilha de auditoria (imutável). Para patrimônio, ganhou
+`serial_unit_id`, `from_employee_id` e `to_employee_id`. Tipos/subtipos usados:
+`entrada`/`aquisicao_patrimonial`, `transferencia_saida`/`movimentacao_patrimonial`,
+`saida`/`baixa`, `depreciacao`/`anual` (ou `baixa` na depreciação total).
+
+**Colaboradores**: vêm do módulo **RH** (`rh_employees`), via endpoint
+`GET /api/inventory/employees` (lista enxuta, sob permissão de inventário).
+
+**Localizações**: `inv_units` (unidade/instalação) → `inv_locations` (sala/zona),
+exibidas como `Unidade · Localização`.
+
+---
+
+## 6. Regras importantes
+
+- **NS único por produto** (`UNIQUE(item_id, serial_number)`).
+- **Unidade baixada** não pode ser movimentada nem baixada de novo.
+- **Concorrência**: movimentação e baixa têm guarda otimista — se a unidade já
+  foi alterada por outra operação, a segunda recebe erro (409) em vez de gravar
+  um registro defasado.
+- **Fronteira de macro no servidor**: consumo e patrimônio não se misturam nos
+  endpoints (validação por `macro_category` / `serial_unit_id`).
+
+---
+
+## 7. Migrações de banco (aplicar em ordem, no Supabase)
+
+O módulo de patrimônio depende de duas migrações manuais:
+
+1. **`database/inventory-refactor/110-patrimonio-serie.sql`**
+   — cria `inv_serial_units` e adiciona `serial_unit_id`/`from_employee_id`/
+   `to_employee_id` a `inv_movements`.
+2. **`database/inventory-refactor/111-patrimonio-depreciacao-unidade.sql`**
+   — adiciona `book_value` à unidade e reescreve `fn_inv_run_depreciation` para
+   correr por unidade.
+
+> Sem aplicar as duas, as telas e endpoints de patrimônio (e o histórico de
+> Saídas de consumo, que passou a filtrar `serial_unit_id`) não funcionam.
+
+---
+
+## 8. Roteiro de teste ponta a ponta
+
+1. Aplicar as migrações 110 e 111.
+2. Em **Itens**, criar um produto `Patrimônio` (categoria/subcategoria + taxa).
+3. **Patrimônio › Entrada**: cadastrar 2–3 unidades (NS, data, valor).
+4. **Patrimônio › Movimentação**: mover uma unidade para outra localização +
+   colaborador. Conferir origem/destino no histórico.
+5. **Patrimônio › Saída**: dar baixa de uma unidade com motivo.
+6. **Depreciação**: rodar um ano e conferir a redução do valor contábil das
+   unidades (e baixa automática se zerar) na ficha do item.
+</script>
+
+<script>
+renderInventoryLayout({
+    activePage: 'docs-patrimonio',
+    title: 'Documentação · Patrimônio',
+    subtitle: 'Como funciona o controle de itens de patrimônio'
+});
+
+(function renderDoc() {
+    const md = document.getElementById('docSource').textContent;
+    const target = document.getElementById('pageContent');
+    let html;
+    try {
+        html = (window.marked && (marked.parse ? marked.parse(md) : marked(md)));
+    } catch (_) { html = null; }
+    target.innerHTML = `
+        <div class="max-w-4xl mx-auto">
+            <div class="bg-white border border-gray-200/70 rounded-xl shadow-sm p-7 md:p-9">
+                ${html
+                    ? `<div class="doc">${html}</div>`
+                    : `<p class="text-sm text-gray-500 mb-3">Não foi possível formatar a documentação — exibindo o texto bruto.</p>
+                       <pre class="text-xs whitespace-pre-wrap text-gray-700">${md.replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]))}</pre>`}
+            </div>
+            <p class="text-[11px] text-gray-400 text-center mt-3">
+                Fonte: <span class="font-mono">documentacao/INVENTARIO_PATRIMONIO.md</span>
+            </p>
+        </div>`;
+    // Links internos abrem na mesma aba; externos em nova
+    target.querySelectorAll('.doc a[href^="http"]').forEach(a => { a.target = '_blank'; a.rel = 'noopener'; });
+})();
+</script>
+</body>
+</html>
