@@ -29,7 +29,9 @@ document.getElementById('pageContent').innerHTML = `
                 <div>
                     A planilha deve seguir o formato <b>Instituto Areluna v1.2</b> — abas <b>Cadastro_Produtos</b> e <b>Cadastro de Fornecedores</b>.
                     <br>Chaves de deduplicação: <b>ID</b> para produtos · <b>NIF/NIPC</b> para fornecedores.
-                    <br>O ID do produto deve seguir o padrão <span class="font-mono">1XXXXXX</span> (Uso e Consumo) ou <span class="font-mono">2XXXXXX</span> (Patrimônio). Linhas fora do padrão bloqueiam o import.
+                    <br><b>ID em branco</b> → o sistema atribui o próximo código de Uso e Consumo (<span class="font-mono">1XXXXXX</span>) automaticamente.
+                    <br><b>ID já cadastrado</b> → o item é <b>atualizado</b> (você confirma quais na pré-visualização).
+                    <br>ID preenchido <b>fora</b> do padrão <span class="font-mono">1XXXXXX</span>/<span class="font-mono">2XXXXXX</span> bloqueia o import.
                 </div>
             </div>
             <form id="uploadForm" class="space-y-3">
@@ -71,6 +73,31 @@ document.getElementById('pageContent').innerHTML = `
                 </details>
             </div>
 
+            <!-- Itens já cadastrados → serão ATUALIZADOS (desmarcáveis) -->
+            <div id="updatesBlock" class="hidden mb-4">
+                <div class="flex items-center justify-between mb-1.5">
+                    <p class="text-[10px] uppercase tracking-wider font-bold text-amber-700 flex items-center gap-1.5"><i class="fas fa-pen-to-square"></i> Itens já cadastrados — serão atualizados</p>
+                    <label class="text-[11px] text-gray-600 flex items-center gap-1.5 cursor-pointer select-none">
+                        <input type="checkbox" id="updatesSelectAll" checked> Selecionar todos
+                    </label>
+                </div>
+                <div class="border border-amber-200 rounded-lg overflow-hidden">
+                    <table class="w-full text-xs">
+                        <thead class="bg-amber-50 text-[10px] uppercase tracking-wider text-amber-700 border-b border-amber-200">
+                            <tr>
+                                <th class="text-center p-2 w-10"><i class="fas fa-check"></i></th>
+                                <th class="text-left p-2">Linha</th>
+                                <th class="text-left p-2 font-mono">ID</th>
+                                <th class="text-left p-2">Nome (planilha)</th>
+                                <th class="text-left p-2">Nome atual no sistema</th>
+                            </tr>
+                        </thead>
+                        <tbody id="updatesPreview" class="divide-y divide-amber-100/70"></tbody>
+                    </table>
+                </div>
+                <p class="text-[11px] text-gray-500 mt-1">Desmarque os que <b>não</b> devem ser atualizados. Total: <span id="updatesTotal">0</span></p>
+            </div>
+
             <!-- Detalhes do que será criado -->
             <div id="detailsBox" class="space-y-3 mb-4">
                 <div>
@@ -109,11 +136,11 @@ document.getElementById('pageContent').innerHTML = `
                     <thead class="bg-gray-50 text-[10px] uppercase tracking-wider text-gray-500 border-b border-gray-200">
                         <tr>
                             <th class="text-left p-2">Linha</th>
-                            <th class="text-left p-2">Código (origem)</th>
+                            <th class="text-left p-2">ID</th>
                             <th class="text-left p-2">Nome</th>
                             <th class="text-left p-2">Categoria</th>
                             <th class="text-left p-2">UM</th>
-                            <th class="text-right p-2">Min</th>
+                            <th class="text-left p-2">Operação</th>
                         </tr>
                     </thead>
                     <tbody id="itemsPreview" class="divide-y divide-gray-100"></tbody>
@@ -177,11 +204,13 @@ function renderPreview(data) {
     document.getElementById('step2').scrollIntoView({ behavior: 'smooth' });
 
     // Cards
+    const novosVal = `${data.items_insert_count ?? data.items_count}` +
+        (data.items_autoassigned_count ? ` · ${data.items_autoassigned_count} c/ ID auto` : '');
     document.getElementById('summaryCards').innerHTML = [
-        ['Itens', data.items_count, 'fa-boxes-stacked', 'sky'],
-        ['Fornecedores', `${data.new_suppliers_count} novos · ${data.existing_suppliers_count} existentes`, 'fa-truck', 'cyan'],
-        ['Vínculo item→fornecedor', `${data.items_with_supplier} de ${data.items_count}`, 'fa-link', 'emerald'],
-        ['Categorias novas', data.new_categories.length, 'fa-tags', 'amber']
+        ['Novos itens', novosVal, 'fa-boxes-stacked', 'sky', ''],
+        ['A atualizar', `<span id="updateCardVal">${data.items_update_count || 0}</span>`, 'fa-pen-to-square', 'amber', ''],
+        ['Fornecedores', `${data.new_suppliers_count} novos · ${data.existing_suppliers_count} existentes`, 'fa-truck', 'cyan', ''],
+        ['Vínculo item→fornecedor', `${data.items_with_supplier} de ${data.items_insert_count ?? data.items_count} novos`, 'fa-link', 'emerald', '']
     ].map(([label, val, icon, color]) => `
         <div class="bg-white rounded-lg border border-gray-200 p-3">
             <p class="text-[10px] uppercase tracking-wider text-gray-500 font-semibold">${label}</p>
@@ -247,31 +276,84 @@ function renderPreview(data) {
         sb.classList.add('hidden');
     }
 
-    // Tabela
+    // Container de updates (com checkbox por SKU)
+    const ub = document.getElementById('updatesBlock');
+    const toUpdate = data.items_to_update || [];
+    if (toUpdate.length) {
+        ub.classList.remove('hidden');
+        document.getElementById('updatesTotal').textContent = toUpdate.length;
+        document.getElementById('updatesPreview').innerHTML = toUpdate.map(u => `
+            <tr>
+                <td class="p-2 text-center"><input type="checkbox" class="update-chk" data-code="${escapeHtml(u.internal_code)}" checked></td>
+                <td class="p-2 text-gray-400">${u.line}</td>
+                <td class="p-2 font-mono text-[11px] text-gray-700">${escapeHtml(u.internal_code)}</td>
+                <td class="p-2 text-gray-800">${escapeHtml(u.name || '—')}</td>
+                <td class="p-2 text-gray-500">${escapeHtml(u.existing_name || '—')}${u.was_deleted ? ' <span class="px-1 py-0.5 rounded text-[9px] bg-red-50 text-red-600 border border-red-100">reativar</span>' : ''}</td>
+            </tr>`).join('');
+        const selAll = document.getElementById('updatesSelectAll');
+        selAll.checked = true;
+        selAll.onchange = () => { document.querySelectorAll('.update-chk').forEach(c => { c.checked = selAll.checked; }); refreshUpdateCount(); };
+        document.querySelectorAll('.update-chk').forEach(c => c.addEventListener('change', refreshUpdateCount));
+        refreshUpdateCount();
+    } else {
+        ub.classList.add('hidden');
+    }
+
+    // Tabela de itens (primeiros 10, com operação)
     document.getElementById('itemsTotal').textContent = data.items_count;
-    document.getElementById('itemsPreview').innerHTML = data.items_preview.map(it => `
+    document.getElementById('itemsPreview').innerHTML = data.items_preview.map(it => {
+        const opBadge = it._op === 'update'
+            ? '<span class="px-1.5 py-0.5 rounded text-[10px] bg-amber-50 text-amber-700 border border-amber-100">atualizar</span>'
+            : (it._auto_assigned
+                ? '<span class="px-1.5 py-0.5 rounded text-[10px] bg-emerald-50 text-emerald-700 border border-emerald-100">novo · ID auto</span>'
+                : '<span class="px-1.5 py-0.5 rounded text-[10px] bg-sky-50 text-sky-700 border border-sky-100">novo</span>');
+        const orig = it.source_code && it.source_code !== it.internal_code
+            ? `<span class="block text-[9px] text-gray-300">orig: ${escapeHtml(it.source_code)}</span>` : '';
+        return `
         <tr>
             <td class="p-2 text-gray-400">${it.line}</td>
-            <td class="p-2 font-mono text-[11px] text-gray-500">${escapeHtml(it.source_code)}</td>
-            <td class="p-2 text-gray-800">${escapeHtml(it.name)}</td>
+            <td class="p-2 font-mono text-[11px] text-gray-600">${escapeHtml(it.internal_code || '—')}${orig}</td>
+            <td class="p-2 text-gray-800">${escapeHtml(it.name || '—')}</td>
             <td class="p-2 text-gray-600">${escapeHtml(it._category_name || '—')}</td>
             <td class="p-2 text-gray-600">${escapeHtml(it._uom_code || '—')}</td>
-            <td class="p-2 text-right text-gray-600">${it.min_stock || 0}</td>
-        </tr>`).join('');
+            <td class="p-2">${opBadge}</td>
+        </tr>`;
+    }).join('');
+}
+
+function refreshUpdateCount() {
+    const chks = [...document.querySelectorAll('.update-chk')];
+    const checked = chks.filter(c => c.checked).length;
+    const el = document.getElementById('updateCardVal');
+    if (el) el.textContent = checked;
+    // Re-sincroniza o "Selecionar todos" ao estado real das linhas.
+    const selAll = document.getElementById('updatesSelectAll');
+    if (selAll) selAll.checked = chks.length > 0 && checked === chks.length;
 }
 
 async function executeImport() {
     if (!previewPayload) return;
+    // Updates desmarcados não são tocados — filtra antes de enviar.
+    const excluded = new Set(
+        [...document.querySelectorAll('.update-chk')].filter(c => !c.checked).map(c => c.dataset.code)
+    );
+    const items = (previewPayload.items || []).filter(it => !(it._op === 'update' && excluded.has(it.internal_code)));
+    const inserts = items.filter(it => it._op !== 'update').length;
+    const updates = items.filter(it => it._op === 'update').length;
     const supCount = (previewPayload.suppliers || []).length;
-    const msg = `Confirmar criação de ${previewPayload.items.length} itens` +
-                (supCount ? ` e ${supCount} fornecedores (dedup por NIF)` : '') + ' no sistema?';
-    if (!confirm(msg)) return;
+    if (!inserts && !updates && !supCount) return toast('Nada para importar — todos os itens foram desmarcados', 'warn');
+
+    const parts = [];
+    if (inserts) parts.push(`criar ${inserts} item(ns)`);
+    if (updates) parts.push(`atualizar ${updates}`);
+    if (supCount) parts.push(`${supCount} fornecedores (dedup por NIF)`);
+    if (!confirm(`Confirmar: ${parts.join(' · ')}?`)) return;
     const btn = document.getElementById('executeBtn');
     btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Importando…';
     try {
         const r = await apiCall('/api/inventory/import/execute', {
             method: 'POST',
-            body: JSON.stringify(previewPayload)
+            body: JSON.stringify({ ...previewPayload, items })
         });
         document.getElementById('step1').classList.add('hidden');
         document.getElementById('step2').classList.add('hidden');
@@ -279,8 +361,9 @@ async function executeImport() {
         s.classList.remove('hidden');
         s.scrollIntoView({ behavior: 'smooth' });
         document.getElementById('resultSummary').innerHTML = `
-            <p><b>${r.data.created_items}</b> itens criados</p>
-            <p><b>${r.data.items_with_supplier}</b> com fornecedor vinculado · <span class="text-gray-500">${r.data.items_without_supplier} sem vínculo (vincular manualmente em Itens)</span></p>
+            <p><b>${r.data.created_items}</b> itens criados${r.data.auto_assigned_items > 0 ? ` · <span class="text-gray-500">${r.data.auto_assigned_items} com ID auto-atribuído</span>` : ''}</p>
+            ${r.data.updated_items > 0 ? `<p><b>${r.data.updated_items}</b> itens atualizados</p>` : ''}
+            <p><b>${r.data.items_with_supplier}</b> itens criados com fornecedor · <span class="text-gray-500">${r.data.items_without_supplier} sem vínculo (vincular manualmente em Itens)</span></p>
             <p><b>${r.data.created_suppliers}</b> fornecedores criados${r.data.skipped_suppliers > 0 ? ` · <span class="text-gray-500">${r.data.skipped_suppliers} já existiam (mesmo NIF)</span>` : ''}</p>
             <p><b>${r.data.created_categories}</b> categorias · <b>${r.data.created_uoms}</b> UMs</p>
             ${r.data.next_consumo_code ? `<p class="text-[11px] text-gray-400 mt-2">Próximo código (Uso e Consumo): <span class="font-mono">${escapeHtml(r.data.next_consumo_code)}</span></p>` : ''}
