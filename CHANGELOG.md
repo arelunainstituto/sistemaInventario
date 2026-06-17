@@ -38,6 +38,19 @@ _Nenhuma alteração pendente._
 
 ---
 
+## [1.12.0] — 2026-06-17
+
+> Recuperação de senha via link do Supabase: o sistema processa o link de *recovery* e permite definir uma nova senha. Sem "esqueci a senha" na tela de login (por opção).
+
+### Adicionado
+- **Página de recuperação de senha** ([reset-password.html](public/reset-password.html)): processa o link de *recovery* enviado pelo Supabase, valida a sessão de recuperação (evento `PASSWORD_RECOVERY` + fallback por `getSession`) e permite definir uma nova senha com confirmação. Ao salvar usa `auth.updateUser({ password })` e — reaproveitando a lógica da troca obrigatória de 30 dias — reseta `last_password_change` e limpa `must_change_password`; depois encerra a sessão e leva ao login. É standalone (não carrega `auth.js`, evitando o redirect automático de sessão). Não há link de "esqueci a senha" na tela de login (por escolha).
+- **Roteamento do token de recovery** ([index.html](public/index.html), [login.html](public/login.html)): se o link aterrissar no root ou no login, um script encaminha para a página de recuperação **preservando o token no hash** — necessário porque o root, ao redirecionar para o login, descartaria o hash. Funciona sem mudança no Supabase além do Site URL ser o domínio do app.
+
+### Notas
+- [_layout.js:5](public/inventory/_layout.js#L5) bump para `v1.12.0`.
+
+---
+
 ## [1.11.0] — 2026-06-15
 
 > Documentação do módulo Patrimônio acessível dentro do sistema, sidebar com grupos retráteis e dashboard reorganizado em listas aninhadas para escalar com muitas localizações.

@@ -4,7 +4,20 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>🔐 Login - Sistema de Inventário</title>
-    
+
+    <!-- Recovery de senha (Supabase): encaminha o link para a definição de nova
+         senha PRESERVANDO o token, antes do auth.js processar/limpar a sessão. -->
+    <script>
+        (function () {
+            var h = location.hash || '', s = location.search || '';
+            // Encaminha o link de recovery E o retorno de erro do Supabase
+            // (ex.: link expirado) para a página dedicada de recuperação.
+            if (/type=recovery/.test(h) || /type=recovery/.test(s) || /(^|[#&])error/.test(h)) {
+                location.replace('/reset-password.html' + s + h);
+            }
+        })();
+    </script>
+
     <!-- Tailwind CSS v3+ -->
     <script src="https://cdn.tailwindcss.com"></script>
     

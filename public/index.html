@@ -4,6 +4,20 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sistema de Inventário - Grupo AreLuna</title>
+    <!-- Recovery de senha (Supabase): se o link aterrissar no root, encaminha
+         para a definição de nova senha PRESERVANDO o token — senão o redirect
+         de autenticação abaixo descartaria o hash com o token. -->
+    <script>
+        (function () {
+            var h = location.hash || '', s = location.search || '';
+            // Encaminha o link de recovery E o retorno de erro do Supabase
+            // (ex.: link expirado: #error=…&error_code=otp_expired) para a página
+            // dedicada — que mostra "link inválido/expirado".
+            if (/type=recovery/.test(h) || /type=recovery/.test(s) || /(^|[#&])error/.test(h)) {
+                location.replace('/reset-password.html' + s + h);
+            }
+        })();
+    </script>
     <script src="/config.js"></script>
     <script>
         // Redirecionar para a página de login ou seleção de módulos
