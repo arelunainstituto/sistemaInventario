@@ -1,0 +1,94 @@
+<!--
+  Template de e-mail "Reset Password" (Supabase).
+  Onde colar: Supabase Dashboard → Authentication → Emails → "Reset Password".
+  Cole TODO o conteúdo abaixo no corpo do template. Sugestão de Assunto:
+    "Recuperação de senha · Sistema de Inventário"
+  Variáveis Supabase usadas: {{ .ConfirmationURL }} e {{ .Email }}.
+  Ao clicar, o link aterrissa no domínio do app e a página reset-password.html
+  assume o fluxo de definição da nova senha.
+-->
+<!DOCTYPE html>
+<html lang="pt-BR" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <title>Recuperação de senha</title>
+</head>
+<body style="margin:0; padding:0; background-color:#f1f5f9; -webkit-font-smoothing:antialiased; font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+    <!-- Pré-cabeçalho (preview na caixa de entrada) -->
+    <div style="display:none; max-height:0; overflow:hidden; opacity:0; color:transparent; height:0; width:0;">
+        Defina uma nova senha de acesso ao Sistema de Inventário.
+    </div>
+
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f1f5f9;">
+        <tr>
+            <td align="center" style="padding:24px 12px;">
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:480px; width:100%; background-color:#ffffff; border-radius:16px; overflow:hidden; box-shadow:0 1px 3px rgba(15,23,42,0.08);">
+                    <!-- Cabeçalho -->
+                    <tr>
+                        <td align="center" style="background:linear-gradient(135deg,#667eea 0%,#764ba2 100%); background-color:#6d5ae0; padding:34px 32px 28px;">
+                            <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center">
+                                <tr>
+                                    <td align="center" valign="middle" style="width:56px; height:56px; background-color:rgba(255,255,255,0.22); border-radius:28px; font-size:26px; line-height:56px;">🔑</td>
+                                </tr>
+                            </table>
+                            <h1 style="margin:16px 0 4px; color:#ffffff; font-size:22px; font-weight:700;">Recuperação de senha</h1>
+                            <p style="margin:0; color:rgba(255,255,255,0.85); font-size:13px;">Sistema de Inventário &middot; Grupo AreLuna</p>
+                        </td>
+                    </tr>
+
+                    <!-- Corpo -->
+                    <tr>
+                        <td style="padding:32px;">
+                            <p style="margin:0 0 16px; color:#334155; font-size:15px; line-height:1.6;">Olá,</p>
+                            <p style="margin:0 0 24px; color:#334155; font-size:15px; line-height:1.6;">
+                                Recebemos um pedido para redefinir a senha da conta
+                                <strong style="color:#0f172a;">{{ .Email }}</strong> no Sistema de Inventário.
+                                Clique no botão abaixo para definir uma nova senha:
+                            </p>
+
+                            <!-- Botão -->
+                            <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" style="margin:0 auto 26px;">
+                                <tr>
+                                    <td align="center" bgcolor="#7c3aed" style="border-radius:10px;">
+                                        <a href="{{ .ConfirmationURL }}" target="_blank"
+                                           style="display:inline-block; padding:14px 34px; font-size:15px; font-weight:700; color:#ffffff; text-decoration:none; border-radius:10px; background-color:#7c3aed;">
+                                            Definir nova senha
+                                        </a>
+                                    </td>
+                                </tr>
+                            </table>
+
+                            <p style="margin:0 0 6px; color:#64748b; font-size:13px; line-height:1.6;">Ou copie e cole este endereço no navegador:</p>
+                            <p style="margin:0 0 24px; word-break:break-all;">
+                                <a href="{{ .ConfirmationURL }}" style="color:#7c3aed; font-size:12px;">{{ .ConfirmationURL }}</a>
+                            </p>
+
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                                <tr>
+                                    <td style="border-top:1px solid #eef2f7; padding-top:16px;">
+                                        <p style="margin:0; color:#94a3b8; font-size:12px; line-height:1.6;">
+                                            Se você não solicitou esta alteração, ignore este e-mail — sua senha permanece a mesma.
+                                            Por segurança, este link expira; se necessário, solicite um novo.
+                                        </p>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+
+                    <!-- Rodapé -->
+                    <tr>
+                        <td align="center" style="background-color:#f8fafc; padding:20px 32px; border-top:1px solid #eef2f7;">
+                            <p style="margin:0; color:#94a3b8; font-size:12px;">&copy; Grupo AreLuna &middot; Sistema de Inventário</p>
+                        </td>
+                    </tr>
+                </table>
+
+                <p style="margin:16px 0 0; color:#cbd5e1; font-size:11px;">Este é um e-mail automático, por favor não responda.</p>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>

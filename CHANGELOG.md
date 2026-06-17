@@ -38,6 +38,22 @@ _Nenhuma alteração pendente._
 
 ---
 
+## [1.12.1] — 2026-06-17
+
+> Corrige a tela de recuperação de senha (1.12.0), que ficava presa em "Validando o link…", e adiciona o template de e-mail de *recovery*.
+
+### Corrigido
+- **Recuperação de senha travava em "Validando o link…"** ([reset-password.html](public/reset-password.html)): causa raiz — o script declarava `const supabase`, que **colide com o global `supabase` criado pelo CDN do supabase-js** (`Identifier 'supabase' has already been declared`). Com o erro de sintaxe, o script **não executava** e a tela ficava no estado inicial "Validando…". Corrigido renomeando a variável local para `sb`. (O `node --check` não pega: o conflito só existe no browser, com o CDN carregado.)
+- **Validação do link tornada determinística e endurecida** ([reset-password.html](public/reset-password.html)): a página passou a validar o token **manualmente** (`detectSessionInUrl:false` + parse do hash + `auth.setSession`) em vez do auto-processamento de URL — que, com `persistSession:false`, poderia travar o `getSession`. Mantém o isolamento de segurança (client próprio, não herda sessão logada; só há sessão se o link trouxer um token válido) e limpa o token da URL (`history.replaceState`). Também removido um `decodeURIComponent` redundante sobre o `error_description` (já decodificado pelo `URLSearchParams`) que podia lançar `URIError` no caminho de link inválido.
+
+### Adicionado
+- **Template de e-mail de recuperação de senha** ([documentacao/email-templates/recovery-senha.html](documentacao/email-templates/recovery-senha.html)): HTML responsivo (layout em tabela + estilos inline, botão *bulletproof*) no visual do sistema, para colar em Supabase → Authentication → Emails → "Reset Password". Usa `{{ .ConfirmationURL }}` e `{{ .Email }}`.
+
+### Notas
+- [_layout.js:5](public/inventory/_layout.js#L5) bump para `v1.12.1`.
+
+---
+
 ## [1.12.0] — 2026-06-17
 
 > Recuperação de senha via link do Supabase: o sistema processa o link de *recovery* e permite definir uma nova senha. Sem "esqueci a senha" na tela de login (por opção).
