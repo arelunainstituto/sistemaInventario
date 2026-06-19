@@ -21,6 +21,7 @@
 <div id="layoutRoot"></div>
 
 <script src="_layout.js"></script>
+<script src="_searchable-select.js"></script>
 <script>
 const params = new URLSearchParams(location.search);
 const editingId = params.get('id');
@@ -78,6 +79,13 @@ document.getElementById('pageContent').innerHTML = `
             </button>
         </div>
 
+        <!-- Estado de carregando (modo edição): evita o form em branco enquanto
+             os dados do item chegam. -->
+        <div id="formLoading" class="hidden py-16 text-center">
+            <div class="animate-spin rounded-full h-10 w-10 border-b-2 border-sky-500 mx-auto mb-3"></div>
+            <p class="text-sm text-gray-500">Carregando dados do item…</p>
+        </div>
+
         <form id="itemForm" class="space-y-7">
             <input type="hidden" name="macro_category" id="macroField">
 
@@ -96,6 +104,10 @@ document.getElementById('pageContent').innerHTML = `
                         <label class="field-label">Categoria</label>
                         <select name="subcategory_id" id="subcategorySelect" class="field-input"></select>
                         <p class="text-[11px] text-gray-400 mt-1.5">Caminho completo aparece ao passar o mouse.</p>
+                    </div>
+                    <div>
+                        <label class="field-label">Fabricante</label>
+                        <input name="manufacturer" class="field-input" placeholder="Ex.: Apple, Dell, HP">
                     </div>
                     <div>
                         <label class="field-label">Ref. fabricante</label>
@@ -229,15 +241,22 @@ let uomsAll = [];
 let locationsAll = [];
 let bootstrapPromise = null;
 let categoriesLoaded = false;
+// Handles dos comboboxes (makeSearchable) — usados para re-sincronizar o texto
+// exibido com os valores carregados no modo edição.
+let scSubcat, scPurchaseUom, scConsumptionUom, scSupplier;
 
 async function bootstrap() {
     try {
-        const [cats, uoms, locs, sups] = await Promise.all([
+        // Em modo edição, busca o item EM PARALELO com os cadastros (antes era
+        // sequencial: 4 chamadas → depois o item), cortando o tempo até preencher.
+        const calls = [
             apiCall('/api/inventory/categories'),
             apiCall('/api/inventory/uoms'),
             apiCall('/api/inventory/locations'),
             apiCall('/api/inventory/suppliers')
-        ]);
+        ];
+        if (editingId) calls.push(apiCall(`/api/inventory/items/${editingId}`));
+        const [cats, uoms, locs, sups, itemRes] = await Promise.all(calls);
         categoriesAll = cats.data;
         categoriesLoaded = true;
         uomsAll       = uoms.data;
@@ -258,8 +277,19 @@ async function bootstrap() {
                 const tag = s.tax_id ? ` · ${escapeHtml(s.tax_id)}` : '';
                 return `<option value="${s.id}">${escapeHtml(s.name)}${tag}</option>`;
             }).join('');
-        if (editingId) await loadForEdit();
-    } catch (err) { toast(err.message, 'error'); }
+        // Comboboxes com busca (idempotente; || mantém o handle entre chamadas).
+        scPurchaseUom    = makeSearchable('purchaseUomSelect',     { placeholder: 'Buscar unidade…' }) || scPurchaseUom;
+        scConsumptionUom = makeSearchable('consumptionUomSelect',  { placeholder: 'Buscar unidade…' }) || scConsumptionUom;
+        scSupplier       = makeSearchable('defaultSupplierSelect', { placeholder: 'Buscar fornecedor por nome ou NIF…' }) || scSupplier;
+        if (editingId) await loadForEdit(itemRes.data);
+    } catch (err) {
+        toast(err.message, 'error');
+        // Se o bootstrap falhar antes do loadForEdit, não deixa o spinner preso.
+        if (editingId) {
+            document.getElementById('formLoading').classList.add('hidden');
+            document.getElementById('itemForm').classList.remove('hidden');
+        }
+    }
 }
 
 async function activateMacro(macro) {
@@ -299,6 +329,9 @@ async function activateMacro(macro) {
             return `<option value="${c.id}"${title}>${escapeHtml(label)}</option>`;
         }).join('');
     subcategorySelect.innerHTML = '<option value="">—</option>' + opts;
+    // Combobox com busca na categoria (idempotente; o MutationObserver re-sincroniza
+    // quando as opções mudam ao trocar de macro).
+    scSubcat = makeSearchable('subcategorySelect', { placeholder: 'Buscar categoria…' }) || scSubcat;
 }
 
 // Renderiza a tabela de overrides por localização (apenas no modo edit)
@@ -407,16 +440,20 @@ function collectLocationOverrides() {
     return out;
 }
 
-async function loadForEdit() {
+// `prefetched` = item já buscado pelo bootstrap (carga inicial, em paralelo).
+// Sem argumento (ex.: removeOverride), busca o item de novo.
+async function loadForEdit(prefetched) {
     try {
-        const res = await apiCall(`/api/inventory/items/${editingId}`);
-        const it = res.data;
+        const it = prefetched || (await apiCall(`/api/inventory/items/${editingId}`)).data;
         await activateMacro(it.macro_category);
         const f = document.getElementById('itemForm');
         for (const [k, v] of Object.entries(it)) {
             const el = f.elements[k];
             if (el && v !== null && v !== undefined) el.value = v;
         }
+        // Sincroniza o texto exibido dos comboboxes com os valores carregados
+        // (definir select.value por fora não atualiza o input do combobox sozinho).
+        scSubcat?.refresh(); scPurchaseUom?.refresh(); scConsumptionUom?.refresh(); scSupplier?.refresh();
         if (it.image_url) {
             document.getElementById('imagePreview').innerHTML = `
                 <div class="flex items-start gap-3">
@@ -430,12 +467,22 @@ async function loadForEdit() {
         if (it.macro_category === 'consumo') {
             renderLocationParams(it.location_params || []);
         }
-    } catch (err) { toast(err.message, 'error'); }
+    } catch (err) {
+        toast(err.message, 'error');
+    } finally {
+        // Revela o form preenchido e remove o estado de carregando (mesmo em erro,
+        // para não travar a tela no spinner).
+        document.getElementById('formLoading').classList.add('hidden');
+        document.getElementById('itemForm').classList.remove('hidden');
+    }
 }
 
 if (editingId) {
     step1.classList.add('hidden');
     step2.classList.remove('hidden');
+    // Mostra o spinner e esconde o form vazio até os dados chegarem.
+    document.getElementById('formLoading').classList.remove('hidden');
+    document.getElementById('itemForm').classList.add('hidden');
 }
 
 document.getElementById('itemForm').addEventListener('submit', async (e) => {

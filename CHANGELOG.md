@@ -38,6 +38,21 @@ _Nenhuma alteração pendente._
 
 ---
 
+## [1.13.0] — 2026-06-18
+
+### Adicionado
+- **Campo "Fabricante" nos itens** (`requer migração`: [112-item-fabricante.sql](database/inventory-refactor/112-item-fabricante.sql)): nova coluna `inv_items.manufacturer` (nome do fabricante/marca — ex.: Apple, Dell), distinta de `manufacturer_ref` (que é a referência/código do fabricante). Exibida no cadastro ([item-form.html](public/inventory/item-form.html)) e na ficha ([item-view.html](public/inventory/item-view.html)). Mostrada para todos os itens (útil sobretudo no patrimônio; dá para restringir só ao patrimônio se desejado).
+- **Selects com busca (combobox) nos campos de listas longas** ([_searchable-select.js](public/inventory/_searchable-select.js)): aplicado o mesmo padrão `makeSearchable` já usado nas entradas. No **cadastro de item** ([item-form.html](public/inventory/item-form.html)): subcategoria, unidade de compra, unidade de consumo e fornecedor padrão viram campos pesquisáveis (digita-se para filtrar; o `<select>` original continua oculto e nomeado, então o submit não muda). No modo edição, os valores carregados re-sincronizam o texto exibido via `refresh()`. Nos **filtros da tela de itens** ([items.html](public/inventory/items.html)): o filtro de subcategoria também vira combobox. O filtro de **Macro** segue como `<select>` simples (apenas 3 opções fixas — uma caixa de busca ali não agrega).
+
+### Corrigido
+- **Editar item mostrava ~1,5s de form em branco** ([item-form.html](public/inventory/item-form.html)): ao clicar em "Editar", o formulário aparecia vazio enquanto os dados carregavam (o item era buscado **depois** dos 4 cadastros, em sequência). Agora o item é buscado **em paralelo** com os cadastros e, no modo edição, exibe-se um **"Carregando dados do item…"** no lugar do form vazio — o formulário só aparece já preenchido.
+
+### Notas
+- **Script de manutenção (não altera o app)** — [dedup-inv-items-duplicados.sql](database/dedup-inv-items-duplicados.sql): identifica e remove itens duplicados gerados na importação (IDs apagados → códigos re-atribuídos). Regra: mantém o registro que tem histórico; entre os sem histórico, mantém o de menor `internal_code` e apaga os de maior; se ambos têm histórico, fica para revisão manual. **Destrutivo** — rodar a identificação + backup antes.
+- [_layout.js:5](public/inventory/_layout.js#L5) bump para `v1.13.0`.
+
+---
+
 ## [1.12.1] — 2026-06-17
 
 > Corrige a tela de recuperação de senha (1.12.0), que ficava presa em "Validando o link…", e adiciona o template de e-mail de *recovery*.

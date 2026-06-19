@@ -99,6 +99,7 @@ function render(it) {
             <div class="bg-white rounded-xl border border-gray-200/70 shadow-sm p-6">
                 <h3 class="font-bold text-gray-900 mb-3 text-sm flex items-center gap-2"><i class="fas fa-id-card text-gray-600"></i> Identificação</h3>
                 ${infoRow('Subcategoria', it.subcategory?.name)}
+                ${infoRow('Fabricante', it.manufacturer)}
                 ${infoRow('Ref. fabricante', it.manufacturer_ref)}
                 ${infoRow('Código de barras', it.barcode, true)}
                 ${infoRow('Fornecedor padrão', it.default_supplier ? `${it.default_supplier.name}${it.default_supplier.tax_id ? ' · ' + it.default_supplier.tax_id : ''}` : null)}

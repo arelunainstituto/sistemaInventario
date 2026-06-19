@@ -16,6 +16,7 @@
 <div id="layoutRoot"></div>
 
 <script src="_layout.js"></script>
+<script src="_searchable-select.js"></script>
 <script>
 renderInventoryLayout({ activePage: 'items', title: 'Itens', subtitle: 'Catálogo de itens do inventário' });
 
@@ -91,6 +92,8 @@ const state = { page: 1, limit: 50, sort: 'name', dir: 'asc' };
         const cats = await apiCall('/api/inventory/categories');
         filterSubcategory.innerHTML = '<option value="">Todas</option>' +
             cats.data.map(c => `<option value="${c.id}">${escapeHtml(c.name)} (${c.parent_macro})</option>`).join('');
+        // Combobox com busca no filtro de subcategoria (lista grande).
+        makeSearchable('filterSubcategory', { placeholder: 'Buscar subcategoria…' });
     } catch (e) {}
 })();
 
