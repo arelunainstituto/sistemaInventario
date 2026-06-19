@@ -38,6 +38,19 @@ _Nenhuma alteração pendente._
 
 ---
 
+## [1.13.1] — 2026-06-19
+
+> Corrige o modo seeding para itens que controlam lote: a saída em estoque negativo travava com "nenhum lote disponível".
+
+### Corrigido
+- **Modo seeding não permitia saída de item com lote sem stock** (`requer migração`: [113-seeding-consumo-sem-lote.sql](database/inventory-refactor/113-seeding-consumo-sem-lote.sql)): com `allow_negative_stock = true`, itens **sem** lote já saíam em negativo, mas itens que **controlam lote** com stock zero (ex.: ACIDO CITRICO) eram bloqueados com `Item X controla lote (RN03): nenhum lote disponível na localização`. Causa: em `fn_inv_consume`, o FEFO levantava a RN03 (lote obrigatório) **antes** de a regra de stock negativo ser avaliada, então o flag de seeding nunca era considerado. Agora a RN03 é **relaxada apenas durante o seeding**: sem lote em stock para abater, a saída segue contra o bucket sem lote (`lot_id NULL`), deixando o saldo negativo — igual ao comportamento dos itens sem lote. Fora do seeding, o erro original continua valendo. (Reconciliação: quando o stock real entrar com lotes, zere o lot-less via ajuste.)
+- **UX da tela de saídas** ([exits.html](public/inventory/exits.html)): em modo seeding, item com lote sem stock mostrava o aviso enganoso "Sem lotes disponíveis nesta localização". Agora exibe "Modo seeding: sem lote em stock — a saída será lançada sem lote e o saldo ficará negativo."
+
+### Notas
+- [_layout.js:5](public/inventory/_layout.js#L5) bump para `v1.13.1`.
+
+---
+
 ## [1.13.0] — 2026-06-18
 
 ### Adicionado

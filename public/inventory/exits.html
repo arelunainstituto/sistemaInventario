@@ -154,6 +154,7 @@ function badgeClass(subtype) {
 }
 
 let currentStock = [];
+let seedingMode = false;   // setado em onItemChange a partir de stock-by-item
 
 function openModal() {
     document.getElementById('form').reset();
@@ -178,6 +179,7 @@ async function onItemChange() {
         const r = await apiCall(`/api/inventory/exits/stock-by-item/${itemId}`);
         currentStock = r.data || [];
         const seeding = r.seeding_mode === true;
+        seedingMode = seeding;
 
         // Sem stock e sem modo seeding → bloqueia como antes
         if (!currentStock.length) {
@@ -240,6 +242,13 @@ function onLocationChange() {
     } else {
         document.getElementById('lotSelect').innerHTML = '<option value="">— item não controla lote —</option>';
         document.getElementById('lotHint').textContent = '';
+    }
+
+    // Modo seeding + item com lote sem nenhum lote em stock: a saída é lançada
+    // SEM lote (saldo fica negativo). Substitui o aviso enganoso de "sem lotes".
+    if (controlsLot && seedingMode && !lotsHere.some(s => s.lot)) {
+        document.getElementById('lotHint').innerHTML =
+            '<span class="text-amber-700"><i class="fas fa-triangle-exclamation"></i> Modo seeding: sem lote em stock — a saída será lançada sem lote e o saldo ficará negativo.</span>';
     }
 }
 
