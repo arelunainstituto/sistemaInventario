@@ -2,7 +2,7 @@
 // Each page calls renderInventoryLayout({ activePage, title, subtitle }).
 
 // Versão exibida no sidebar — manter em sync com CHANGELOG.md
-const INVENTORY_VERSION = 'v1.15.0-beta-02';
+const INVENTORY_VERSION = 'v1.15.0';
 
 // Operações separadas por macro_category como "módulos" (Consumo / Patrimônio).
 // Itens com type:'group' viram um cabeçalho + sub-itens indentados (ver

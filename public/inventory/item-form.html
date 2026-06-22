@@ -214,6 +214,11 @@ document.getElementById('pageContent').innerHTML = `
                 </p>
             </section>
 
+            <section id="attachmentsFieldset" class="hidden">
+                <h4 class="text-[10px] uppercase tracking-wider font-bold text-purple-600 mb-3">Anexos (fotos) <span class="help-tip" tabindex="0" data-tip="Até 6 fotos do bem/modelo. Documentos da nota fiscal/entrada não entram aqui — serão anexados na própria entrada.">?</span></h4>
+                <div id="attachmentsRows"></div>
+            </section>
+
             <section>
                 <h4 class="text-[10px] uppercase tracking-wider font-bold text-gray-500 mb-3">Imagem <span class="help-tip" tabindex="0" data-tip="Para substituir uma imagem existente, basta escolher um novo arquivo.">?</span></h4>
                 <label class="border-2 border-dashed border-gray-200 rounded-lg p-4 block cursor-pointer hover:border-sky-400 hover:bg-sky-50/30 transition">
@@ -342,6 +347,9 @@ async function activateMacro(macro) {
     document.getElementById('locationParamsFieldset').classList.toggle('hidden', !isConsumo);
     // Controle de lote é conceito de consumo (patrimônio controla por nº de série).
     document.getElementById('lotControlFieldset').classList.toggle('hidden', !isConsumo);
+    // Anexos (fotos) só para patrimônio.
+    document.getElementById('attachmentsFieldset').classList.toggle('hidden', isConsumo);
+    if (!isConsumo) renderAttachments();
     step1.classList.add('hidden');
     step2.classList.remove('hidden');
     // O usuário pode escolher o tipo antes de o bootstrap() terminar de buscar
@@ -482,6 +490,58 @@ function collectLocationOverrides() {
         });
     });
     return out;
+}
+
+// Anexos (fotos) do item de patrimônio — até 6. Gerenciados na edição
+// (precisam do item já salvo); na criação, mostra "salve primeiro".
+const MAX_ATTACHMENTS = 6;
+async function renderAttachments() {
+    const box = document.getElementById('attachmentsRows');
+    if (!box) return;
+    if (!editingId) {
+        box.innerHTML = '<p class="text-xs text-gray-400 italic">Salve o item primeiro para anexar fotos.</p>';
+        return;
+    }
+    let list = [];
+    try {
+        const r = await apiCall(`/api/inventory/items/${editingId}/attachments`);
+        list = r.data || [];
+    } catch (err) { box.innerHTML = `<p class="text-xs text-red-500">${escapeHtml(err.message)}</p>`; return; }
+
+    const thumbs = list.map(a => `
+        <div class="relative group w-24 h-24 rounded-lg border border-gray-200 overflow-hidden bg-gray-50">
+            <a href="${a.file_url}" target="_blank" rel="noopener"><img src="${a.file_url}" alt="${escapeHtml(a.file_name || '')}" class="w-full h-full object-cover"></a>
+            <button type="button" onclick="removeAttachment('${a.id}')" title="Remover" class="absolute top-1 right-1 w-6 h-6 rounded-full bg-red-600/90 text-white text-xs opacity-0 group-hover:opacity-100 transition flex items-center justify-center"><i class="fas fa-trash"></i></button>
+        </div>`).join('');
+    const adder = list.length < MAX_ATTACHMENTS ? `
+        <label class="w-24 h-24 rounded-lg border-2 border-dashed border-gray-300 flex flex-col items-center justify-center text-gray-400 cursor-pointer hover:border-purple-400 hover:text-purple-500 transition">
+            <i class="fas fa-plus text-lg"></i><span class="text-[10px] mt-1">Adicionar</span>
+            <input type="file" accept="image/*" class="hidden" onchange="uploadAttachment(this)">
+        </label>` : '';
+    box.innerHTML = `<div class="flex flex-wrap gap-3">${thumbs}${adder}</div>
+        <p class="text-[11px] text-gray-400 mt-2">${list.length}/${MAX_ATTACHMENTS} foto(s).</p>`;
+}
+
+async function uploadAttachment(input) {
+    const file = input.files[0];
+    if (!file) return;
+    const fd = new FormData();
+    fd.append('file', file);
+    try {
+        await apiCall(`/api/inventory/items/${editingId}/attachments`, { method: 'POST', body: fd });
+        toast('Anexo enviado');
+        renderAttachments();
+    } catch (err) { toast(err.message, 'error'); }
+    input.value = '';
+}
+
+async function removeAttachment(attId) {
+    if (!confirm('Remover este anexo?')) return;
+    try {
+        await apiCall(`/api/inventory/items/${editingId}/attachments/${attId}`, { method: 'DELETE' });
+        toast('Anexo removido');
+        renderAttachments();
+    } catch (err) { toast(err.message, 'error'); }
 }
 
 // `prefetched` = item já buscado pelo bootstrap (carga inicial, em paralelo).

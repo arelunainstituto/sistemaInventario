@@ -34,11 +34,24 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e
 
 ## [Unreleased]
 
-> **Em validação (beta).** Versão exibida no header: `v1.15.0-beta-02`. Funcionalidades entregues uma a uma (sufixo `-beta-NN`), consolidando na release estável `1.15.0` no último commit.
+_Nenhuma alteração pendente._
+
+---
+
+## [1.15.0] — 2026-06-22
+
+> Anexos (fotos) nos itens de patrimônio, Enter deixa de salvar registros por acidente e as anotações de ajuda viram tooltips "?". Entregue e validado via betas `1.15.0-beta-01..03`.
+
+### Adicionado
+- **Anexos (fotos) nos itens de patrimônio — até 6** (`requer migração`: [116-item-attachments.sql](database/inventory-refactor/116-item-attachments.sql)): itens patrimoniais ganham uma galeria de até **6 fotos** do bem/modelo. Nova tabela `inv_item_attachments` + bucket de Storage **público** `item-attachments` + trigger que limita a 6 por item. API ([items.js](api/inventory/items.js)): `GET/POST/DELETE /items/:id/attachments` — POST só para item patrimonial, só imagens, máx 6, até 10MB. UI: galeria com adicionar/remover no **cadastro do item** ([item-form.html](public/inventory/item-form.html), gerenciada após salvar) e galeria na **ficha** ([item-view.html](public/inventory/item-view.html)). Anexos de documentos de entrada (nota fiscal) ficam para um fluxo futuro, na própria entrada.
 
 ### Alterado
 - **Anotações explicativas viraram tooltips "?"** ([_layout.js](public/inventory/_layout.js) + telas): as notas de ajuda sob os campos passaram a ser um ícone **"?"** ao lado do rótulo, que mostra a explicação ao passar o mouse/focar — deixando os formulários mais limpos. Novo componente reutilizável `helpTip()`/`.help-tip` (CSS injetado pelo layout). Convertidas: item ([item-form.html](public/inventory/item-form.html): categoria, fornecedor padrão, UM de compra, fator de conversão, controle de lote, depreciação, imagem), movimentação de patrimônio (colaborador de destino), categorias (janela de consumo), ficha do item (dados patrimoniais) e o tooltip de "Tipo de saída" em Saídas foi padronizado para o novo componente. **Avisos importantes/destrutivos** (ex.: "código gerado automaticamente", stock negativo, ajuste >5%, baixa de patrimônio) e notas com **link clicável** continuam visíveis.
 - **Enter não salva mais registros dentro de formulários** ([_layout.js](public/inventory/_layout.js)): para evitar envio acidental (ex.: criar uma movimentação sem querer), o Enter dentro de um `<form>` deixa de submeter. Textarea (nova linha) e botões de ação seguem normais; campos de busca fora de form e o Enter dos comboboxes (que seleciona a opção realçada) não mudam.
+
+### Notas
+- [_layout.js:5](public/inventory/_layout.js#L5) bump para `v1.15.0` (estável).
+- **Migração desta release** (aplicar no Supabase): [116-item-attachments.sql](database/inventory-refactor/116-item-attachments.sql) — cria a tabela de anexos e o bucket `item-attachments`. As mudanças de Enter e tooltips não exigem migração.
 
 ---
 

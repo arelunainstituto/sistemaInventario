@@ -15,6 +15,12 @@ const upload = multer({
     limits: { fileSize: 8 * 1024 * 1024 }
 });
 
+// Anexos (fotos) de patrimônio: limite um pouco maior p/ fotos de celular.
+const attachmentUpload = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 10 * 1024 * 1024 }
+});
+
 // Hint explícito de FK é necessário porque inv_items tem 3 FKs para
 // inv_units_of_measure (base/purchase/consumption). Sem o "!fk_column"
 // o PostgREST falha ao tentar resolver a relação.
@@ -353,6 +359,109 @@ router.post('/:id/pdf', requirePermission('inventory', 'update_item'), upload.si
     } catch (err) {
         console.error('POST inv_items/:id/pdf error:', err);
         res.status(500).json({ error: err.message || 'Erro ao fazer upload de PDF' });
+    }
+});
+
+// =====================================================
+// Anexos (fotos) por item de patrimônio — até 6 (migração 116)
+// =====================================================
+const ATTACHMENTS_BUCKET = 'item-attachments';
+const MAX_ATTACHMENTS = 6;
+
+// Upload genérico p/ um bucket, devolvendo url pública + caminho (p/ delete).
+async function uploadToBucket(file, bucket, folder) {
+    const safeName = file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_');
+    const path = `${folder}/${Date.now()}-${safeName}`;
+    const { error } = await supabaseAdmin.storage
+        .from(bucket)
+        .upload(path, file.buffer, { contentType: file.mimetype, upsert: true });
+    if (error) throw error;
+    const { data } = supabaseAdmin.storage.from(bucket).getPublicUrl(path);
+    return { url: data.publicUrl, path };
+}
+
+// GET /:id/attachments — lista os anexos do item
+router.get('/:id/attachments', requirePermission('inventory', 'read'), async (req, res) => {
+    try {
+        const { data, error } = await supabaseAdmin
+            .from('inv_item_attachments')
+            .select('id, file_url, file_name, mime_type, size_bytes, created_at')
+            .eq('item_id', req.params.id)
+            .order('created_at', { ascending: true });
+        if (error) throw error;
+        res.json({ success: true, data: data || [] });
+    } catch (err) {
+        console.error('GET inv_items/:id/attachments error:', err);
+        res.status(500).json({ error: err.message || 'Erro ao listar anexos' });
+    }
+});
+
+// POST /:id/attachments — envia 1 anexo (foto). Só itens patrimoniais, máx 6.
+router.post('/:id/attachments', requirePermission('inventory', 'update_item'), attachmentUpload.single('file'), async (req, res) => {
+    try {
+        const { id } = req.params;
+        if (!req.file) return res.status(400).json({ error: 'Arquivo (file) ausente' });
+        // Por enquanto, anexos são fotos.
+        if (!req.file.mimetype.startsWith('image/'))
+            return res.status(400).json({ error: 'Apenas imagens (fotos) são permitidas' });
+
+        const { data: item } = await supabaseAdmin
+            .from('inv_items').select('id, macro_category').eq('id', id).single();
+        if (!item) return res.status(404).json({ error: 'Item não encontrado' });
+        if (item.macro_category !== 'patrimonial')
+            return res.status(400).json({ error: 'Anexos disponíveis apenas para itens de patrimônio' });
+
+        const { count } = await supabaseAdmin
+            .from('inv_item_attachments').select('id', { count: 'exact', head: true }).eq('item_id', id);
+        if ((count || 0) >= MAX_ATTACHMENTS)
+            return res.status(409).json({ error: `Limite de ${MAX_ATTACHMENTS} anexos por item atingido` });
+
+        const { url, path } = await uploadToBucket(req.file, ATTACHMENTS_BUCKET, `inventory/items/${id}`);
+        const { data, error } = await supabaseAdmin
+            .from('inv_item_attachments')
+            .insert({
+                item_id:      id,
+                file_url:     url,
+                storage_path: path,
+                file_name:    req.file.originalname,
+                mime_type:    req.file.mimetype,
+                size_bytes:   req.file.size,
+                uploaded_by:  req.user?.id || null
+            })
+            .select('id, file_url, file_name, mime_type, size_bytes, created_at')
+            .single();
+        if (error) {
+            // Trigger de limite (P0001) ou outro erro: tenta limpar o objeto órfão.
+            await supabaseAdmin.storage.from(ATTACHMENTS_BUCKET).remove([path]).catch(() => {});
+            if (error.code === 'P0001') return res.status(409).json({ error: error.message });
+            throw error;
+        }
+        res.status(201).json({ success: true, data });
+    } catch (err) {
+        console.error('POST inv_items/:id/attachments error:', err);
+        res.status(500).json({ error: err.message || 'Erro ao enviar anexo' });
+    }
+});
+
+// DELETE /:id/attachments/:attId — remove um anexo (objeto do Storage + linha)
+router.delete('/:id/attachments/:attId', requirePermission('inventory', 'update_item'), async (req, res) => {
+    try {
+        const { id, attId } = req.params;
+        const { data: att } = await supabaseAdmin
+            .from('inv_item_attachments')
+            .select('id, storage_path')
+            .eq('id', attId).eq('item_id', id).single();
+        if (!att) return res.status(404).json({ error: 'Anexo não encontrado' });
+
+        if (att.storage_path) {
+            await supabaseAdmin.storage.from(ATTACHMENTS_BUCKET).remove([att.storage_path]).catch(() => {});
+        }
+        const { error } = await supabaseAdmin.from('inv_item_attachments').delete().eq('id', attId);
+        if (error) throw error;
+        res.json({ success: true });
+    } catch (err) {
+        console.error('DELETE inv_items/:id/attachments/:attId error:', err);
+        res.status(500).json({ error: err.message || 'Erro ao remover anexo' });
     }
 });
 
