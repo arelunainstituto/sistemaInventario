@@ -34,7 +34,7 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e
 
 ## [Unreleased]
 
-> **Em validação (beta).** Versão exibida no header: `v1.14.0-beta-03`. As funcionalidades abaixo estão sendo entregues uma a uma (cada uma incrementa o sufixo `-beta-NN`) e consolidam na release estável `1.14.0` no último commit.
+> **Em validação (beta).** Versão exibida no header: `v1.14.0-beta-04`. As funcionalidades abaixo estão sendo entregues uma a uma (cada uma incrementa o sufixo `-beta-NN`) e consolidam na release estável `1.14.0` no último commit.
 
 ### Adicionado
 - **Cadastro de Fabricantes** (`requer migração`: [115-fabricantes.sql](database/inventory-refactor/115-fabricantes.sql)): o "Fabricante" do item deixa de ser texto livre e vira **entidade própria**, com tela de gestão ([manufacturers.html](public/inventory/manufacturers.html)), API CRUD ([manufacturers.js](api/inventory/manufacturers.js)) e modal partilhado ([_manufacturer-modal.js](public/inventory/_manufacturer-modal.js)) — espelhando Fornecedores. Nova tabela `inv_manufacturers` + FK `inv_items.manufacturer_id`. No cadastro do item ([item-form.html](public/inventory/item-form.html)) o campo virou **select com busca** + botão de cadastro inline. A migração cria os fabricantes a partir dos textos livres existentes, linka os itens e **remove a coluna de texto** `inv_items.manufacturer` (não confundir com `manufacturer_ref`, que permanece). Item ([items.js](api/inventory/items.js)) e ficha ([item-view.html](public/inventory/item-view.html)) passam a exibir o fabricante via FK. Novo item de menu **Fabricantes** em Cadastros.
@@ -46,10 +46,11 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e
   - API ([items.js](api/inventory/items.js)): POST honra o valor para consumo; PUT permite editar o controle de lote **apenas enquanto o item não tiver lotes registrados** (evita saldo inconsistente entre bucket por-lote e sem-lote) — caso contrário retorna 409.
 
 ### Alterado
+- **Categoria do item: seleção só em categorias-folha, exibida em cascata** ([item-form.html](public/inventory/item-form.html), [items.html](public/inventory/items.html), [items.js](api/inventory/items.js), [_searchable-select.js](public/inventory/_searchable-select.js)): uma categoria-**pai** (que tem subcategorias) deixa de ser selecionável para um item. No cadastro, o select passa a mostrar a **árvore em cascata** — categorias-pai como **cabeçalho não-selecionável** e as folhas **indentadas** abaixo (o combobox `makeSearchable` ganhou suporte a `option disabled` e a `data-depth`). No filtro da tela de Itens, lista só as folhas. Backstop no servidor valida no POST/PUT (com *grandfather*: se a categoria atual do item virou pai depois, a edição não é bloqueada enquanto não trocar a categoria). Calculado a partir de `parent_id` (sem mudança de schema). Não afeta a tela de Categorias, onde a árvore continua sendo montada normalmente.
 - **Itens da sidebar viraram âncoras `<a href>`** ([_layout.js](public/inventory/_layout.js)): antes eram `<button onclick>`, o que impedia clique-do-meio / Ctrl+clique de abrir em nova aba. Agora são links reais — clique normal navega na mesma aba; clique do meio (scroll) ou Ctrl/Cmd+clique abrem em nova aba. Itens desabilitados continuam não-navegáveis.
 
 ### Notas
-- [_layout.js:5](public/inventory/_layout.js#L5) bump para `v1.14.0-beta-03`.
+- [_layout.js:5](public/inventory/_layout.js#L5) bump para `v1.14.0-beta-04`.
 
 ---
 

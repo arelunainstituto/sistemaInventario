@@ -48,6 +48,18 @@ function validateItemPayload(body, isUpdate = false) {
     return errors;
 }
 
+// Categoria-folha = nenhuma outra categoria ativa a referencia como pai.
+// Itens só podem ser atribuídos a folhas (categoria-pai não é selecionável).
+async function isLeafCategory(catId) {
+    const { count } = await supabaseAdmin
+        .from('inv_categories')
+        .select('id', { count: 'exact', head: true })
+        .eq('parent_id', catId)
+        .is('deleted_at', null);
+    return (count || 0) === 0;
+}
+const NON_LEAF_CATEGORY_MSG = 'A categoria selecionada possui subcategorias — escolha uma categoria folha.';
+
 // Helper de upload para Supabase Storage (reaproveita bucket item-images)
 async function uploadFile(file, folder) {
     const safeName = file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_');
@@ -184,6 +196,11 @@ router.post('/', requirePermission('inventory', 'create_item'), async (req, res)
             updated_by:   req.user?.id || null
         };
 
+        // Categoria precisa ser folha (sem subcategorias).
+        if (payload.subcategory_id && !(await isLeafCategory(payload.subcategory_id))) {
+            return res.status(400).json({ error: NON_LEAF_CATEGORY_MSG });
+        }
+
         const { data, error } = await supabaseAdmin
             .from('inv_items')
             .insert(payload)
@@ -249,6 +266,17 @@ router.put('/:id', requirePermission('inventory', 'update_item'), async (req, re
                     });
                 }
                 patch.controls_lot = !!patch.controls_lot;
+            }
+        }
+
+        // Categoria precisa ser folha. Grandfather: se o valor não mudou em
+        // relação ao atual, não bloqueia (categoria que virou pai depois).
+        if (patch.subcategory_id !== undefined && patch.subcategory_id) {
+            const { data: curItem } = await supabaseAdmin
+                .from('inv_items').select('subcategory_id').eq('id', id).single();
+            if (patch.subcategory_id !== curItem?.subcategory_id
+                && !(await isLeafCategory(patch.subcategory_id))) {
+                return res.status(400).json({ error: NON_LEAF_CATEGORY_MSG });
             }
         }
 

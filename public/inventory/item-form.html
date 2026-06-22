@@ -261,6 +261,9 @@ let categoriesLoaded = false;
 // Handles dos comboboxes (makeSearchable) — usados para re-sincronizar o texto
 // exibido com os valores carregados no modo edição.
 let scSubcat, scPurchaseUom, scConsumptionUom, scSupplier, scManufacturer;
+// Categoria do item em edição — usada para "grandfather" no filtro leaf-only
+// (mantém a categoria atual selecionável mesmo que ela tenha virado pai).
+let editingSubcatId = null;
 
 async function bootstrap() {
     try {
@@ -360,6 +363,10 @@ async function activateMacro(macro) {
     // 'CONSUMO' ainda funciona. Veja também: SQL UPDATE em inv_categories pra
     // normalizar a coluna (database/inventory-refactor/52-fase5...).
     const macroLc = (macro || '').toLowerCase();
+    // Só categorias-FOLHA podem ser atribuídas a um item: uma categoria com
+    // filhos (categoria-pai) não é selecionável. No modo edição, mantém a
+    // categoria atual mesmo que tenha virado pai (grandfather), p/ não perder o valor.
+    const parentIds = new Set(categoriesAll.filter(c => c.parent_id).map(c => c.parent_id));
     const opts = categoriesAll
         .filter(c => (c.parent_macro || '').toLowerCase() === macroLc)
         .sort((a, b) => (a.path || a.name).localeCompare(b.path || b.name))
@@ -367,7 +374,9 @@ async function activateMacro(macro) {
             const indent = '  '.repeat((c.depth || 1) - 1);
             const label  = c.path ? indent + c.path.split(' / ').slice(-1)[0] : c.name;
             const title  = c.path ? ` title="${escapeHtml(c.path)}"` : '';
-            return `<option value="${c.id}"${title}>${escapeHtml(label)}</option>`;
+            const isParent   = parentIds.has(c.id);
+            const selectable = !isParent || c.id === editingSubcatId;
+            return `<option value="${c.id}" data-depth="${(c.depth || 1) - 1}"${selectable ? '' : ' disabled'}${title}>${escapeHtml(label)}</option>`;
         }).join('');
     subcategorySelect.innerHTML = '<option value="">—</option>' + opts;
     // Combobox com busca na categoria (idempotente; o MutationObserver re-sincroniza
@@ -486,6 +495,7 @@ function collectLocationOverrides() {
 async function loadForEdit(prefetched) {
     try {
         const it = prefetched || (await apiCall(`/api/inventory/items/${editingId}`)).data;
+        editingSubcatId = it.subcategory_id || null; // grandfather no filtro leaf-only
         await activateMacro(it.macro_category);
         const f = document.getElementById('itemForm');
         for (const [k, v] of Object.entries(it)) {

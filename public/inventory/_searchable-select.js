@@ -100,10 +100,21 @@
                 highlighted = -1;
                 return;
             }
-            dropdown.innerHTML = matches.map(({ opt }, i) => `
-                <div class="px-3 py-2 hover:bg-sky-50 cursor-pointer text-sm ${i === highlighted ? 'bg-sky-50' : ''}"
-                     data-value="${escapeHtml(opt.value)}" data-idx="${i}">${escapeHtml(opt.textContent.trim())}</div>
-            `).join('');
+            // Suporta indentação (data-depth) e cabeçalhos não-selecionáveis
+            // (option disabled) — usado p/ exibir a árvore de categorias em cascata.
+            // data-idx é atribuído só às opções selecionáveis (alinha com a
+            // navegação por teclado, que itera apenas [data-value]).
+            let selIdx = -1;
+            dropdown.innerHTML = matches.map(({ opt }) => {
+                const depth = parseInt(opt.dataset.depth || '0', 10);
+                const padL = 12 + depth * 16;
+                if (opt.disabled) {
+                    return `<div class="py-1.5 pr-3 text-[11px] font-semibold text-gray-400 cursor-default select-none" style="padding-left:${padL}px">${escapeHtml(opt.textContent.trim())}</div>`;
+                }
+                selIdx++;
+                return `<div class="py-2 pr-3 hover:bg-sky-50 cursor-pointer text-sm ${selIdx === highlighted ? 'bg-sky-50' : ''}"
+                     style="padding-left:${padL}px" data-value="${escapeHtml(opt.value)}" data-idx="${selIdx}">${escapeHtml(opt.textContent.trim())}</div>`;
+            }).join('');
             [...dropdown.querySelectorAll('[data-value]')].forEach(el => {
                 el.addEventListener('mousedown', e => {
                     e.preventDefault();
