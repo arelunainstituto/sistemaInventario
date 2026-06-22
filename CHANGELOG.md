@@ -34,17 +34,21 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e
 
 ## [Unreleased]
 
-> **Em validação (beta).** Versão exibida no header: `v1.14.0-beta-01`. As funcionalidades abaixo estão sendo entregues uma a uma (cada uma incrementa o sufixo `-beta-NN`) e consolidam na release estável `1.14.0` no último commit.
+> **Em validação (beta).** Versão exibida no header: `v1.14.0-beta-02`. As funcionalidades abaixo estão sendo entregues uma a uma (cada uma incrementa o sufixo `-beta-NN`) e consolidam na release estável `1.14.0` no último commit.
 
 ### Adicionado
+- **Renovação de sessão sem deslogar** ([_layout.js](public/inventory/_layout.js)): páginas do inventário passam a monitorar a expiração do token (lendo o `exp` do próprio JWT) e, ~5 min antes de expirar, abrem um aviso **"Sua sessão vai expirar — continuar conectado por mais N?"** com contagem regressiva ao vivo. O botão **Continuar conectado** renova via `refreshSession` (client Supabase dedicado, sem auto-refresh, carregado sob demanda) e atualiza o `access_token` — sem perder a navegação. Se ignorar até zerar, desloga. A duração ("2 horas") é derivada do TTL do JWT configurado no Supabase.
 - **Checkbox "controla lote / validade" no cadastro do item** (`requer migração`: [114-controls-lot-manual.sql](database/inventory-refactor/114-controls-lot-manual.sql)): até aqui todo item de consumo controlava lote obrigatoriamente (RN03). Agora o cadastro tem um checkbox ([item-form.html](public/inventory/item-form.html)) que define `inv_items.controls_lot` (default marcado, preservando o comportamento antigo). Reflete nas movimentações sem mudança extra:
   - **Marcado** → entrada exige nº de lote (validade opcional) e saída usa FEFO pela validade.
   - **Desmarcado** → entrada não pede lote e a saída abate direto do saldo (sem FEFO).
   - O trigger `fn_inv_items_before_insert` passou a honrar o valor enviado (`COALESCE(NEW.controls_lot, TRUE)`) em vez de forçar TRUE; o resto da função (código 1XXXXXX/2XXXXXX, patrimônio, reorder_point) é idêntico. Patrimônio continua sempre por nº de série.
   - API ([items.js](api/inventory/items.js)): POST honra o valor para consumo; PUT permite editar o controle de lote **apenas enquanto o item não tiver lotes registrados** (evita saldo inconsistente entre bucket por-lote e sem-lote) — caso contrário retorna 409.
 
+### Alterado
+- **Itens da sidebar viraram âncoras `<a href>`** ([_layout.js](public/inventory/_layout.js)): antes eram `<button onclick>`, o que impedia clique-do-meio / Ctrl+clique de abrir em nova aba. Agora são links reais — clique normal navega na mesma aba; clique do meio (scroll) ou Ctrl/Cmd+clique abrem em nova aba. Itens desabilitados continuam não-navegáveis.
+
 ### Notas
-- [_layout.js:5](public/inventory/_layout.js#L5) bump para `v1.14.0-beta-01`.
+- [_layout.js:5](public/inventory/_layout.js#L5) bump para `v1.14.0-beta-02`.
 
 ---
 

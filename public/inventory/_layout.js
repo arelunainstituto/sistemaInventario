@@ -2,7 +2,7 @@
 // Each page calls renderInventoryLayout({ activePage, title, subtitle }).
 
 // Versão exibida no sidebar — manter em sync com CHANGELOG.md
-const INVENTORY_VERSION = 'v1.14.0-beta-01';
+const INVENTORY_VERSION = 'v1.14.0-beta-02';
 
 // Operações separadas por macro_category como "módulos" (Consumo / Patrimônio).
 // Itens com type:'group' viram um cabeçalho + sub-itens indentados (ver
@@ -82,16 +82,20 @@ function navItemHtml(item, active, nested = false) {
     const activeBar = isActive
         ? '<span class="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 rounded-r bg-sky-500"></span>'
         : '';
-    const onclick = item.disabled ? '' : `onclick="window.location.href='${item.href}'"`;
     const badge = item.badge ? `<span class="sidebar-label ml-auto text-[10px] font-bold px-1.5 py-0.5 rounded bg-gray-200 text-gray-600">${item.badge}</span>` : '';
     // adminOnly: item começa oculto e é revelado em populateUserHeader se a role conferir
     const adminAttr = item.adminOnly ? ` data-admin-only="1" style="display:none"` : '';
-    return `<button ${onclick} class="${base} ${state}" title="${item.label}"${adminAttr}>
+    const inner = `
         ${activeBar}
         <i class="fas ${item.icon} w-5 text-center ${isActive ? 'text-sky-600' : ''}"></i>
         <span class="sidebar-label flex-1 text-left whitespace-nowrap overflow-hidden">${item.label}</span>
-        ${badge}
-    </button>`;
+        ${badge}`;
+    // Item desabilitado: não navega (span). Caso contrário, ÂNCORA real (<a href>)
+    // para que clique do meio / ctrl+clique abram em nova aba nativamente.
+    if (item.disabled) {
+        return `<span class="${base} ${state}" title="${item.label}"${adminAttr}>${inner}</span>`;
+    }
+    return `<a href="${item.href}" class="${base} ${state} no-underline" title="${item.label}"${adminAttr}>${inner}</a>`;
 }
 
 function renderInventoryLayout({ activePage = 'dashboard', title = 'Inventário', subtitle = '' } = {}) {
@@ -198,6 +202,9 @@ function renderInventoryLayout({ activePage = 'dashboard', title = 'Inventário'
 
     // Bind explícito do botão de logout (mais robusto que onclick inline)
     document.getElementById('btnInventoryLogout')?.addEventListener('click', logout);
+
+    // Aviso proativo de renovação de sessão (renova sem deslogar).
+    initSessionWatcher();
 }
 
 // Mostra um banner persistente quando algum flag operacional está ligado
@@ -219,6 +226,155 @@ function renderSeedingBanner() {
     banner.className = 'bg-amber-100 border-b border-amber-300 text-amber-900 text-xs px-4 py-2 flex items-center justify-center gap-2 sticky top-0 z-30';
     banner.innerHTML = '<i class="fas fa-triangle-exclamation"></i> <strong>Modo seeding ativo:</strong> stock negativo permitido. Lembre de desligar quando terminar (<code>SELECT fn_inv_set_negative_stock(FALSE);</code>).';
     main.insertBefore(banner, main.firstChild);
+}
+
+// =====================================================
+// Renovação de sessão (aviso proativo, sem deslogar)
+// =====================================================
+// Páginas do inventário não carregam o auth.js completo. Aqui carregamos só o
+// supabase-js (CDN) + config.js sob demanda e criamos um client dedicado SEM
+// auto-refresh, para que a renovação seja decidida pelo usuário. A expiração é
+// detectada decodificando o `exp` do próprio access_token (JWT). Ao renovar,
+// atualizamos também o localStorage 'access_token' (que o apiCall lê).
+let _sessionClient = null;
+let _sessionTimer = null;
+let _sessionCountdown = null;
+const SESSION_WARN_BEFORE_MS = 5 * 60 * 1000; // avisa 5 min antes de expirar
+
+function loadScriptOnce(src) {
+    return new Promise((resolve, reject) => {
+        if ([...document.scripts].some(s => s.src === src || s.src.endsWith(src))) return resolve();
+        const el = document.createElement('script');
+        el.src = src;
+        el.onload = () => resolve();
+        el.onerror = () => reject(new Error('falha ao carregar ' + src));
+        document.head.appendChild(el);
+    });
+}
+
+function decodeJwtPayload(token) {
+    try {
+        const part = token.split('.')[1];
+        const b64 = part.replace(/-/g, '+').replace(/_/g, '/')
+            .padEnd(part.length + (4 - part.length % 4) % 4, '=');
+        return JSON.parse(atob(b64));
+    } catch (_) { return null; }
+}
+
+function formatDurationPt(seconds) {
+    const m = Math.round(seconds / 60);
+    if (m >= 60) {
+        const h = Math.floor(m / 60), r = m % 60;
+        const hLabel = h + (h === 1 ? ' hora' : ' horas');
+        return r ? `${hLabel} e ${r} min` : hLabel;
+    }
+    return `${Math.max(1, m)} min`;
+}
+
+async function initSessionWatcher() {
+    try {
+        if (!localStorage.getItem('access_token')) return;
+        await loadScriptOnce('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2');
+        await loadScriptOnce('/config.js');
+        const url = window.SUPABASE_CONFIG?.url;
+        const key = window.SUPABASE_CONFIG?.anonKey;
+        if (!url || !key || !window.supabase) return;
+        // autoRefreshToken:false → a renovação é decidida pelo usuário (não silenciosa).
+        // persistSession:true + storageKey default → compartilha a sessão do login.
+        _sessionClient = window.supabase.createClient(url, key, {
+            auth: { autoRefreshToken: false, persistSession: true, detectSessionInUrl: false }
+        });
+        await _sessionClient.auth.getSession(); // força carregar a sessão persistida
+        scheduleSessionCheck();
+    } catch (e) {
+        console.warn('Watcher de sessão desligado:', e.message);
+    }
+}
+
+function scheduleSessionCheck() {
+    clearTimeout(_sessionTimer);
+    const token = localStorage.getItem('access_token');
+    const jwt = token && decodeJwtPayload(token);
+    if (!jwt || !jwt.exp) return;
+    const expMs = jwt.exp * 1000;
+    if (expMs <= Date.now()) return; // já expirou — o apiCall cuida do logout
+    const msUntilWarn = expMs - Date.now() - SESSION_WARN_BEFORE_MS;
+    if (msUntilWarn <= 0) showSessionRenewModal();
+    else _sessionTimer = setTimeout(showSessionRenewModal, msUntilWarn);
+}
+
+function showSessionRenewModal() {
+    if (document.getElementById('sessionRenewModal')) return;
+    const token = localStorage.getItem('access_token');
+    const jwt = token && decodeJwtPayload(token);
+    if (!jwt || !jwt.exp) return;
+    const ttlLabel = (jwt.iat && jwt.exp > jwt.iat) ? formatDurationPt(jwt.exp - jwt.iat) : '2 horas';
+
+    const overlay = document.createElement('div');
+    overlay.id = 'sessionRenewModal';
+    overlay.className = 'fixed inset-0 bg-gray-900/40 backdrop-blur-[2px] z-[70] flex items-center justify-center p-4';
+    overlay.innerHTML = `
+        <div class="bg-white rounded-xl border border-gray-200 shadow-2xl max-w-md w-full p-6">
+            <div class="flex items-start gap-3">
+                <div class="w-10 h-10 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center flex-shrink-0">
+                    <i class="fas fa-clock"></i>
+                </div>
+                <div class="flex-1">
+                    <h3 class="font-bold text-gray-900">Sua sessão vai expirar</h3>
+                    <p class="text-sm text-gray-600 mt-1">
+                        Expira em <strong id="sessionCountdown">--:--</strong>.
+                        Continuar conectado por mais <strong>${ttlLabel}</strong> sem precisar fazer login de novo?
+                    </p>
+                </div>
+            </div>
+            <div class="flex justify-end gap-2 mt-5">
+                <button id="sessionLogoutBtn" class="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">Sair agora</button>
+                <button id="sessionRenewBtn" class="px-5 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-lg text-sm font-medium shadow-sm shadow-sky-500/20 flex items-center gap-2">
+                    <i class="fas fa-rotate"></i> Continuar conectado
+                </button>
+            </div>
+        </div>`;
+    document.body.appendChild(overlay);
+
+    document.getElementById('sessionLogoutBtn').addEventListener('click', () => { closeSessionRenewModal(); logout(); });
+    document.getElementById('sessionRenewBtn').addEventListener('click', renewSession);
+
+    // Countdown ao vivo; ao chegar a zero sem renovar, desloga.
+    const tick = () => {
+        const remain = Math.floor(jwt.exp - Date.now() / 1000);
+        if (remain <= 0) { closeSessionRenewModal(); logout(); return; }
+        const el = document.getElementById('sessionCountdown');
+        if (el) {
+            const mm = String(Math.floor(remain / 60)).padStart(2, '0');
+            const ss = String(remain % 60).padStart(2, '0');
+            el.textContent = `${mm}:${ss}`;
+        }
+    };
+    tick();
+    _sessionCountdown = setInterval(tick, 1000);
+}
+
+function closeSessionRenewModal() {
+    clearInterval(_sessionCountdown);
+    document.getElementById('sessionRenewModal')?.remove();
+}
+
+async function renewSession() {
+    const btn = document.getElementById('sessionRenewBtn');
+    if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Renovando…'; }
+    try {
+        const { data, error } = await _sessionClient.auth.refreshSession();
+        if (error || !data?.session) throw error || new Error('sem sessão');
+        // apiCall lê o 'access_token' avulso do localStorage — precisa atualizar aqui.
+        localStorage.setItem('access_token', data.session.access_token);
+        closeSessionRenewModal();
+        toast('Sessão renovada');
+        scheduleSessionCheck();
+    } catch (e) {
+        closeSessionRenewModal();
+        toast('Não foi possível renovar a sessão — faça login novamente', 'error');
+        logout();
+    }
 }
 
 async function populateUserHeader() {
