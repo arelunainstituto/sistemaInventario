@@ -21,6 +21,7 @@ const upload = multer({
 const ITEM_SELECT = `
     *,
     subcategory:inv_categories!subcategory_id(id, parent_macro, name),
+    manufacturer:inv_manufacturers!manufacturer_id(id, name),
     base_uom:inv_units_of_measure!base_uom_id(id, code, name),
     purchase_uom:inv_units_of_measure!purchase_uom_id(id, code, name),
     consumption_uom:inv_units_of_measure!consumption_uom_id(id, code, name),

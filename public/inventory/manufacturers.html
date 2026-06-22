@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Inventário · Fabricantes</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/styles.css">
+    <script>if (!localStorage.getItem('access_token')) { const r = encodeURIComponent(location.pathname + location.search); window.location.href = '/login.html?redirect=' + r; }</script>
+</head>
+<body class="bg-white">
+<div id="layoutRoot"></div>
+<script src="_layout.js"></script>
+<script src="_manufacturer-modal.js"></script>
+<script>
+renderInventoryLayout({ activePage: 'manufacturers', title: 'Fabricantes', subtitle: 'Cadastro de fabricantes do inventário' });
+
+document.getElementById('pageContent').innerHTML = `
+    <div class="flex justify-between items-center mb-4">
+        <input id="search" type="text" placeholder="Pesquisar fabricante…" class="px-3 py-2 border border-gray-300 rounded-lg text-sm w-80">
+        <button onclick="openForm(null)" class="bg-sky-600 hover:bg-sky-700 text-white px-4 py-2 rounded-lg text-sm"><i class="fas fa-plus"></i> Novo</button>
+    </div>
+    <div class="bg-white rounded-xl border border-gray-200/70 shadow-sm overflow-hidden">
+        <table class="w-full text-sm">
+            <thead class="bg-gray-50/50 text-[10px] uppercase tracking-wider text-gray-500 border-b border-gray-200">
+                <tr><th class="text-left p-3">Nome</th><th class="text-left p-3">Website</th><th class="text-center p-3">Estado</th><th class="p-3"></th></tr>
+            </thead>
+            <tbody id="tbody" class="divide-y divide-gray-50"></tbody>
+        </table>
+    </div>
+`;
+
+document.getElementById('search').addEventListener('keypress', e => { if (e.key === 'Enter') load(); });
+document.getElementById('search').addEventListener('input', debounce(load, 300));
+
+async function load() {
+    const search = document.getElementById('search').value;
+    try {
+        const r = await apiCall(`/api/inventory/manufacturers?include_inactive=1${search ? '&search='+encodeURIComponent(search) : ''}`);
+        document.getElementById('tbody').innerHTML = r.data.map(m => `
+            <tr class="hover:bg-sky-50/30 transition">
+                <td class="p-3 font-medium">${escapeHtml(m.name)}</td>
+                <td class="p-3 text-gray-600">${m.website ? `<a href="${escapeHtml(m.website)}" target="_blank" rel="noopener" class="text-sky-600 hover:underline">${escapeHtml(m.website)}</a>` : '—'}</td>
+                <td class="p-3 text-center">${m.is_active ? '<span class="text-sky-600">●</span>' : '<span class="text-gray-300">●</span>'}</td>
+                <td class="p-3 text-right"><button onclick='openForm(${JSON.stringify(m)})' class="text-sky-600 hover:text-sky-700"><i class="fas fa-edit"></i></button></td>
+            </tr>`).join('') || '<tr><td colspan="4" class="p-6 text-center text-gray-400">Nenhum fabricante.</td></tr>';
+    } catch (err) { toast(err.message, 'error'); }
+}
+
+// Modal partilhado (_manufacturer-modal.js) — também usado pelo formulário de Item
+function openForm(m) {
+    openManufacturerModal({ manufacturer: m, onSaved: () => load() });
+}
+
+function escapeHtml(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function debounce(fn, ms) { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; }
+
+load();
+</script>
+</body>
+</html>

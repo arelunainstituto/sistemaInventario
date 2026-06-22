@@ -2,7 +2,7 @@
 // Each page calls renderInventoryLayout({ activePage, title, subtitle }).
 
 // Versão exibida no sidebar — manter em sync com CHANGELOG.md
-const INVENTORY_VERSION = 'v1.14.0-beta-02';
+const INVENTORY_VERSION = 'v1.14.0-beta-03';
 
 // Operações separadas por macro_category como "módulos" (Consumo / Patrimônio).
 // Itens com type:'group' viram um cabeçalho + sub-itens indentados (ver
@@ -36,6 +36,7 @@ const INVENTORY_NAV_SETUP = [
     { id: 'locations',   label: 'Localizações',      icon: 'fa-map-marker-alt', href: 'locations.html' },
     { id: 'categories',  label: 'Categorias',        icon: 'fa-tags',           href: 'categories.html' },
     { id: 'suppliers',   label: 'Fornecedores',      icon: 'fa-truck',          href: 'suppliers.html' },
+    { id: 'manufacturers', label: 'Fabricantes',     icon: 'fa-industry',       href: 'manufacturers.html' },
     { id: 'uoms',        label: 'Unidades de medida', icon: 'fa-ruler',         href: 'uoms.html' },
 ];
 

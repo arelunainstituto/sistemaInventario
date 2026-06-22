@@ -22,6 +22,7 @@
 
 <script src="_layout.js"></script>
 <script src="_searchable-select.js"></script>
+<script src="_manufacturer-modal.js"></script>
 <script>
 const params = new URLSearchParams(location.search);
 const editingId = params.get('id');
@@ -107,7 +108,12 @@ document.getElementById('pageContent').innerHTML = `
                     </div>
                     <div>
                         <label class="field-label">Fabricante</label>
-                        <input name="manufacturer" class="field-input" placeholder="Ex.: Apple, Dell, HP">
+                        <div class="flex gap-2">
+                            <select name="manufacturer_id" id="manufacturerSelect" class="field-input flex-1">
+                                <option value="">— sem fabricante —</option>
+                            </select>
+                            <button type="button" id="btnNewManufacturer" title="Cadastrar novo fabricante" class="px-3 rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50 hover:text-sky-600 transition flex-shrink-0"><i class="fas fa-plus"></i></button>
+                        </div>
                     </div>
                     <div>
                         <label class="field-label">Ref. fabricante</label>
@@ -254,7 +260,7 @@ let bootstrapPromise = null;
 let categoriesLoaded = false;
 // Handles dos comboboxes (makeSearchable) — usados para re-sincronizar o texto
 // exibido com os valores carregados no modo edição.
-let scSubcat, scPurchaseUom, scConsumptionUom, scSupplier;
+let scSubcat, scPurchaseUom, scConsumptionUom, scSupplier, scManufacturer;
 
 async function bootstrap() {
     try {
@@ -264,10 +270,11 @@ async function bootstrap() {
             apiCall('/api/inventory/categories'),
             apiCall('/api/inventory/uoms'),
             apiCall('/api/inventory/locations'),
-            apiCall('/api/inventory/suppliers')
+            apiCall('/api/inventory/suppliers'),
+            apiCall('/api/inventory/manufacturers')
         ];
         if (editingId) calls.push(apiCall(`/api/inventory/items/${editingId}`));
-        const [cats, uoms, locs, sups, itemRes] = await Promise.all(calls);
+        const [cats, uoms, locs, sups, mans, itemRes] = await Promise.all(calls);
         categoriesAll = cats.data;
         categoriesLoaded = true;
         uomsAll       = uoms.data;
@@ -288,10 +295,31 @@ async function bootstrap() {
                 const tag = s.tax_id ? ` · ${escapeHtml(s.tax_id)}` : '';
                 return `<option value="${s.id}">${escapeHtml(s.name)}${tag}</option>`;
             }).join('');
+        // Fabricante: entidade própria (cadastro semelhante a fornecedores).
+        const manList = (mans.data || []).filter(m => m.is_active)
+            .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+        document.getElementById('manufacturerSelect').innerHTML =
+            '<option value="">— sem fabricante —</option>'
+            + manList.map(m => `<option value="${m.id}">${escapeHtml(m.name)}</option>`).join('');
+        // Botão inline: cadastra um fabricante e já o seleciona.
+        document.getElementById('btnNewManufacturer').onclick = () => openManufacturerModal({
+            onSaved: (m) => {
+                const sel = document.getElementById('manufacturerSelect');
+                if (!sel.querySelector(`option[value="${m.id}"]`)) {
+                    const opt = document.createElement('option');
+                    opt.value = m.id; opt.textContent = m.name;
+                    sel.appendChild(opt);
+                }
+                sel.value = m.id;
+                scManufacturer?.refresh();
+            }
+        });
+
         // Comboboxes com busca (idempotente; || mantém o handle entre chamadas).
         scPurchaseUom    = makeSearchable('purchaseUomSelect',     { placeholder: 'Buscar unidade…' }) || scPurchaseUom;
         scConsumptionUom = makeSearchable('consumptionUomSelect',  { placeholder: 'Buscar unidade…' }) || scConsumptionUom;
         scSupplier       = makeSearchable('defaultSupplierSelect', { placeholder: 'Buscar fornecedor por nome ou NIF…' }) || scSupplier;
+        scManufacturer   = makeSearchable('manufacturerSelect',    { placeholder: 'Buscar fabricante…' }) || scManufacturer;
         if (editingId) await loadForEdit(itemRes.data);
     } catch (err) {
         toast(err.message, 'error');
@@ -468,7 +496,7 @@ async function loadForEdit(prefetched) {
         }
         // Sincroniza o texto exibido dos comboboxes com os valores carregados
         // (definir select.value por fora não atualiza o input do combobox sozinho).
-        scSubcat?.refresh(); scPurchaseUom?.refresh(); scConsumptionUom?.refresh(); scSupplier?.refresh();
+        scSubcat?.refresh(); scPurchaseUom?.refresh(); scConsumptionUom?.refresh(); scSupplier?.refresh(); scManufacturer?.refresh();
         if (it.image_url) {
             document.getElementById('imagePreview').innerHTML = `
                 <div class="flex items-start gap-3">
