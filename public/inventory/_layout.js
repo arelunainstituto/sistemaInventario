@@ -2,7 +2,7 @@
 // Each page calls renderInventoryLayout({ activePage, title, subtitle }).
 
 // Versão exibida no sidebar — manter em sync com CHANGELOG.md
-const INVENTORY_VERSION = 'v1.15.0-beta-01';
+const INVENTORY_VERSION = 'v1.15.0-beta-02';
 
 // Operações separadas por macro_category como "módulos" (Consumo / Patrimônio).
 // Itens com type:'group' viram um cabeçalho + sub-itens indentados (ver
@@ -114,7 +114,31 @@ document.addEventListener('keydown', (e) => {
     e.preventDefault();                        // bloqueia o submit implícito
 });
 
+// Tooltip de ajuda reutilizável: um "?" que mostra a explicação no hover/focus.
+// Em template strings JS:  ${helpTip('texto explicativo')}
+// Em HTML estático:        <span class="help-tip" tabindex="0" data-tip="texto">?</span>
+function helpTip(text) {
+    const t = String(text == null ? '' : text).replace(/"/g, '&quot;');
+    return `<span class="help-tip" tabindex="0" role="img" aria-label="Ajuda" data-tip="${t}">?</span>`;
+}
+window.helpTip = helpTip;
+
+function injectHelpTipStyle() {
+    if (document.getElementById('helpTipStyle')) return;
+    const style = document.createElement('style');
+    style.id = 'helpTipStyle';
+    style.textContent = `
+        .help-tip { position:relative; display:inline-flex; align-items:center; justify-content:center; width:15px; height:15px; border-radius:9999px; background:#e5e7eb; color:#6b7280; font-size:10px; font-weight:700; line-height:1; cursor:help; vertical-align:middle; user-select:none; flex-shrink:0; }
+        .help-tip:hover, .help-tip:focus { background:#0ea5e9; color:#fff; outline:none; }
+        .help-tip::after { content:attr(data-tip); position:absolute; left:50%; bottom:calc(100% + 7px); transform:translateX(-50%); width:max-content; max-width:260px; background:#111827; color:#fff; text-align:left; font-size:11px; font-weight:400; line-height:1.4; padding:7px 9px; border-radius:7px; box-shadow:0 6px 20px rgba(0,0,0,.18); white-space:normal; opacity:0; pointer-events:none; transition:opacity .15s; z-index:60; }
+        .help-tip::before { content:''; position:absolute; left:50%; bottom:calc(100% + 2px); transform:translateX(-50%); border:5px solid transparent; border-top-color:#111827; opacity:0; pointer-events:none; transition:opacity .15s; z-index:60; }
+        .help-tip:hover::after, .help-tip:focus::after, .help-tip:hover::before, .help-tip:focus::before { opacity:1; }
+    `;
+    document.head.appendChild(style);
+}
+
 function renderInventoryLayout({ activePage = 'dashboard', title = 'Inventário', subtitle = '' } = {}) {
+    injectHelpTipStyle();
     const sidebar = `
         <aside id="inventorySidebar" class="bg-white border-r border-gray-200 flex flex-col z-10 transition-[width] duration-200" style="width: 256px;">
             <div class="p-5 border-b border-gray-100 flex items-center gap-3">

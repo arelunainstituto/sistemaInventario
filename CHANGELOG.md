@@ -34,9 +34,10 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e
 
 ## [Unreleased]
 
-> **Em validação (beta).** Versão exibida no header: `v1.15.0-beta-01`. Funcionalidades entregues uma a uma (sufixo `-beta-NN`), consolidando na release estável `1.15.0` no último commit.
+> **Em validação (beta).** Versão exibida no header: `v1.15.0-beta-02`. Funcionalidades entregues uma a uma (sufixo `-beta-NN`), consolidando na release estável `1.15.0` no último commit.
 
 ### Alterado
+- **Anotações explicativas viraram tooltips "?"** ([_layout.js](public/inventory/_layout.js) + telas): as notas de ajuda sob os campos passaram a ser um ícone **"?"** ao lado do rótulo, que mostra a explicação ao passar o mouse/focar — deixando os formulários mais limpos. Novo componente reutilizável `helpTip()`/`.help-tip` (CSS injetado pelo layout). Convertidas: item ([item-form.html](public/inventory/item-form.html): categoria, fornecedor padrão, UM de compra, fator de conversão, controle de lote, depreciação, imagem), movimentação de patrimônio (colaborador de destino), categorias (janela de consumo), ficha do item (dados patrimoniais) e o tooltip de "Tipo de saída" em Saídas foi padronizado para o novo componente. **Avisos importantes/destrutivos** (ex.: "código gerado automaticamente", stock negativo, ajuste >5%, baixa de patrimônio) e notas com **link clicável** continuam visíveis.
 - **Enter não salva mais registros dentro de formulários** ([_layout.js](public/inventory/_layout.js)): para evitar envio acidental (ex.: criar uma movimentação sem querer), o Enter dentro de um `<form>` deixa de submeter. Textarea (nova linha) e botões de ação seguem normais; campos de busca fora de form e o Enter dos comboboxes (que seleciona a opção realçada) não mudam.
 
 ---

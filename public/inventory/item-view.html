@@ -132,11 +132,10 @@ function render(it) {
             ${isPatrimonial ? `
             <!-- Patrimoniais -->
             <div class="bg-white rounded-xl border border-gray-200/70 shadow-sm p-6 lg:col-span-1">
-                <h3 class="font-bold text-gray-900 mb-3 text-sm flex items-center gap-2"><i class="fas fa-laptop-medical text-purple-600"></i> Dados patrimoniais</h3>
+                <h3 class="font-bold text-gray-900 mb-3 text-sm flex items-center gap-2"><i class="fas fa-laptop-medical text-purple-600"></i> Dados patrimoniais <span class="help-tip" tabindex="0" data-tip="Valor e data de aquisição são por unidade (ver tabela). A depreciação anual corre por unidade usando esta taxa.">?</span></h3>
                 ${infoRow('Taxa depreciação anual', it.depreciation_rate ? `${it.depreciation_rate}%` : null)}
                 ${infoRow('Unidades (ativas)', `${serialUnits.length} (${activeUnits})`)}
                 ${infoRow('Valor contábil total', `€ ${totalBook.toFixed(2)}`)}
-                <p class="text-[11px] text-gray-400 mt-2 leading-relaxed">Valor e data de aquisição são <b>por unidade</b> (ver tabela). A depreciação anual corre por unidade usando esta taxa.</p>
             </div>` : ''}
 
             ${!isPatrimonial && (it.location_params || []).length ? `

@@ -102,9 +102,8 @@ document.getElementById('pageContent').innerHTML = `
                         <textarea name="description" rows="2" class="field-input"></textarea>
                     </div>
                     <div>
-                        <label class="field-label">Categoria</label>
+                        <label class="field-label">Categoria <span class="help-tip" tabindex="0" data-tip="Só categorias-folha podem ser escolhidas. As categorias-pai aparecem como cabeçalho. O caminho completo aparece ao passar o mouse na opção.">?</span></label>
                         <select name="subcategory_id" id="subcategorySelect" class="field-input"></select>
-                        <p class="text-[11px] text-gray-400 mt-1.5">Caminho completo aparece ao passar o mouse.</p>
                     </div>
                     <div>
                         <label class="field-label">Fabricante</label>
@@ -124,11 +123,10 @@ document.getElementById('pageContent').innerHTML = `
                         <input name="barcode" class="field-input">
                     </div>
                     <div>
-                        <label class="field-label">Fornecedor padrão</label>
+                        <label class="field-label">Fornecedor padrão <span class="help-tip" tabindex="0" data-tip="Sugestão usada nas entradas. Cada entrada pode usar um fornecedor diferente.">?</span></label>
                         <select name="default_supplier_id" id="defaultSupplierSelect" class="field-input">
                             <option value="">— sem fornecedor padrão —</option>
                         </select>
-                        <p class="text-[11px] text-gray-400 mt-1.5">Sugestão usada em entradas. Cada entrada pode usar fornecedor diferente.</p>
                     </div>
                     <div class="md:col-span-2 flex items-end">
                         <p class="text-[11px] text-gray-500 bg-sky-50/50 border border-sky-100 rounded-lg px-3 py-2 flex items-start gap-2">
@@ -143,18 +141,16 @@ document.getElementById('pageContent').innerHTML = `
                 <h4 class="text-[10px] uppercase tracking-wider font-bold text-gray-500 mb-3">Unidades e conversão</h4>
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div id="purchaseUomWrap">
-                        <label class="field-label">UM de compra <span class="text-red-500">*</span></label>
+                        <label class="field-label">UM de compra <span class="text-red-500">*</span> <span class="help-tip" tabindex="0" data-tip="Para itens de consumo, a UM de compra também é usada como unidade base.">?</span></label>
                         <select name="purchase_uom_id" id="purchaseUomSelect" required class="field-input"></select>
-                        <p class="text-[11px] text-gray-400 mt-1.5">Para consumo: também serve como unidade base.</p>
                     </div>
                     <div>
                         <label class="field-label">UM de consumo</label>
                         <select name="consumption_uom_id" id="consumptionUomSelect" class="field-input"></select>
                     </div>
                     <div id="conversionFactorWrap">
-                        <label class="field-label">Fator de conversão</label>
+                        <label class="field-label">Fator de conversão <span class="help-tip" tabindex="0" data-tip="Quantas unidades de consumo cabem em 1 unidade de compra. Ex.: 1 caixa = 100 unidades → 100.">?</span></label>
                         <input name="conversion_factor" type="number" step="0.0001" value="1" class="field-input">
-                        <p class="text-[11px] text-gray-400 mt-1.5">Ex.: 1 caixa = 100 unidades → 100</p>
                     </div>
                 </div>
                 <!-- base_uom_id é definido automaticamente para consumo no submit -->
@@ -167,7 +163,7 @@ document.getElementById('pageContent').innerHTML = `
                     <input type="checkbox" name="controls_lot" id="controlsLotCheck" checked class="mt-0.5 w-4 h-4 accent-sky-600">
                     <span class="text-sm text-gray-700">
                         <strong>Este item controla lote / validade</strong>
-                        <span class="block text-[11px] text-gray-400 mt-1">Marcado: a <b>entrada</b> exige o nº de lote (validade opcional) e a <b>saída</b> usa FEFO pela validade. Desmarque para itens sem rastreio de lote — a saída abate direto do saldo.</span>
+                        <span class="help-tip" tabindex="0" data-tip="Marcado: a entrada exige o nº de lote (validade opcional) e a saída usa FEFO pela validade. Desmarque para itens sem rastreio de lote — a saída abate direto do saldo.">?</span>
                     </span>
                 </label>
             </section>
@@ -208,9 +204,8 @@ document.getElementById('pageContent').innerHTML = `
                 <h4 class="text-[10px] uppercase tracking-wider font-bold text-purple-600 mb-3">Dados patrimoniais</h4>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                        <label class="field-label">Taxa de depreciação anual (%)</label>
+                        <label class="field-label">Taxa de depreciação anual (%) <span class="help-tip" tabindex="0" data-tip="Taxa do modelo — aplicada por unidade na depreciação anual.">?</span></label>
                         <input name="depreciation_rate" type="number" step="0.01" min="0" max="100" class="field-input">
-                        <p class="text-[11px] text-gray-400 mt-1.5">Taxa do modelo — aplicada por unidade na depreciação anual.</p>
                     </div>
                 </div>
                 <p class="text-[11px] text-gray-500 bg-purple-50/50 border border-purple-100 rounded-lg px-3 py-2 mt-3 flex items-start gap-2">
@@ -220,10 +215,9 @@ document.getElementById('pageContent').innerHTML = `
             </section>
 
             <section>
-                <h4 class="text-[10px] uppercase tracking-wider font-bold text-gray-500 mb-3">Imagem</h4>
+                <h4 class="text-[10px] uppercase tracking-wider font-bold text-gray-500 mb-3">Imagem <span class="help-tip" tabindex="0" data-tip="Para substituir uma imagem existente, basta escolher um novo arquivo.">?</span></h4>
                 <label class="border-2 border-dashed border-gray-200 rounded-lg p-4 block cursor-pointer hover:border-sky-400 hover:bg-sky-50/30 transition">
                     <input id="imageFile" type="file" accept="image/*" class="text-sm w-full">
-                    <p class="text-[11px] text-gray-400 mt-2">Substituir uma imagem existente é só escolher um novo arquivo.</p>
                 </label>
                 <div id="imagePreview" class="mt-3"></div>
             </section>
