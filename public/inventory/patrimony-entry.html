@@ -72,7 +72,7 @@ document.getElementById('pageContent').innerHTML = `
                         <button type="button" onclick="addUnit()" class="text-sm bg-gray-100 hover:bg-gray-200 px-3 py-1.5 rounded-lg"><i class="fas fa-plus"></i> Adicionar unidade</button>
                     </div>
                     <div class="grid grid-cols-12 gap-2 text-[10px] uppercase tracking-wider text-gray-400 font-semibold px-1 mb-1">
-                        <div class="col-span-5">Número de série *</div>
+                        <div class="col-span-5">Número de série <span class="text-gray-300 normal-case">— vazio gera automático</span></div>
                         <div class="col-span-3">Data de aquisição</div>
                         <div class="col-span-3">Valor (€)</div>
                         <div class="col-span-1"></div>
@@ -159,7 +159,7 @@ function addUnit() {
     div.className = 'grid grid-cols-12 gap-2 items-center';
     div.dataset.unit = idx;
     div.innerHTML = `
-        <div class="col-span-5"><input class="u-serial w-full px-2 py-1.5 border border-gray-300 rounded text-xs" placeholder="Número de série" required></div>
+        <div class="col-span-5"><input class="u-serial w-full px-2 py-1.5 border border-gray-300 rounded text-xs" placeholder="Vazio = automático (código-NN)"></div>
         <div class="col-span-3"><input type="date" class="u-date w-full px-2 py-1.5 border border-gray-300 rounded text-xs"></div>
         <div class="col-span-3"><input type="number" step="0.01" min="0" class="u-value w-full px-2 py-1.5 border border-gray-300 rounded text-xs" placeholder="0.00"></div>
         <div class="col-span-1 text-center"><button type="button" onclick="this.closest('[data-unit]').remove()" class="text-red-500 hover:text-red-700"><i class="fas fa-trash text-xs"></i></button></div>`;
@@ -186,15 +186,14 @@ document.getElementById('entryForm').addEventListener('submit', async (e) => {
     const f = e.target;
     const units = [];
     for (const div of document.querySelectorAll('[data-unit]')) {
-        const serial = div.querySelector('.u-serial').value.trim();
-        if (!serial) continue;
         units.push({
-            serial_number:     serial,
+            // Vazio → o backend gera "<código do item>-NN" sequencial.
+            serial_number:     div.querySelector('.u-serial').value.trim() || null,
             acquisition_date:  div.querySelector('.u-date').value || null,
             acquisition_value: div.querySelector('.u-value').value || null
         });
     }
-    if (!units.length) return toast('Adicione pelo menos uma unidade com número de série', 'error');
+    if (!units.length) return toast('Adicione pelo menos uma unidade', 'error');
 
     const payload = {
         item_id:         f.item_id.value,
@@ -206,7 +205,9 @@ document.getElementById('entryForm').addEventListener('submit', async (e) => {
     };
     try {
         const r = await apiCall('/api/inventory/patrimony/entries', { method: 'POST', body: JSON.stringify(payload) });
-        toast(`${r.data.created_units} unidade(s) cadastrada(s)`);
+        const serials = r.data.serials || [];
+        const preview = serials.slice(0, 5).join(', ') + (serials.length > 5 ? '…' : '');
+        toast(`${r.data.created_units} unidade(s) cadastrada(s)${preview ? ': ' + preview : ''}`);
         closeEntryModal();
         load();
     } catch (err) { toast(err.message, 'error'); }

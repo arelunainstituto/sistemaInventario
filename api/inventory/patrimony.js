@@ -23,19 +23,51 @@ router.post('/entries', requirePermission('inventory', 'entry'), async (req, res
 
         // Fronteira de macro: este fluxo é só de PATRIMÔNIO.
         const { data: item } = await supabaseAdmin
-            .from('inv_items').select('id, name, macro_category').eq('id', item_id).single();
+            .from('inv_items').select('id, name, macro_category, internal_code').eq('id', item_id).single();
         if (!item) return res.status(400).json({ error: 'Item não encontrado' });
         if (item.macro_category !== 'patrimonial')
             return res.status(400).json({ error: `"${item.name}" não é patrimonial — use Consumo › Entrada` });
 
-        // Normaliza/valida séries: não vazias e sem duplicata no próprio formulário.
+        // Séries já existentes do item: usadas p/ rejeitar duplicatas (ativas) e
+        // p/ numerar as auto-geradas (sem reusar número algum, mesmo apagado).
+        const { data: existingUnits } = await supabaseAdmin
+            .from('inv_serial_units')
+            .select('serial_number, deleted_at')
+            .eq('item_id', item_id);
+        const existingActive = new Set((existingUnits || []).filter(u => u.deleted_at == null).map(u => u.serial_number));
+        const taken = new Set((existingUnits || []).map(u => u.serial_number));
+
+        // Gerador do próximo "<internal_code>-NN" sequencial. NN começa em 01 e
+        // alarga p/ 3+ dígitos após 99 (padStart só preenche, não trunca). O
+        // início é o maior NN JÁ EXISTENTE + 1; o do-while pula qualquer número
+        // já ocupado (inclusive séries informadas neste formulário).
+        const code = item.internal_code || '';
+        const reCode = new RegExp('^' + code.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '-(\\d+)$');
+        let maxNN = 0;
+        for (const s of taken) { const m = reCode.exec(s); if (m) maxNN = Math.max(maxNN, parseInt(m[1], 10)); }
+        let nextNN = maxNN + 1;
+        // Reserva as séries informadas (não-vazias) p/ a auto-geração não colidir.
+        for (const u of units) { const s = (u.serial_number ?? '').toString().trim(); if (s) taken.add(s); }
+        const nextAutoSerial = () => {
+            let s;
+            do { s = `${code}-${String(nextNN).padStart(2, '0')}`; nextNN++; } while (taken.has(s));
+            taken.add(s);
+            return s;
+        };
+
+        // Normaliza/valida séries: AUTO-GERA quando vazia; sem duplicata no form.
         const seen = new Set();
         const rows = [];
+        const dupExisting = [];
         for (const [i, u] of units.entries()) {
-            const sn = (u.serial_number ?? '').toString().trim();
-            if (!sn) return res.status(400).json({ error: `Unidade ${i + 1}: número de série é obrigatório` });
+            let sn = (u.serial_number ?? '').toString().trim();
+            if (!sn) {
+                if (!code) return res.status(400).json({ error: `Unidade ${i + 1}: item sem código interno — não é possível gerar o nº de série automaticamente` });
+                sn = nextAutoSerial();
+            }
             if (seen.has(sn)) return res.status(400).json({ error: `Número de série "${sn}" duplicado no formulário` });
             seen.add(sn);
+            if (existingActive.has(sn)) dupExisting.push(sn);
             const raw = u.acquisition_value;
             const val = (raw != null && raw !== '') ? parseFloat(raw) : null;
             if (val != null && (!isFinite(val) || val < 0))
@@ -56,16 +88,9 @@ router.post('/entries', requirePermission('inventory', 'entry'), async (req, res
             });
         }
 
-        // Rejeita séries que já existem para este item (não soft-deleted).
-        const { data: existing } = await supabaseAdmin
-            .from('inv_serial_units')
-            .select('serial_number')
-            .eq('item_id', item_id)
-            .is('deleted_at', null)
-            .in('serial_number', [...seen]);
-        if (existing && existing.length) {
-            const list = existing.map(e => e.serial_number).slice(0, 10).join(', ');
-            return res.status(409).json({ error: `Número(s) de série já cadastrado(s) para este item: ${list}` });
+        // Rejeita séries INFORMADAS que já existem (ativas) para este item.
+        if (dupExisting.length) {
+            return res.status(409).json({ error: `Número(s) de série já cadastrado(s) para este item: ${dupExisting.slice(0, 10).join(', ')}` });
         }
 
         // 1) Insere as unidades.
@@ -111,7 +136,7 @@ router.post('/entries', requirePermission('inventory', 'entry'), async (req, res
             throw movErr;
         }
 
-        res.status(201).json({ success: true, data: { created_units: created.length } });
+        res.status(201).json({ success: true, data: { created_units: created.length, serials: created.map(u => u.serial_number) } });
     } catch (err) {
         console.error('POST patrimony/entries error:', err);
         res.status(500).json({ error: err.message || 'Erro ao registar entrada de patrimônio' });
