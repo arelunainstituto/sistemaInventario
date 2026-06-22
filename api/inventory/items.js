@@ -167,12 +167,17 @@ router.post('/', requirePermission('inventory', 'create_item'), async (req, res)
         const errors = validateItemPayload(req.body, false);
         if (errors.length) return res.status(400).json({ error: errors.join('; ') });
 
-        // Não confiar em controls_lot/uses_serial do cliente — trigger define
+        // uses_serial é sempre derivado do macro. controls_lot agora é escolha
+        // do usuário para CONSUMO (checkbox no cadastro): default TRUE quando
+        // não informado; PATRIMONIAL sempre FALSE (controla por nº de série).
         const { controls_lot, uses_serial, internal_code, qr_code, patrimony_number, ...rest } = req.body;
+        const isConsumo = req.body.macro_category === 'consumo';
 
         const payload = {
             ...rest,
-            controls_lot: req.body.macro_category === 'consumo',
+            controls_lot: isConsumo
+                ? (controls_lot === undefined || controls_lot === null ? true : !!controls_lot)
+                : false,
             uses_serial:  req.body.macro_category === 'patrimonial',
             created_by:   req.user?.id || null,
             updated_by:   req.user?.id || null
@@ -199,8 +204,9 @@ router.put('/:id', requirePermission('inventory', 'update_item'), async (req, re
         const errors = validateItemPayload(req.body, true);
         if (errors.length) return res.status(400).json({ error: errors.join('; ') });
 
-        // Campos imutáveis após criação
-        const immutable = ['internal_code','qr_code','macro_category','controls_lot','uses_serial','patrimony_number'];
+        // Campos imutáveis após criação. controls_lot saiu daqui: é editável
+        // (com guarda abaixo) para permitir ligar/desligar o controle de lote.
+        const immutable = ['internal_code','qr_code','macro_category','uses_serial','patrimony_number'];
         // Campos editáveis apenas por Inventory_Admin/Admin (gerenciados normalmente
         // por operações: cmp via entradas, asset_status via depreciação ou saída tipo depreciacao)
         const adminOnly = ['cmp','asset_status'];
@@ -222,6 +228,27 @@ router.put('/:id', requirePermission('inventory', 'update_item'), async (req, re
         // (UI nova não pede base — sempre alinhada à compra).
         if (patch.purchase_uom_id) {
             patch.base_uom_id = patch.purchase_uom_id;
+        }
+
+        // controls_lot: editável só para CONSUMO e só enquanto o item não tiver
+        // lotes (mudar o controle com lotes existentes deixaria o saldo
+        // inconsistente entre o bucket por-lote e o sem-lote). Patrimonial
+        // ignora (controla sempre por nº de série).
+        if (Object.prototype.hasOwnProperty.call(patch, 'controls_lot')) {
+            const { data: itemRow } = await supabaseAdmin
+                .from('inv_items').select('macro_category').eq('id', id).single();
+            if (itemRow?.macro_category !== 'consumo') {
+                delete patch.controls_lot;
+            } else {
+                const { count: lotCount } = await supabaseAdmin
+                    .from('inv_lots').select('id', { count: 'exact', head: true }).eq('item_id', id);
+                if ((lotCount || 0) > 0) {
+                    return res.status(409).json({
+                        error: 'Não é possível alterar o controle de lote: o item já possui lotes registrados.'
+                    });
+                }
+                patch.controls_lot = !!patch.controls_lot;
+            }
         }
 
         const { data, error } = await supabaseAdmin

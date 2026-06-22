@@ -155,6 +155,17 @@ document.getElementById('pageContent').innerHTML = `
                 <input type="hidden" name="base_uom_id" id="baseUomSelect">
             </section>
 
+            <section id="lotControlFieldset">
+                <h4 class="text-[10px] uppercase tracking-wider font-bold text-gray-500 mb-3">Controle de lote</h4>
+                <label class="flex items-start gap-3 cursor-pointer border border-gray-200 rounded-lg px-4 py-3 hover:bg-sky-50/30 transition">
+                    <input type="checkbox" name="controls_lot" id="controlsLotCheck" checked class="mt-0.5 w-4 h-4 accent-sky-600">
+                    <span class="text-sm text-gray-700">
+                        <strong>Este item controla lote / validade</strong>
+                        <span class="block text-[11px] text-gray-400 mt-1">Marcado: a <b>entrada</b> exige o nº de lote (validade opcional) e a <b>saída</b> usa FEFO pela validade. Desmarque para itens sem rastreio de lote — a saída abate direto do saldo.</span>
+                    </span>
+                </label>
+            </section>
+
             <section id="stockFieldset">
                 <h4 class="text-[10px] uppercase tracking-wider font-bold text-gray-500 mb-3">Parâmetros de stock (padrão global)</h4>
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -296,7 +307,7 @@ async function activateMacro(macro) {
     macroField.value = macro;
     const isConsumo = macro === 'consumo';
     document.getElementById('formMacroLabel').innerHTML = isConsumo
-        ? '<span class="inline-flex items-center gap-1.5"><span class="w-1.5 h-1.5 rounded-full bg-sky-500"></span>Consumo · controla lote e validade</span>'
+        ? '<span class="inline-flex items-center gap-1.5"><span class="w-1.5 h-1.5 rounded-full bg-sky-500"></span>Consumo · stock e lote (opcional)</span>'
         : '<span class="inline-flex items-center gap-1.5"><span class="w-1.5 h-1.5 rounded-full bg-purple-500"></span>Patrimonial · controla nº de série e depreciação</span>';
     patrimonyFieldset.classList.toggle('hidden', macro !== 'patrimonial');
     // Patrimônio não usa parâmetros de stock (mín/máx/lead), fator de conversão
@@ -304,6 +315,8 @@ async function activateMacro(macro) {
     document.getElementById('stockFieldset').classList.toggle('hidden', !isConsumo);
     document.getElementById('conversionFactorWrap').classList.toggle('hidden', !isConsumo);
     document.getElementById('locationParamsFieldset').classList.toggle('hidden', !isConsumo);
+    // Controle de lote é conceito de consumo (patrimônio controla por nº de série).
+    document.getElementById('lotControlFieldset').classList.toggle('hidden', !isConsumo);
     step1.classList.add('hidden');
     step2.classList.remove('hidden');
     // O usuário pode escolher o tipo antes de o bootstrap() terminar de buscar
@@ -449,7 +462,9 @@ async function loadForEdit(prefetched) {
         const f = document.getElementById('itemForm');
         for (const [k, v] of Object.entries(it)) {
             const el = f.elements[k];
-            if (el && v !== null && v !== undefined) el.value = v;
+            if (!el || v === null || v === undefined) continue;
+            if (el.type === 'checkbox') el.checked = !!v;
+            else el.value = v;
         }
         // Sincroniza o texto exibido dos comboboxes com os valores carregados
         // (definir select.value por fora não atualiza o input do combobox sozinho).
@@ -491,6 +506,7 @@ document.getElementById('itemForm').addEventListener('submit', async (e) => {
     const payload = {};
     for (const el of f.elements) {
         if (!el.name) continue;
+        if (el.type === 'checkbox') { payload[el.name] = el.checked; continue; }
         let v = el.value;
         if (v === '') v = null;
         if (el.type === 'number' && v !== null) v = parseFloat(v);

@@ -34,7 +34,17 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e
 
 ## [Unreleased]
 
-_Nenhuma alteração pendente._
+> **Em validação (beta).** Versão exibida no header: `v1.14.0-beta-01`. As funcionalidades abaixo estão sendo entregues uma a uma (cada uma incrementa o sufixo `-beta-NN`) e consolidam na release estável `1.14.0` no último commit.
+
+### Adicionado
+- **Checkbox "controla lote / validade" no cadastro do item** (`requer migração`: [114-controls-lot-manual.sql](database/inventory-refactor/114-controls-lot-manual.sql)): até aqui todo item de consumo controlava lote obrigatoriamente (RN03). Agora o cadastro tem um checkbox ([item-form.html](public/inventory/item-form.html)) que define `inv_items.controls_lot` (default marcado, preservando o comportamento antigo). Reflete nas movimentações sem mudança extra:
+  - **Marcado** → entrada exige nº de lote (validade opcional) e saída usa FEFO pela validade.
+  - **Desmarcado** → entrada não pede lote e a saída abate direto do saldo (sem FEFO).
+  - O trigger `fn_inv_items_before_insert` passou a honrar o valor enviado (`COALESCE(NEW.controls_lot, TRUE)`) em vez de forçar TRUE; o resto da função (código 1XXXXXX/2XXXXXX, patrimônio, reorder_point) é idêntico. Patrimônio continua sempre por nº de série.
+  - API ([items.js](api/inventory/items.js)): POST honra o valor para consumo; PUT permite editar o controle de lote **apenas enquanto o item não tiver lotes registrados** (evita saldo inconsistente entre bucket por-lote e sem-lote) — caso contrário retorna 409.
+
+### Notas
+- [_layout.js:5](public/inventory/_layout.js#L5) bump para `v1.14.0-beta-01`.
 
 ---
 
