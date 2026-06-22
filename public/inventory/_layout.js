@@ -2,7 +2,7 @@
 // Each page calls renderInventoryLayout({ activePage, title, subtitle }).
 
 // Versão exibida no sidebar — manter em sync com CHANGELOG.md
-const INVENTORY_VERSION = 'v1.14.0';
+const INVENTORY_VERSION = 'v1.15.0-beta-01';
 
 // Operações separadas por macro_category como "módulos" (Consumo / Patrimônio).
 // Itens com type:'group' viram um cabeçalho + sub-itens indentados (ver
@@ -98,6 +98,21 @@ function navItemHtml(item, active, nested = false) {
     }
     return `<a href="${item.href}" class="${base} ${state} no-underline" title="${item.label}"${adminAttr}>${inner}</a>`;
 }
+
+// Desativa o Enter como "salvar" dentro de formulários, para evitar que o
+// usuário envie um registro (ex.: uma movimentação) sem querer. Vale só dentro
+// de <form>: textarea (Enter = nova linha) e botões (ação intencional) seguem
+// normais; campos de busca fora de form não são afetados; o Enter dos
+// comboboxes (makeSearchable) continua selecionando a opção, só não submete.
+document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter' || e.isComposing) return;
+    const t = e.target;
+    if (!t || !t.form) return;                 // só dentro de um <form>
+    const tag = t.tagName;
+    if (tag === 'TEXTAREA') return;            // nova linha
+    if (tag === 'BUTTON' || (tag === 'INPUT' && /^(submit|button|reset)$/i.test(t.type))) return; // intencional
+    e.preventDefault();                        // bloqueia o submit implícito
+});
 
 function renderInventoryLayout({ activePage = 'dashboard', title = 'Inventário', subtitle = '' } = {}) {
     const sidebar = `

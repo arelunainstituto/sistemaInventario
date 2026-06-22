@@ -34,7 +34,10 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e
 
 ## [Unreleased]
 
-_Nenhuma alteração pendente._
+> **Em validação (beta).** Versão exibida no header: `v1.15.0-beta-01`. Funcionalidades entregues uma a uma (sufixo `-beta-NN`), consolidando na release estável `1.15.0` no último commit.
+
+### Alterado
+- **Enter não salva mais registros dentro de formulários** ([_layout.js](public/inventory/_layout.js)): para evitar envio acidental (ex.: criar uma movimentação sem querer), o Enter dentro de um `<form>` deixa de submeter. Textarea (nova linha) e botões de ação seguem normais; campos de busca fora de form e o Enter dos comboboxes (que seleciona a opção realçada) não mudam.
 
 ---
 
