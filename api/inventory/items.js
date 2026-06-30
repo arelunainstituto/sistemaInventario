@@ -79,16 +79,75 @@ async function uploadFile(file, folder) {
     return data.publicUrl;
 }
 
+// Anexa stock_qty (saldo atual) às linhas: consumo = soma do inv_stock;
+// patrimônio = nº de unidades ativas (não baixadas). Calculado só p/ a página.
+async function attachStockQty(rows) {
+    if (!rows || !rows.length) return rows || [];
+    const stockByItem = {};
+    const consumoIds = rows.filter(i => i.macro_category === 'consumo').map(i => i.id);
+    const patrIds    = rows.filter(i => i.macro_category === 'patrimonial').map(i => i.id);
+    if (consumoIds.length) {
+        const { data: st } = await supabaseAdmin
+            .from('inv_stock').select('item_id, quantity').in('item_id', consumoIds);
+        for (const r of (st || [])) stockByItem[r.item_id] = (stockByItem[r.item_id] || 0) + (parseFloat(r.quantity) || 0);
+    }
+    if (patrIds.length) {
+        const { data: su } = await supabaseAdmin
+            .from('inv_serial_units').select('item_id, status').in('item_id', patrIds).is('deleted_at', null);
+        for (const r of (su || [])) if (r.status !== 'baixado') stockByItem[r.item_id] = (stockByItem[r.item_id] || 0) + 1;
+    }
+    return rows.map(i => ({ ...i, stock_qty: stockByItem[i.id] || 0 }));
+}
+
 // GET /  — lista itens com filtros
 router.get('/', requirePermission('inventory', 'read'), async (req, res) => {
     try {
         const { macro_category, subcategory_id, search, include_inactive, sort, dir, limit = 100, page = 1 } = req.query;
         const offset = (parseInt(page) - 1) * parseInt(limit);
+        const ascending = String(dir).toLowerCase() !== 'desc';
+        const searchOr = search
+            ? `name.ilike.%${search}%,internal_code.ilike.%${search}%,manufacturer_ref.ilike.%${search}%,barcode.ilike.%${search}%`
+            : null;
 
+        // Ordenar por SALDO (stock_qty) é um agregado → ordena/pagina na view
+        // vw_inv_items_with_stock (que tem o saldo) e depois hidrata os itens
+        // completos por ID, preservando a ordem (embeds só existem na tabela).
+        if (sort === 'stock_qty') {
+            let vq = supabaseAdmin
+                .from('vw_inv_items_with_stock')
+                .select('id', { count: 'exact' })
+                .is('deleted_at', null)
+                .order('stock_qty', { ascending })
+                .order('internal_code', { ascending: true })
+                .range(offset, offset + parseInt(limit) - 1);
+            if (!include_inactive) vq = vq.eq('is_active', true);
+            if (macro_category)    vq = vq.eq('macro_category', macro_category);
+            if (subcategory_id)    vq = vq.eq('subcategory_id', subcategory_id);
+            if (searchOr)          vq = vq.or(searchOr);
+
+            const { data: idRows, error: idErr, count } = await vq;
+            if (idErr) throw idErr;
+            const orderedIds = (idRows || []).map(r => r.id);
+            let pageItems = [];
+            if (orderedIds.length) {
+                const { data: full, error: fErr } = await supabaseAdmin
+                    .from('inv_items').select(ITEM_SELECT).in('id', orderedIds);
+                if (fErr) throw fErr;
+                const byId = new Map((full || []).map(i => [i.id, i]));
+                pageItems = orderedIds.map(id => byId.get(id)).filter(Boolean);
+            }
+            const enriched = await attachStockQty(pageItems);
+            return res.json({
+                success: true,
+                data: enriched,
+                pagination: { page: parseInt(page), limit: parseInt(limit), total: count, totalPages: Math.ceil((count || 0) / parseInt(limit)) }
+            });
+        }
+
+        // Demais ordenações: direto na tabela (colunas reais, com embeds).
         // Whitelist de colunas ordenáveis — evita injeção no .order()
         const SORTABLE  = ['internal_code', 'name', 'macro_category', 'cmp', 'min_stock', 'is_active', 'created_at'];
         const sortCol   = SORTABLE.includes(sort) ? sort : 'name';
-        const ascending = String(dir).toLowerCase() !== 'desc';
 
         let q = supabaseAdmin
             .from('inv_items')
@@ -99,18 +158,18 @@ router.get('/', requirePermission('inventory', 'read'), async (req, res) => {
         if (sortCol !== 'internal_code') q = q.order('internal_code', { ascending: true });
         q = q.range(offset, offset + parseInt(limit) - 1);
 
-        if (!include_inactive)       q = q.eq('is_active', true);
-        if (macro_category)          q = q.eq('macro_category', macro_category);
-        if (subcategory_id)          q = q.eq('subcategory_id', subcategory_id);
-        if (search) {
-            q = q.or(`name.ilike.%${search}%,internal_code.ilike.%${search}%,manufacturer_ref.ilike.%${search}%,barcode.ilike.%${search}%`);
-        }
+        if (!include_inactive) q = q.eq('is_active', true);
+        if (macro_category)    q = q.eq('macro_category', macro_category);
+        if (subcategory_id)    q = q.eq('subcategory_id', subcategory_id);
+        if (searchOr)          q = q.or(searchOr);
 
         const { data, error, count } = await q;
         if (error) throw error;
+        const enriched = await attachStockQty(data || []);
+
         res.json({
             success: true,
-            data,
+            data: enriched,
             pagination: { page: parseInt(page), limit: parseInt(limit), total: count, totalPages: Math.ceil((count || 0) / parseInt(limit)) }
         });
     } catch (err) {

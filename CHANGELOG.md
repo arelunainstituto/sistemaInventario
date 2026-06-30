@@ -38,6 +38,36 @@ _Nenhuma alteração pendente._
 
 ---
 
+## [1.16.0] — 2026-06-22
+
+> A saída de consumo passa a aceitar vários itens num mesmo registro (multi-linha), como já era na entrada.
+
+### Adicionado
+- **Saída de consumo com vários itens (multi-linha)** (`requer migração`: [118-consume-batch.sql](database/inventory-refactor/118-consume-batch.sql)): a tela de Saídas ([exits.html](public/inventory/exits.html)) passa a registrar **várias linhas** (item + localização + qtd + lote) num único envio, espelhando a Entrada. Nova função `fn_inv_consume_batch` processa as linhas em **uma única transação** (atômico: se qualquer linha falhar, nenhuma é gravada), reutilizando `fn_inv_consume` por linha (FEFO, RN05/seeding, confirmação de mínimo §16). Novo endpoint `POST /exits/batch` ([exits.js](api/inventory/exits.js)); o `POST /exits` antigo (single) permanece para a tela de Ajustes. Lote por **FEFO automático**, com opção de lote específico para itens que controlam lote; disponibilidade exibida por linha. A confirmação de "abaixo do mínimo" cobre todas as linhas de uma vez.
+- **`apiCall` expõe `code`/`status`/`data` no erro** ([_layout.js](public/inventory/_layout.js)): retrocompatível (a mensagem não muda) — permite tratar fluxos como a confirmação de stock mínimo de forma robusta.
+
+### Alterado
+- **Tela de Itens: coluna "Stock mín." vira "Stock"** (`requer migração`: [119-vw-items-with-stock.sql](database/inventory-refactor/119-vw-items-with-stock.sql); [items.html](public/inventory/items.html), [items.js](api/inventory/items.js)): em vez do mínimo, a lista passa a mostrar o **saldo atual** de cada item — consumo = soma do `inv_stock`; patrimônio = nº de unidades ativas (não baixadas). Fica em **vermelho** quando o consumo está no/abaixo do mínimo. A coluna é **ordenável**: como o saldo é um agregado, a ordenação/paginação usa a view `vw_inv_items_with_stock` (obtém os IDs ordenados da página) e depois hidrata os itens completos por ID.
+
+### Notas
+- [_layout.js:5](public/inventory/_layout.js#L5) bump para `v1.16.0`.
+- **Migrações desta release**: [118-consume-batch.sql](database/inventory-refactor/118-consume-batch.sql), [119-vw-items-with-stock.sql](database/inventory-refactor/119-vw-items-with-stock.sql).
+- Cada item da saída continua sendo um **movimento individual** no histórico (saídas não têm cabeçalho como as entradas). Agrupar como "um registro" no histórico seria um passo adicional (tabela de cabeçalho).
+
+---
+
+## [1.15.1] — 2026-06-22
+
+> Completa o seeding de stock negativo: a saída negativa ainda travava no CHECK da tabela, mesmo após a 113.
+
+### Corrigido
+- **Saída em estoque negativo travava em `inv_stock_quantity_check`** (`requer migração`: [117-inv-stock-allow-negative.sql](database/inventory-refactor/117-inv-stock-allow-negative.sql)): mesmo com o modo seeding ligado e a `fn_inv_consume` já corrigida (113), a gravação do saldo negativo era barrada pelo `CHECK (quantity >= 0)` da coluna `inv_stock.quantity` (criado em [10-fase1-cadastros-entradas.sql:213](database/inventory-refactor/10-fase1-cadastros-entradas.sql#L213)) — a feature de stock negativo (100) relaxou a regra **na função**, mas o CHECK **estático da tabela** nunca foi removido. A migração 117 remove esse CHECK; a regra de não-negativo passa a ser garantida só nas funções (`fn_inv_consume` RN05, `fn_inv_adjust` `v_can_neg`, `fn_inv_transfer` via consume), todas condicionadas ao flag — com o flag OFF continua impossível ficar negativo; com o flag ON (seeding), passa a ser permitido. A coluna mantém `NOT NULL DEFAULT 0`.
+
+### Notas
+- [_layout.js:5](public/inventory/_layout.js#L5) bump para `v1.15.1`.
+
+---
+
 ## [1.15.0] — 2026-06-22
 
 > Anexos (fotos) nos itens de patrimônio, Enter deixa de salvar registros por acidente e as anotações de ajuda viram tooltips "?". Entregue e validado via betas `1.15.0-beta-01..03`.

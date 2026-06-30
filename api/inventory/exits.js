@@ -66,6 +66,67 @@ router.get('/stock-by-item/:itemId', requirePermission('inventory', 'read'), asy
     }
 });
 
+// POST /batch — saída de CONSUMO com várias linhas num único registro (atômico).
+// Body: { lines: [{ item_id, location_id, quantity, lot_id? }], justification?, confirmed_low_stock? }
+router.post('/batch', requirePermission('inventory', 'exit'), async (req, res) => {
+    try {
+        const { lines, justification, confirmed_low_stock } = req.body || {};
+        if (!Array.isArray(lines) || lines.length === 0)
+            return res.status(400).json({ error: 'Pelo menos uma linha é obrigatória' });
+
+        for (const [i, l] of lines.entries()) {
+            if (!l.item_id)        return res.status(400).json({ error: `Linha ${i + 1}: item é obrigatório` });
+            if (!l.location_id)    return res.status(400).json({ error: `Linha ${i + 1}: localização é obrigatória` });
+            if (!(l.quantity > 0)) return res.status(400).json({ error: `Linha ${i + 1}: quantidade deve ser > 0` });
+        }
+
+        // Fronteira de macro: todas as linhas precisam ser de CONSUMO.
+        const ids = [...new Set(lines.map(l => l.item_id))];
+        const { data: metas } = await supabaseAdmin
+            .from('inv_items').select('id, name, macro_category').in('id', ids);
+        const byId = new Map((metas || []).map(m => [m.id, m]));
+        for (const [i, l] of lines.entries()) {
+            const m = byId.get(l.item_id);
+            if (!m) return res.status(400).json({ error: `Linha ${i + 1}: item não encontrado` });
+            if (m.macro_category !== 'consumo')
+                return res.status(400).json({ error: `Linha ${i + 1}: "${m.name}" é patrimonial — use Patrimônio › Saída` });
+        }
+
+        const cleanLines = lines.map(l => ({
+            item_id: l.item_id,
+            location_id: l.location_id,
+            quantity: l.quantity,
+            lot_id: l.lot_id || null
+        }));
+
+        const { data, error } = await supabaseAdmin.rpc('fn_inv_consume_batch', {
+            p_lines: cleanLines,
+            p_justification: justification || null,
+            p_user: req.user?.id || null,
+            p_confirmed_low_stock: !!confirmed_low_stock
+        });
+
+        if (error) {
+            const pg = parsePgException(error.message);
+            if (pg && pg.code === 'LOW_STOCK_CONFIRMATION_REQUIRED') {
+                return res.status(409).json({
+                    error: 'Alguma saída deixará o stock abaixo do mínimo',
+                    code: 'LOW_STOCK_CONFIRMATION_REQUIRED',
+                    details: pg.fields
+                });
+            }
+            if (error.code === 'P0002') return res.status(400).json({ error: error.message, code: 'INSUFFICIENT_STOCK' });
+            if (error.code === 'P0001') return res.status(400).json({ error: error.message });
+            throw error;
+        }
+
+        res.status(201).json({ success: true, data: { movement_ids: data || [], count: (data || []).length } });
+    } catch (err) {
+        console.error('POST exits/batch error:', err);
+        res.status(500).json({ error: err.message || 'Erro ao lançar saídas' });
+    }
+});
+
 // GET / — lista saídas (movements type='saida')
 router.get('/', requirePermission('inventory', 'read'), async (req, res) => {
     try {

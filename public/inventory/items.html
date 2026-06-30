@@ -66,7 +66,7 @@ document.getElementById('pageContent').innerHTML = `
                         <th class="px-4 py-3 text-left font-semibold cursor-pointer select-none hover:text-gray-700 transition" data-sort="macro_category">Categoria <i class="sort-icon fas fa-sort text-gray-300 text-[9px] ml-0.5"></i></th>
                         <th class="px-4 py-3 text-left font-semibold">Subcategoria</th>
                         <th class="px-4 py-3 text-right font-semibold cursor-pointer select-none hover:text-gray-700 transition" data-sort="cmp">Custo M. <i class="sort-icon fas fa-sort text-gray-300 text-[9px] ml-0.5"></i></th>
-                        <th class="px-4 py-3 text-right font-semibold cursor-pointer select-none hover:text-gray-700 transition" data-sort="min_stock">Stock mín. <i class="sort-icon fas fa-sort text-gray-300 text-[9px] ml-0.5"></i></th>
+                        <th class="px-4 py-3 text-right font-semibold cursor-pointer select-none hover:text-gray-700 transition" data-sort="stock_qty">Stock <i class="sort-icon fas fa-sort text-gray-300 text-[9px] ml-0.5"></i></th>
                         <th class="px-4 py-3 text-center font-semibold">Estado</th>
                         <th class="px-4 py-3 text-center font-semibold w-32">Ações</th>
                     </tr>
@@ -184,6 +184,10 @@ async function loadItems() {
         tbody.innerHTML = res.data.map(it => {
             const macroColor = it.macro_category === 'consumo' ? 'sky' : 'purple';
             const macroIcon  = it.macro_category === 'consumo' ? 'fa-prescription-bottle' : 'fa-laptop-medical';
+            // Saldo atual; destaca em vermelho quando consumo está no/abaixo do mínimo.
+            const stockQty = parseFloat(it.stock_qty) || 0;
+            const minStock = parseFloat(it.min_stock) || 0;
+            const lowStock = it.macro_category === 'consumo' && minStock > 0 && stockQty <= minStock;
             return `
             <tr class="hover:bg-sky-50/30 transition">
                 <td class="px-4 py-3 font-mono text-[11px] text-gray-500">${escapeHtml(it.internal_code)}</td>
@@ -198,7 +202,7 @@ async function loadItems() {
                 </td>
                 <td class="px-4 py-3 text-gray-600 text-xs">${escapeHtml(it.subcategory?.name || '—')}</td>
                 <td class="px-4 py-3 text-right text-gray-700 tabular-nums font-medium">${it.macro_category === 'patrimonial' ? '<span class="text-gray-300">—</span>' : '€ ' + (parseFloat(it.cmp) || 0).toFixed(2)}</td>
-                <td class="px-4 py-3 text-right text-gray-600 tabular-nums">${parseFloat(it.min_stock) || 0}</td>
+                <td class="px-4 py-3 text-right tabular-nums ${lowStock ? 'text-red-600 font-semibold' : 'text-gray-700'}" title="${lowStock ? 'No/abaixo do stock mínimo ('+minStock+')' : ''}">${stockQty}</td>
                 <td class="px-4 py-3 text-center">
                     ${it.is_active
                         ? '<span class="inline-flex items-center gap-1.5 text-[11px] text-sky-700"><span class="w-1.5 h-1.5 rounded-full bg-sky-500"></span>Ativo</span>'

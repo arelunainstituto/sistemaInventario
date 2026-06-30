@@ -38,59 +38,29 @@ document.getElementById('pageContent').innerHTML = `
     </div>
 
     <div id="modal" class="hidden fixed inset-0 bg-gray-900/40 backdrop-blur-[2px] z-50 flex items-center justify-center p-4">
-        <div class="bg-white rounded-xl border border-gray-200 shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+        <div class="bg-white rounded-xl border border-gray-200 shadow-2xl max-w-5xl w-full max-h-[90vh] overflow-y-auto">
             <div class="flex justify-between items-center p-4 border-b">
                 <h3 class="font-bold text-gray-800">Nova saída</h3>
                 <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600"><i class="fas fa-times"></i></button>
             </div>
-            <form id="form" class="p-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+            <form id="form" class="p-6 space-y-4">
                 <div>
-                    <label class="text-xs text-gray-500 flex items-center gap-1.5">
-                        Tipo de saída
-                        <span class="help-tip" tabindex="0" data-tip="Avaria, extravio, perda e quebra são lançados em Ajustes (acesso de Admin).">?</span>
+                    <label class="text-xs text-gray-500 flex items-center gap-1.5">Justificação
+                        <span class="help-tip" tabindex="0" data-tip="Aplica-se a todas as linhas desta saída. Opcional para consumo. Avaria/extravio/perda/quebra são lançados em Ajustes (Admin).">?</span>
                     </label>
-                    <div class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-gray-50 text-gray-600 flex items-center gap-2 mt-1">
-                        <i class="fas fa-arrow-right-from-bracket text-gray-400 text-xs"></i> Consumo
+                    <textarea name="justification" rows="2" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"></textarea>
+                </div>
+
+                <div class="border border-gray-200 rounded-lg p-4">
+                    <div class="flex justify-between items-center mb-3">
+                        <h4 class="font-bold text-gray-800">Itens da saída</h4>
+                        <button type="button" onclick="addLine()" class="text-sm bg-gray-100 hover:bg-gray-200 px-3 py-1.5 rounded-lg"><i class="fas fa-plus"></i> Adicionar linha</button>
                     </div>
-                    <input type="hidden" name="subtype" value="consumo">
-                </div>
-                <div class="md:col-span-2">
-                    <label class="text-xs text-gray-500">Item *</label>
-                    <select name="item_id" required onchange="onItemChange()" id="itemSelect" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
-                        <option value="">— selecione —</option>
-                    </select>
+                    <div id="lines" class="space-y-2"></div>
+                    <p class="text-[11px] text-gray-400 mt-2">Lote por <b>FEFO automático</b> (validade mais próxima) — para itens que controlam lote, dá para escolher um lote específico.</p>
                 </div>
 
-                <div id="stockPanel" class="md:col-span-3 hidden border border-sky-200 bg-sky-50 rounded-lg p-3 text-xs">
-                    <p class="font-bold text-sky-700 mb-2"><i class="fas fa-info-circle"></i> Stock disponível para este item:</p>
-                    <div id="stockList"></div>
-                </div>
-
-                <div>
-                    <label class="text-xs text-gray-500">Localização de origem *</label>
-                    <select name="location_id" id="locationSelect" required onchange="onLocationChange()" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
-                        <option value="">—</option>
-                    </select>
-                </div>
-                <div>
-                    <label class="text-xs text-gray-500">Quantidade *</label>
-                    <input name="quantity" type="number" step="0.0001" required class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
-                    <p id="maxAvailable" class="text-[10px] text-gray-500 mt-1"></p>
-                </div>
-                <div>
-                    <label class="text-xs text-gray-500">Lote</label>
-                    <select name="lot_id" id="lotSelect" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
-                        <option value="">— Sugestão FEFO automática —</option>
-                    </select>
-                    <p id="lotHint" class="text-[10px] text-blue-600 mt-1"></p>
-                </div>
-
-                <div class="md:col-span-3">
-                    <label class="text-xs text-gray-500"><span id="justificationLabel">Justificação</span></label>
-                    <textarea name="justification" id="justificationField" rows="2" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"></textarea>
-                </div>
-
-                <div class="md:col-span-3 flex justify-end gap-2 border-t pt-4">
+                <div class="flex justify-end gap-2 border-t pt-4">
                     <button type="button" onclick="closeModal()" class="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">Cancelar</button>
                     <button type="submit" class="px-5 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium shadow-sm shadow-red-500/20 transition flex items-center gap-2"><i class="fas fa-save"></i> Registar saída</button>
                 </div>
@@ -99,16 +69,18 @@ document.getElementById('pageContent').innerHTML = `
     </div>
 `;
 
-let items = [];
+let items = [], locations = [];
 
 async function bootstrap() {
     try {
-        const r = await apiCall('/api/inventory/items?macro_category=consumo&limit=1000');
-        items = r.data || [];
-        document.getElementById('itemSelect').innerHTML = '<option value="">— selecione —</option>' +
-            items.map(i => `<option value="${i.id}" data-controls-lot="${i.controls_lot}" data-min="${i.min_stock || 0}" data-macro="${i.macro_category}">${escapeHtml(i.internal_code)} · ${escapeHtml(i.name)}${i.subcategory?.name ? ' · ' + escapeHtml(i.subcategory.name) : ''}</option>`).join('');
-        // Combobox no item (location e lot mudam dinamicamente — re-aplicamos depois)
-        makeSearchable('itemSelect', { placeholder: 'Buscar item por nome, código ou categoria…' });
+        const [it, lo] = await Promise.all([
+            apiCall('/api/inventory/items?macro_category=consumo&limit=1000'),
+            apiCall('/api/inventory/locations')
+        ]);
+        items = it.data || [];
+        locations = (lo.data || []).filter(l => l.is_active !== false);
+        if (!items.length)     toast('Nenhum item de consumo cadastrado', 'warn');
+        if (!locations.length) toast('Nenhuma localização cadastrada', 'warn');
     } catch (err) { toast(err.message, 'error'); }
 }
 
@@ -145,138 +117,117 @@ function badgeClass(subtype) {
     return map[subtype] || 'bg-gray-100 text-gray-700';
 }
 
-let currentStock = [];
-let seedingMode = false;   // setado em onItemChange a partir de stock-by-item
+// Stock por linha (idx -> linhas de stock vindas de /stock-by-item), usado p/
+// o hint de disponibilidade e o dropdown de lote (FEFO) de cada linha.
+const lineStock = {};
+let lineCounter = 0;
+
+function addLine() {
+    const idx = lineCounter++;
+    const div = document.createElement('div');
+    div.className = 'grid grid-cols-12 gap-2 items-end p-2 border border-gray-100 rounded-lg';
+    div.dataset.line = idx;
+    div.innerHTML = `
+        <div class="col-span-4"><label class="text-xs text-gray-500">Item</label>
+            <select required onchange="onLineItemChange(this, ${idx})" class="line-item w-full px-2 py-1.5 border border-gray-300 rounded text-xs" id="lineItem-${idx}">
+                <option value="">—</option>
+                ${items.map(i => `<option value="${i.id}" data-controls-lot="${i.controls_lot}">${escapeHtml(i.internal_code)} · ${escapeHtml(i.name)}${i.subcategory?.name ? ' · ' + escapeHtml(i.subcategory.name) : ''}</option>`).join('')}
+            </select>
+        </div>
+        <div class="col-span-3"><label class="text-xs text-gray-500">Localização</label>
+            <select required onchange="onLineLocationChange(this, ${idx})" class="line-location w-full px-2 py-1.5 border border-gray-300 rounded text-xs" id="lineLoc-${idx}">
+                <option value="">—</option>
+                ${locations.map(l => `<option value="${l.id}">${escapeHtml(l.unit?.name || '')} · ${escapeHtml(l.name)}</option>`).join('')}
+            </select>
+        </div>
+        <div class="col-span-2"><label class="text-xs text-gray-500 flex items-center gap-1">Qtd <span class="line-avail text-[10px] text-gray-400"></span></label>
+            <input type="number" step="0.0001" required class="line-qty w-full px-2 py-1.5 border border-gray-300 rounded text-xs"></div>
+        <div class="col-span-2 line-lot-area hidden"><label class="text-xs text-gray-500">Lote</label>
+            <select class="line-lot w-full px-2 py-1.5 border border-gray-300 rounded text-xs"><option value="">— FEFO automático —</option></select></div>
+        <div class="col-span-1 flex items-center justify-center"><button type="button" onclick="this.closest('[data-line]').remove()" class="text-red-500 hover:text-red-700" title="Remover linha"><i class="fas fa-trash"></i></button></div>`;
+    document.getElementById('lines').appendChild(div);
+    makeSearchable(`lineItem-${idx}`, { placeholder: 'Buscar item por nome, código ou categoria…' });
+    makeSearchable(`lineLoc-${idx}`,  { placeholder: 'Buscar localização…' });
+}
+
+async function onLineItemChange(sel, idx) {
+    const line = sel.closest('[data-line]');
+    const controlsLot = sel.selectedOptions[0]?.dataset.controlsLot === 'true';
+    line.querySelector('.line-lot-area').classList.toggle('hidden', !controlsLot);
+    line.querySelector('.line-avail').textContent = '';
+    lineStock[idx] = [];
+    if (sel.value) {
+        try {
+            const r = await apiCall(`/api/inventory/exits/stock-by-item/${sel.value}`);
+            lineStock[idx] = r.data || [];
+        } catch (_) { /* sem stock: backend valida no submit (seeding permite negativo) */ }
+    }
+    rebuildLineLot(line, idx);
+}
+
+function onLineLocationChange(sel, idx) { rebuildLineLot(sel.closest('[data-line]'), idx); }
+
+function rebuildLineLot(line, idx) {
+    const itemOpt = line.querySelector('.line-item').selectedOptions[0];
+    const controlsLot = itemOpt?.dataset.controlsLot === 'true';
+    const locId = line.querySelector('.line-location').value;
+    const here = (lineStock[idx] || []).filter(s => s.location_id === locId);
+    const total = here.reduce((a, s) => a + parseFloat(s.quantity || 0), 0);
+    const avail = line.querySelector('.line-avail');
+    if (avail) avail.textContent = locId ? `· disp ${total.toFixed(2)}` : '';
+    if (!controlsLot) return;
+    const lotSel = line.querySelector('.line-lot');
+    const lots = here.filter(s => s.lot).sort((a, b) =>
+        (a.lot.expiry_date || '9999-12-31').localeCompare(b.lot.expiry_date || '9999-12-31'));
+    lotSel.innerHTML = '<option value="">— FEFO automático —</option>' +
+        lots.map((s, i) => `<option value="${s.lot.id}">${escapeHtml(s.lot.lot_number)} · ${parseFloat(s.quantity).toFixed(2)}${s.lot.expiry_date ? ' · val ' + s.lot.expiry_date : ''}${i === 0 ? ' 🟢' : ''}</option>`).join('');
+}
 
 function openModal() {
     document.getElementById('form').reset();
-    document.getElementById('stockPanel').classList.add('hidden');
-    document.getElementById('locationSelect').innerHTML = '<option value="">—</option>';
-    document.getElementById('lotSelect').innerHTML = '<option value="">— Sugestão FEFO automática —</option>';
-    document.getElementById('maxAvailable').textContent = '';
-    document.getElementById('lotHint').textContent = '';
-    onSubtypeChange();
+    document.getElementById('lines').innerHTML = '';
+    for (const k in lineStock) delete lineStock[k];
+    addLine();
     document.getElementById('modal').classList.remove('hidden');
 }
 
 function closeModal() { document.getElementById('modal').classList.add('hidden'); }
 
-// Saídas só de tipo 'consumo' — sem necessidade de toggle de justificação obrigatória
-function onSubtypeChange() {}
-
-async function onItemChange() {
-    const itemId = document.getElementById('itemSelect').value;
-    if (!itemId) return;
-    try {
-        const r = await apiCall(`/api/inventory/exits/stock-by-item/${itemId}`);
-        currentStock = r.data || [];
-        const seeding = r.seeding_mode === true;
-        seedingMode = seeding;
-
-        // Sem stock e sem modo seeding → bloqueia como antes
-        if (!currentStock.length) {
-            document.getElementById('stockPanel').classList.remove('hidden');
-            document.getElementById('stockList').innerHTML = '<p class="text-red-600">Sem stock disponível para este item.</p>';
-            document.getElementById('locationSelect').innerHTML = '<option value="">—</option>';
-            return;
-        }
-
-        document.getElementById('stockPanel').classList.remove('hidden');
-
-        if (seeding) {
-            // Modo seeding: localizações vieram sintéticas (qty=0). Avisar o usuário
-            // e popular o dropdown normalmente para permitir a saída em negativo.
-            document.getElementById('stockList').innerHTML = `
-                <p class="text-amber-800 bg-amber-50 border border-amber-200 rounded px-2 py-1 flex items-start gap-2">
-                    <i class="fas fa-triangle-exclamation mt-0.5"></i>
-                    <span><strong>Modo seeding:</strong> sem stock atual para este item. A saída deixará o saldo negativo na localização escolhida.</span>
-                </p>`;
-        } else {
-            document.getElementById('stockList').innerHTML = currentStock.map(s => `
-                <div class="flex justify-between py-1 border-b border-sky-100 last:border-0">
-                    <span>${escapeHtml(s.location?.unit?.name || '')} · ${escapeHtml(s.location?.name || '')} ${s.lot ? `· lote ${escapeHtml(s.lot.lot_number)}${s.lot.expiry_date ? ' (val. '+s.lot.expiry_date+')' : ''}` : ''}</span>
-                    <span class="font-bold">${parseFloat(s.quantity).toFixed(2)}</span>
-                </div>`).join('');
-        }
-
-        // Localizações distintas que enviam (can_send)
-        const locMap = new Map();
-        for (const s of currentStock) {
-            if (s.location?.can_send !== false) locMap.set(s.location_id, s.location);
-        }
-        document.getElementById('locationSelect').innerHTML = '<option value="">—</option>' +
-            Array.from(locMap.values()).map(l => `<option value="${l.id}">${escapeHtml(l.unit?.name || '')} · ${escapeHtml(l.name)}</option>`).join('');
-        makeSearchable('locationSelect', { placeholder: 'Buscar localização…' });
-    } catch (err) { toast(err.message, 'error'); }
-}
-
-function onLocationChange() {
-    const locId = document.getElementById('locationSelect').value;
-    const itemOpt = document.getElementById('itemSelect').selectedOptions[0];
-    const controlsLot = itemOpt?.dataset?.controlsLot === 'true';
-
-    const lotsHere = currentStock.filter(s => s.location_id === locId);
-    const total = lotsHere.reduce((a, s) => a + parseFloat(s.quantity), 0);
-    document.getElementById('maxAvailable').textContent = `Disponível na localização: ${total.toFixed(2)}`;
-
-    if (controlsLot) {
-        // Ordena por expiry_date ASC (FEFO)
-        const sorted = [...lotsHere].filter(s => s.lot).sort((a, b) => {
-            const ea = a.lot.expiry_date || '9999-12-31';
-            const eb = b.lot.expiry_date || '9999-12-31';
-            return ea.localeCompare(eb);
+async function submitExit(confirmedLowStock) {
+    const lines = [];
+    for (const div of document.querySelectorAll('[data-line]')) {
+        const item_id = div.querySelector('.line-item').value;
+        if (!item_id) continue;
+        lines.push({
+            item_id,
+            location_id: div.querySelector('.line-location').value,
+            quantity:    parseFloat(div.querySelector('.line-qty').value),
+            lot_id:      div.querySelector('.line-lot')?.value || null
         });
-        document.getElementById('lotSelect').innerHTML = '<option value="">— Sugestão FEFO automática —</option>' +
-            sorted.map((s, idx) => `<option value="${s.lot.id}">${escapeHtml(s.lot.lot_number)} · qty ${parseFloat(s.quantity).toFixed(2)} · val ${s.lot.expiry_date || 'sem'}${idx === 0 ? ' 🟢 FEFO' : ''}</option>`).join('');
-        document.getElementById('lotHint').textContent = sorted.length
-            ? `🟢 = Sugestão FEFO (validade mais próxima: ${sorted[0].lot.expiry_date || 'sem'})`
-            : 'Sem lotes disponíveis nesta localização.';
-    } else {
-        document.getElementById('lotSelect').innerHTML = '<option value="">— item não controla lote —</option>';
-        document.getElementById('lotHint').textContent = '';
     }
+    if (!lines.length) { toast('Adicione pelo menos uma linha', 'error'); return; }
 
-    // Modo seeding + item com lote sem nenhum lote em stock: a saída é lançada
-    // SEM lote (saldo fica negativo). Substitui o aviso enganoso de "sem lotes".
-    if (controlsLot && seedingMode && !lotsHere.some(s => s.lot)) {
-        document.getElementById('lotHint').innerHTML =
-            '<span class="text-amber-700"><i class="fas fa-triangle-exclamation"></i> Modo seeding: sem lote em stock — a saída será lançada sem lote e o saldo ficará negativo.</span>';
-    }
-}
-
-document.getElementById('form').addEventListener('submit', async e => {
-    e.preventDefault();
-    const f = e.target;
     const payload = {
-        item_id: f.item_id.value,
-        location_id: f.location_id.value,
-        quantity: parseFloat(f.quantity.value),
-        lot_id: f.lot_id.value || null,
-        subtype: f.subtype.value,
-        justification: f.justification.value || null
+        lines,
+        justification: document.getElementById('form').justification.value || null,
+        confirmed_low_stock: !!confirmedLowStock
     };
     try {
-        await apiCall('/api/inventory/exits', { method: 'POST', body: JSON.stringify(payload) });
-        toast('Saída registada');
+        const r = await apiCall('/api/inventory/exits/batch', { method: 'POST', body: JSON.stringify(payload) });
+        toast(`${r.data.count} saída(s) registada(s)${confirmedLowStock ? ' (abaixo do mínimo)' : ''}`, confirmedLowStock ? 'warn' : 'success');
         closeModal();
         load();
     } catch (err) {
-        // §16: stock vai cair abaixo do mínimo — pedir confirmação
-        if (err.message && err.message.includes('LOW_STOCK_CONFIRMATION_REQUIRED')) {
-            const confirmed = confirm('⚠️ Esta saída deixará o stock abaixo do mínimo definido. Confirmar?');
-            if (confirmed) {
-                try {
-                    await apiCall('/api/inventory/exits', { method: 'POST', body: JSON.stringify({ ...payload, confirmed_low_stock: true }) });
-                    toast('Saída registada (abaixo do mínimo)', 'warn');
-                    closeModal();
-                    load();
-                } catch (e2) { toast(e2.message, 'error'); }
-            }
+        // §16: alguma linha cai abaixo do mínimo — confirma uma vez e reenvia.
+        if (err.code === 'LOW_STOCK_CONFIRMATION_REQUIRED') {
+            if (confirm('⚠️ Alguma saída deixará o stock abaixo do mínimo definido. Confirmar todas?')) submitExit(true);
             return;
         }
         toast(err.message, 'error');
     }
-});
+}
+
+document.getElementById('form').addEventListener('submit', e => { e.preventDefault(); submitExit(false); });
 
 function escapeHtml(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 

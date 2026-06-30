@@ -2,7 +2,7 @@
 // Each page calls renderInventoryLayout({ activePage, title, subtitle }).
 
 // Versão exibida no sidebar — manter em sync com CHANGELOG.md
-const INVENTORY_VERSION = 'v1.15.0';
+const INVENTORY_VERSION = 'v1.16.0';
 
 // Operações separadas por macro_category como "módulos" (Consumo / Patrimônio).
 // Itens com type:'group' viram um cabeçalho + sub-itens indentados (ver
@@ -588,7 +588,14 @@ async function apiCall(path, options = {}) {
         throw new Error('Sessão expirada — redirecionando para login');
     }
 
-    if (!res.ok) throw new Error((data && data.error) || `HTTP ${res.status}`);
+    if (!res.ok) {
+        // Anexa code/status/data ao erro (retrocompatível: message continua igual)
+        // para o chamador tratar fluxos como LOW_STOCK_CONFIRMATION_REQUIRED.
+        const e = new Error((data && data.error) || `HTTP ${res.status}`);
+        e.status = res.status;
+        if (data && typeof data === 'object') { e.code = data.code; e.data = data; }
+        throw e;
+    }
     return data;
 }
 
