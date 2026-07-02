@@ -38,6 +38,25 @@ _Nenhuma alteração pendente._
 
 ---
 
+## [1.17.0] — 2026-06-23
+
+> QR Code passa a ser por **lote** e por **número de série** (item sem lote mantém QR do item), a impressão pergunta **qual** lote/série e ganha tamanhos **P/M/G**. O `/scan` vira o contrato que o PDV lerá no futuro para dar baixa.
+
+### Adicionado
+- **QR por lote / número de série** (`requer migração`: [120-lot-serial-qr.sql](database/inventory-refactor/120-lot-serial-qr.sql)): `inv_lots` e `inv_serial_units` ganham `qr_code` (UUID, DEFAULT **permanente**). O QR codifica `.../item-view.html?qr=<uuid>` e o **resolvedor unificado** [scan.js](api/inventory/scan.js) (`GET /scan/:qrCode`) devolve `{ type: item|lot|serial, item, lot, serial }` — o **contrato** que o PDV lerá para saída (consumo: `item_id`+`lot_id`; patrimônio: `serial_id`+`status`). Novo endpoint de imagem [qr.js](api/inventory/qr.js) (`GET /qr/:token`).
+- **Impressão pergunta qual lote/série** ([_label-picker.js](public/inventory/_label-picker.js)): ao clicar em "Etiqueta QR", um picker lista os **lotes** (consumo com lote) ou as **unidades/séries** (patrimônio) para escolher qual imprimir; consumo **sem** lote vai direto ao QR do item (fallback). Gatilhos trocados em [item-view.html](public/inventory/item-view.html), [items.html](public/inventory/items.html) e no modal compartilhado ([_layout.js](public/inventory/_layout.js), via `printItemLabel` que carrega o picker sob demanda). `GET /items/:id` passou a devolver `lots[]` e `qr_code` nas séries.
+- **Ficha destaca a etiqueta lida** ([item-view.html](public/inventory/item-view.html)): abrir a ficha por um QR de lote/série mostra um banner "Etiqueta lida: …" e **realça a linha** correspondente na tabela. (Correção acoplada: a ficha agora lê `scan.data.item.id` — a resposta do scan aninha o item.)
+
+### Alterado
+- **Etiqueta com tamanhos P/M/G** ([item-label.html](public/inventory/item-label.html)): o seletor de rolo dá lugar a **P (50%) / M (75%) / G (100%)** — 62mm fixo (DK-2205, corte automático), escalando só o QR. A tela busca os campos via `/scan` (ramifica por lote/série/item) e a imagem via `/qr`. **CSS de impressão endurecido** (neutraliza `min-height`/padding e força 1 página) para corrigir a quebra em várias páginas.
+
+### Notas
+- [_layout.js:5](public/inventory/_layout.js#L5) bump para `v1.17.0`.
+- **Migração desta release**: [120-lot-serial-qr.sql](database/inventory-refactor/120-lot-serial-qr.sql). O `DEFAULT gen_random_uuid()` do `qr_code` é **permanente** — não remover (o trigger de entrada e o patrimony.js não nomeiam a coluna no insert).
+- **Impressão em 3 páginas** era o **driver** em formato die-cut "62mm × 29mm"; para o design contínuo, ajustar o driver da QL-810W para **"62mm" (contínuo)**. Instrução no aviso da própria tela.
+
+---
+
 ## [1.16.0] — 2026-06-22
 
 > A saída de consumo passa a aceitar vários itens num mesmo registro (multi-linha), como já era na entrada.

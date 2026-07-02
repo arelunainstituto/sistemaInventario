@@ -10,75 +10,61 @@
     <style>
         body { font-family: 'Inter', sans-serif; }
 
-        /* ===== Tamanho do papel para Brother QL-810W ===== */
-        /* Padrão: DK-2205 — fita CONTÍNUA de 62 mm × 30.48 m. A impressora faz
-           o corte automático a cada etiqueta, no comprimento da página. Por isso
-           a altura segue o conteúdo (medida por JS e gravada no @page abaixo),
-           gerando uma etiqueta justa em vez de desperdiçar fita.
-           Rolos die-cut (tamanho fixo) também são suportados no seletor:
-             DK-2205  62 mm contínuo  (padrão — corte automático)
-             DK-1202  62 × 100 mm
-             DK-1208  38 ×  90 mm
-             DK-1209  29 ×  62 mm */
+        /* ===== Brother QL-810W · DK-2205 (fita CONTÍNUA 62 mm × 30.48 m) =====
+           Largura fixa 62 mm; a impressora corta cada etiqueta automaticamente
+           no comprimento do conteúdo. A altura do @page é medida por JS (conteúdo).
+           O QR escala por tamanho: P=50%, M=75%, G=100% do lado útil (~50 mm). */
         :root {
             --label-w: 62mm;
-            --label-h: auto;     /* 'auto' = fita contínua: altura segue o conteúdo */
-            --qr-size: 50mm;     /* lado do QR; ajustado por JS conforme a largura do rolo */
+            --qr-size: 50mm;   /* G (100%); ajustado por JS conforme P/M/G */
         }
 
-        /* Pré-visualização na tela imita o tamanho real */
-        .label-preview {
-            width: var(--label-w);
-            height: var(--label-h);
-        }
+        .label-preview { width: var(--label-w); }
 
-        /* ===== Modo impressão ===== */
-        /* O tamanho REAL da página é injetado por JS em #pageStyle com valores
-           concretos em mm (para contínuo = largura × altura medida do conteúdo).
-           var() em descritores @page não é confiável entre navegadores, então
-           aqui fica só a margem; o size vem do #pageStyle. */
-        @page { margin: 0; }     /* sem cabeçalho/rodapé/margem do navegador */
+        /* O tamanho REAL da página vem do #pageStyle (valores concretos em mm). */
+        @page { margin: 0; }
         @media print {
+            /* Neutraliza min-height/padding de tela — senão o conteúdo transborda
+               e o navegador quebra a etiqueta em várias páginas. */
             html, body {
                 margin: 0 !important;
                 padding: 0 !important;
-                width: var(--label-w);
+                min-height: 0 !important;
+                height: auto !important;
+                width: var(--label-w) !important;
                 background: white !important;
             }
             .no-print { display: none !important; }
             .label-preview {
                 width: var(--label-w) !important;
-                height: var(--label-h) !important;
+                height: auto !important;
                 box-shadow: none !important;
                 border: none !important;
                 border-radius: 0 !important;
                 margin: 0 !important;
-                /* page-break-after: always causaria uma segunda página em branco
-                   quando há apenas uma etiqueta. Para imprimir várias em sequência,
-                   usar javascript: window.print() em loop ou ?qty=N (futuro). */
-                page-break-after: auto;
                 page-break-inside: avoid;
+                page-break-after: avoid;
+                break-after: avoid;
             }
             body * { background: white; }
         }
     </style>
 </head>
-<body class="bg-gradient-to-b from-sky-50/40 via-blue-50/20 to-white min-h-screen p-6">
+<body class="bg-white">
 
 <!-- Barra superior (somente na tela) -->
-<div class="no-print max-w-4xl mx-auto">
+<div class="no-print max-w-4xl mx-auto p-6">
     <div class="flex justify-between items-start mb-4 gap-4">
         <a href="items.html" class="inline-flex items-center gap-2 text-sky-600 hover:text-sky-700 text-sm font-medium">
             <i class="fas fa-arrow-left text-xs"></i> Voltar à lista
         </a>
         <div class="flex items-end gap-3">
             <div>
-                <label class="block text-[10px] uppercase tracking-wider text-gray-500 font-semibold">Formato Brother DK</label>
-                <select id="rollSize" class="px-3 py-1.5 border border-gray-300 rounded-lg text-sm bg-white mt-1">
-                    <option value="dk2205" selected>DK-2205 — 62 mm contínuo (corte automático)</option>
-                    <option value="dk1202">DK-1202 — 62 × 100 mm</option>
-                    <option value="dk1208">DK-1208 — 38 × 90 mm</option>
-                    <option value="dk1209">DK-1209 — 29 × 62 mm</option>
+                <label class="block text-[10px] uppercase tracking-wider text-gray-500 font-semibold">Tamanho do QR</label>
+                <select id="sizeSel" class="px-3 py-1.5 border border-gray-300 rounded-lg text-sm bg-white mt-1">
+                    <option value="G" selected>G — 100% (grande)</option>
+                    <option value="M">M — 75% (médio)</option>
+                    <option value="P">P — 50% (pequeno)</option>
                 </select>
             </div>
             <button onclick="window.print()" class="bg-sky-600 hover:bg-sky-700 text-white px-5 py-2 rounded-lg text-sm font-medium shadow-sm shadow-sky-500/20 transition flex items-center gap-2">
@@ -88,11 +74,10 @@
     </div>
     <div class="bg-amber-50 border border-amber-200 rounded-lg p-3 text-[11px] text-amber-800 mb-4">
         <i class="fas fa-circle-info"></i>
-        Rolo padrão <b>DK-2205 (62 mm contínuo)</b> — a impressora corta cada etiqueta automaticamente
-        no comprimento do conteúdo. No driver da <b>Brother QL-810W</b>, selecione a fita
-        <b>“Contínuo 62 mm”</b> com <b>corte automático</b> ligado.
-        No diálogo do navegador, em <b>Mais configurações</b>: <b>Margens: Nenhuma</b> e
-        <b>Cabeçalhos e rodapés</b> desativados.
+        Rolo <b>DK-2205 (62 mm contínuo)</b> — corte automático no comprimento do conteúdo.
+        No driver da <b>Brother QL-810W</b> → <b>Formato do papel</b> deve ser <b>“62 mm” (contínuo)</b>,
+        <u>não</u> “62 mm × 29 mm” (die-cut) — senão a etiqueta sai quebrada em várias páginas.
+        No diálogo do navegador → <b>Margens: Nenhuma</b> e <b>Cabeçalhos/rodapés</b> desativados.
     </div>
 </div>
 
@@ -102,109 +87,94 @@
 </div>
 
 <script>
-const id = new URLSearchParams(location.search).get('id');
+const params = new URLSearchParams(location.search);
 const token = localStorage.getItem('access_token');
 
-// Rolos Brother DK suportados. h:'auto' = fita contínua (a impressora corta
-// automaticamente no comprimento da página — medimos o conteúdo); número = die-cut.
-const ROLLS = {
-    dk2205: { w: 62, h: 'auto' },  // 62 mm × 30.48 m contínuo (padrão)
-    dk1202: { w: 62, h: 100 },
-    dk1208: { w: 38, h: 90 },
-    dk1209: { w: 29, h: 62 },
-};
+// Lado do QR a 100% (G), na largura útil de 62 mm; P/M/G escalam sobre ele.
+const QR_MAX_MM = 50;
+const SIZES = { P: 0.5, M: 0.75, G: 1.0 };
 
 function pxToMm(px) { return px / 96 * 25.4; }
+function escapeHtml(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
-// Injeta o tamanho real da página (valores concretos em mm). Para a fita
-// contínua, a altura = comprimento de corte automático.
+async function api(path) {
+    const res = await fetch(path, { headers: { Authorization: 'Bearer ' + token, 'Cache-Control': 'no-cache' }, cache: 'no-store' });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(json.error || `HTTP ${res.status}`);
+    return json;
+}
+
+// Injeta o tamanho real da página (largura fixa × comprimento medido do conteúdo).
 function setPageSize(wmm, hmm) {
     let st = document.getElementById('pageStyle');
     if (!st) { st = document.createElement('style'); st.id = 'pageStyle'; document.head.appendChild(st); }
     st.textContent = `@page { size: ${wmm}mm ${hmm}mm; margin: 0; }`;
 }
 
-// Aplica o rolo escolhido: largura da etiqueta, lado do QR (cabe na largura
-// útil do rolo) e, no contínuo, mede o conteúdo para definir o comprimento.
-function applyRoll() {
-    const roll = ROLLS[document.getElementById('rollSize').value] || ROLLS.dk2205;
-    document.documentElement.style.setProperty('--label-w', roll.w + 'mm');
-    // QR ocupa a largura útil (largura − ~12 mm de margens), entre 18 e 55 mm.
-    const qr = Math.max(18, Math.min(roll.w - 12, 55));
-    document.documentElement.style.setProperty('--qr-size', qr + 'mm');
-
-    if (roll.h === 'auto') {
-        document.documentElement.style.setProperty('--label-h', 'auto');
-        const el = document.querySelector('.label-preview');
-        const hmm = el && el.scrollHeight ? Math.ceil(pxToMm(el.scrollHeight)) + 2 : 80; // +2 mm de folga
-        setPageSize(roll.w, hmm);
-    } else {
-        document.documentElement.style.setProperty('--label-h', roll.h + 'mm');
-        setPageSize(roll.w, roll.h);
-    }
+// Aplica P/M/G (lado do QR) e mede o conteúdo p/ o comprimento do corte.
+function applySize() {
+    const factor = SIZES[document.getElementById('sizeSel').value] || 1;
+    document.documentElement.style.setProperty('--label-w', '62mm');
+    document.documentElement.style.setProperty('--qr-size', Math.round(QR_MAX_MM * factor) + 'mm');
+    const el = document.querySelector('.label-preview');
+    const hmm = el && el.scrollHeight ? Math.ceil(pxToMm(el.scrollHeight)) + 2 : 60; // +2 mm de folga
+    setPageSize(62, hmm);
 }
 
-document.getElementById('rollSize').addEventListener('change', applyRoll);
-// Recalcula o comprimento do corte imediatamente antes de imprimir (garante
-// que reflete o conteúdo atual mesmo se algo mudou após o carregamento).
-window.addEventListener('beforeprint', applyRoll);
+document.getElementById('sizeSel').addEventListener('change', applySize);
+// Recalcula o comprimento imediatamente antes de imprimir (reflete o conteúdo atual).
+window.addEventListener('beforeprint', applySize);
 
 async function load() {
-    if (!id) { document.getElementById('labelContainer').textContent = 'ID não fornecido.'; return; }
     try {
-        const res = await fetch(`/api/inventory/items/${id}`, { headers: { Authorization: 'Bearer ' + token } });
-        const json = await res.json();
-        if (!res.ok) throw new Error(json.error || 'Erro');
-        const it = json.data;
-
-        const qrRes = await fetch(`/api/inventory/items/${id}/qr?_=${Date.now()}`, {
-            headers: { Authorization: 'Bearer ' + token, 'Cache-Control': 'no-cache' },
-            cache: 'no-store'
-        });
-        if (!qrRes.ok) {
-            const msg = await qrRes.text();
-            throw new Error(`Falha ao gerar QR (status ${qrRes.status}): ${msg.slice(0, 200)}`);
-        }
-        const ct = qrRes.headers.get('content-type') || '';
-        let qrUrl;
-        if (ct.includes('application/json')) {
-            const qrJson = await qrRes.json();
-            qrUrl = qrJson.data?.data_url;
-            if (!qrUrl) throw new Error('Resposta sem data_url do QR');
-        } else if (ct.startsWith('image/')) {
-            qrUrl = URL.createObjectURL(await qrRes.blob());
+        // Entrada: ?qr=<token do lote/série/item>. Fallback: ?id=<itemId> → QR do item.
+        let resolved, qrToken;
+        const qrParam = params.get('qr');
+        const idParam = params.get('id');
+        if (qrParam) {
+            qrToken = qrParam;
+            resolved = (await api(`/api/inventory/scan/${encodeURIComponent(qrParam)}`)).data;
+        } else if (idParam) {
+            const it = (await api(`/api/inventory/items/${encodeURIComponent(idParam)}`)).data;
+            resolved = { type: 'item', item: it, lot: null, serial: null };
+            qrToken = it.qr_code;
         } else {
-            const txt = await qrRes.text();
-            throw new Error(`Content-type inesperado (${ct}): ${txt.slice(0, 200)}`);
+            throw new Error('Parâmetro ausente (qr ou id).');
         }
 
-        // Layout otimizado para 62×100mm. Tipografia em mm para escalar bem
-        // em diferentes rolos. Sem cores/rounding que confundam impressão térmica.
+        const it = resolved.item;
+        // 3ª linha depende do tipo: lote / nº de série / patrimônio.
+        let line3 = '';
+        if (resolved.type === 'lot' && resolved.lot) {
+            line3 = `Lote ${resolved.lot.lot_number}` + (resolved.lot.expiry_date ? ` · val ${resolved.lot.expiry_date}` : '');
+        } else if (resolved.type === 'serial' && resolved.serial) {
+            line3 = `S/N ${resolved.serial.serial_number}`;
+        } else if (it.patrimony_number) {
+            line3 = it.patrimony_number;
+        }
+
+        // Imagem do QR (codifica a URL do token — resolvida pelo /scan).
+        const qrUrl = (await api(`/api/inventory/qr/${encodeURIComponent(qrToken)}`)).data.data_url;
+
         document.getElementById('labelContainer').innerHTML = `
             <div class="label-preview bg-white border border-gray-200 shadow-sm flex flex-col items-center justify-center"
                  style="padding: 3mm 3mm 2mm 3mm;">
-                <p style="font-size: 2.6mm; font-weight: 700; text-align: center;
-                          color: #111; line-height: 1.15; max-height: 9mm; overflow: hidden;">
+                <p style="font-size: 2.6mm; font-weight: 700; text-align: center; color: #111; line-height: 1.15; max-height: 9mm; overflow: hidden;">
                     ${escapeHtml(it.name)}
                 </p>
                 <img src="${qrUrl}" alt="QR" style="width: var(--qr-size); height: var(--qr-size); margin-top: 1.5mm; image-rendering: pixelated;"
-                     onload="applyRoll()"
+                     onload="applySize()"
                      onerror="this.parentElement.innerHTML='<p style=&quot;color:red;font-size:2.5mm&quot;>Erro QR</p>'">
                 <p style="font-size: 2.8mm; font-family: 'Courier New', monospace; font-weight: 700; margin-top: 1.5mm;">
                     ${escapeHtml(it.internal_code)}
                 </p>
-                ${it.patrimony_number ? `
-                <p style="font-size: 2.2mm; font-family: 'Courier New', monospace; color: #444;">
-                    ${escapeHtml(it.patrimony_number)}
-                </p>` : ''}
+                ${line3 ? `<p style="font-size: 2.2mm; font-family: 'Courier New', monospace; color: #444; margin-top: 0.5mm;">${escapeHtml(line3)}</p>` : ''}
             </div>`;
-        applyRoll(); // define largura/QR e mede o comprimento do corte (contínuo)
+        applySize(); // define QR/largura e mede o comprimento do corte
     } catch (err) {
-        document.getElementById('labelContainer').innerHTML = `<p class="text-red-500">${err.message}</p>`;
+        document.getElementById('labelContainer').innerHTML = `<p class="text-red-500">${escapeHtml(err.message)}</p>`;
     }
 }
-
-function escapeHtml(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
 load();
 </script>

@@ -2,7 +2,7 @@
 // Each page calls renderInventoryLayout({ activePage, title, subtitle }).
 
 // Versão exibida no sidebar — manter em sync com CHANGELOG.md
-const INVENTORY_VERSION = 'v1.16.0';
+const INVENTORY_VERSION = 'v1.17.0';
 
 // Operações separadas por macro_category como "módulos" (Consumo / Patrimônio).
 // Itens com type:'group' viram um cabeçalho + sub-itens indentados (ver
@@ -290,6 +290,15 @@ function loadScriptOnce(src) {
         el.onerror = () => reject(new Error('falha ao carregar ' + src));
         document.head.appendChild(el);
     });
+}
+
+// Abre o picker de etiqueta (pergunta qual lote/série). Carrega _label-picker.js
+// sob demanda para não precisar incluí-lo em todas as páginas. Fallback: QR do
+// item (item-label?id=) se o picker não carregar.
+function printItemLabel(itemId) {
+    loadScriptOnce('/inventory/_label-picker.js')
+        .then(() => window.openLabelPicker(itemId))
+        .catch(() => { location.href = `/inventory/item-label.html?id=${itemId}`; });
 }
 
 function decodeJwtPayload(token) {
@@ -881,7 +890,7 @@ function openActionPanel(entity) {
             <div class="grid grid-cols-2 gap-2 pt-1">
                 ${actionBtn(`/inventory/item-form.html?id=${entity.id}`,    'sky',    'fa-edit',                    'Editar')}
                 ${actionBtn(`/inventory/kardex.html?item=${entity.id}`,    'cyan',   'fa-clipboard-list',          'Kardex')}
-                ${actionBtn(`/inventory/item-label.html?id=${entity.id}`,  'gray',   'fa-qrcode',                  'Etiqueta')}
+                <button type="button" onclick="printItemLabel('${entity.id}')" class="px-3 py-2.5 bg-gray-50 hover:bg-gray-100 text-gray-700 border border-gray-100 rounded-lg text-xs text-center font-medium transition flex items-center justify-center gap-1.5"><i class="fas fa-qrcode"></i> Etiqueta</button>
                 ${actionBtn(`/inventory/movements.html?item_id=${entity.id}`, 'purple', 'fa-history',              'Histórico')}
                 ${actionBtn(`/inventory/entries.html`,                      'sky',    'fa-arrow-right-to-bracket',  'Nova entrada')}
                 ${actionBtn(`/inventory/exits.html`,                        'red',    'fa-arrow-right-from-bracket','Nova saída')}

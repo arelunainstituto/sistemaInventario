@@ -12,6 +12,7 @@
 <body class="bg-white">
 <div id="layoutRoot"></div>
 <script src="_layout.js"></script>
+<script src="_label-picker.js"></script>
 <script>
 const params = new URLSearchParams(location.search);
 const itemId = params.get('id');
@@ -32,15 +33,18 @@ async function loadItem() {
     }
     try {
         let resolvedId = itemId;
+        let scanned = null;
         if (!resolvedId && qrCode) {
-            // Resolve QR Code → id via endpoint público de scan
+            // Resolve QR → item/lote/série. A resposta nova aninha o item em data.item.
             const scan = await apiCall(`/api/inventory/scan/${qrCode}`);
-            resolvedId = scan.data?.id;
+            scanned = scan.data;
+            resolvedId = scanned?.item?.id;
             if (!resolvedId) throw new Error('QR Code não encontrado');
         }
         const r = await apiCall(`/api/inventory/items/${resolvedId}`);
         render(r.data);
         if (r.data.macro_category === 'patrimonial') loadAttachmentsGallery(r.data.id);
+        if (scanned && scanned.type !== 'item') highlightScanned(scanned);
     } catch (err) {
         document.getElementById('content').innerHTML = `<p class="text-red-500">${escapeHtml(err.message)}</p>`;
     }
@@ -57,6 +61,25 @@ async function loadAttachmentsGallery(id) {
                 `<a href="${a.file_url}" target="_blank" rel="noopener" class="block w-16 h-16 rounded-lg border border-gray-200 overflow-hidden hover:ring-2 hover:ring-purple-300"><img src="${a.file_url}" alt="${escapeHtml(a.file_name || '')}" class="w-full h-full object-cover"></a>`).join('') + `</div>`
             : '<p class="text-[11px] text-gray-400">Sem anexos.</p>');
     } catch (_) { /* silencioso — não quebra a ficha */ }
+}
+
+// Quando a ficha é aberta por um QR de LOTE/SÉRIE, mostra um banner e destaca
+// a linha correspondente na tabela (o QR foi lido de uma etiqueta física).
+function highlightScanned(ctx) {
+    const content = document.getElementById('content');
+    if (!content) return;
+    const label = ctx.type === 'lot'
+        ? `Lote <b>${escapeHtml(ctx.lot?.lot_number || '')}</b>${ctx.lot?.expiry_date ? ' · val ' + escapeHtml(ctx.lot.expiry_date) : ''}`
+        : `Nº de série <b>${escapeHtml(ctx.serial?.serial_number || '')}</b>`;
+    const banner = document.createElement('div');
+    banner.className = 'mb-4 rounded-lg border border-sky-200 bg-sky-50 text-sky-800 text-sm px-4 py-2.5 flex items-center gap-2';
+    banner.innerHTML = `<i class="fas fa-qrcode"></i> Etiqueta lida: ${label}`;
+    content.insertBefore(banner, content.firstChild);
+
+    const sel = ctx.type === 'lot' ? `[data-lot-id="${ctx.lot?.id}"]` : `[data-serial-id="${ctx.serial?.id}"]`;
+    const rows = ctx[ctx.type]?.id ? document.querySelectorAll(sel) : [];
+    rows.forEach(row => row.classList.add('bg-amber-100', 'font-medium'));
+    if (rows[0]) rows[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
 
 function infoRow(label, value, mono = false) {
@@ -100,7 +123,7 @@ function render(it) {
                     <div class="flex flex-wrap gap-2 mt-5">
                         <a href="item-form.html?id=${it.id}" class="px-3 py-1.5 bg-sky-50 hover:bg-sky-100 text-sky-700 border border-sky-100 rounded-lg text-xs font-medium transition flex items-center gap-1.5"><i class="fas fa-edit text-[10px]"></i> Editar</a>
                         <a href="kardex.html?item=${it.id}" class="px-3 py-1.5 bg-cyan-50 hover:bg-cyan-100 text-cyan-700 border border-cyan-100 rounded-lg text-xs font-medium transition flex items-center gap-1.5"><i class="fas fa-clipboard-list text-[10px]"></i> Kardex</a>
-                        <a href="item-label.html?id=${it.id}" class="px-3 py-1.5 bg-gray-50 hover:bg-gray-100 text-gray-700 border border-gray-200 rounded-lg text-xs font-medium transition flex items-center gap-1.5"><i class="fas fa-qrcode text-[10px]"></i> Etiqueta QR</a>
+                        <button type="button" onclick="openLabelPicker('${it.id}')" class="px-3 py-1.5 bg-gray-50 hover:bg-gray-100 text-gray-700 border border-gray-200 rounded-lg text-xs font-medium transition flex items-center gap-1.5"><i class="fas fa-qrcode text-[10px]"></i> Etiqueta QR</button>
                         <a href="movements.html?item_id=${it.id}" class="px-3 py-1.5 bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-100 rounded-lg text-xs font-medium transition flex items-center gap-1.5"><i class="fas fa-history text-[10px]"></i> Histórico</a>
                         <a href="items.html" class="ml-auto px-3 py-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-50 rounded-lg text-xs font-medium transition flex items-center gap-1.5"><i class="fas fa-arrow-left text-[10px]"></i> Voltar à lista</a>
                     </div>
@@ -212,7 +235,7 @@ function render(it) {
                     </thead>
                     <tbody class="divide-y divide-gray-50">
                         ${(it.serial_units || []).map(u => `
-                            <tr class="hover:bg-purple-50/30 transition">
+                            <tr class="hover:bg-purple-50/30 transition" data-serial-id="${u.id}">
                                 <td class="px-6 py-2.5 font-mono text-xs text-gray-700">${escapeHtml(u.serial_number)}</td>
                                 <td class="px-3 py-2.5 text-gray-800"><span class="text-gray-400 text-xs">${escapeHtml(u.location?.unit?.name || '')} ·</span> ${escapeHtml(u.location?.name || '—')}</td>
                                 <td class="px-3 py-2.5 text-gray-700">${u.holder ? escapeHtml(u.holder.name) : '—'}</td>
@@ -245,7 +268,7 @@ function render(it) {
                     </thead>
                     <tbody class="divide-y divide-gray-50">
                         ${stockByLoc.map(s => `
-                            <tr class="hover:bg-sky-50/30 transition">
+                            <tr class="hover:bg-sky-50/30 transition" data-lot-id="${s.lot?.id || ''}">
                                 <td class="px-6 py-2.5 text-gray-800"><span class="text-gray-400 text-xs">${escapeHtml(s.location?.unit?.name || '')} ·</span> ${escapeHtml(s.location?.name || '')}</td>
                                 <td class="px-3 py-2.5 font-mono text-xs text-gray-500">${s.lot?.lot_number ? escapeHtml(s.lot.lot_number) : '—'}</td>
                                 <td class="px-3 py-2.5 text-xs ${s.lot?.expiry_date ? 'text-amber-600' : 'text-gray-400'}">${s.lot?.expiry_date || '—'}</td>

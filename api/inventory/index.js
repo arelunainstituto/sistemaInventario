@@ -22,6 +22,7 @@ router.use('/items/:itemId/location-params', require('./item-location-params'));
 router.use('/items',      require('./items'));
 router.use('/entries',    require('./entries'));
 router.use('/scan',       require('./scan'));
+router.use('/qr',         require('./qr'));
 
 // Épico Patrimônio — unidades por número de série, colaboradores (RH) e
 // operações patrimoniais (entrada/movimentação/baixa).
