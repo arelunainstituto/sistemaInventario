@@ -83,4 +83,59 @@ router.post('/', requirePermission('inventory', 'transfer'), async (req, res) =>
     }
 });
 
+// POST /batch — transferência de VÁRIOS itens, mesma origem/destino (atômico).
+// Body: { from_location_id, to_location_id, justification?, lines: [{ item_id, quantity, lot_id? }] }
+router.post('/batch', requirePermission('inventory', 'transfer'), async (req, res) => {
+    try {
+        const { from_location_id, to_location_id, justification, lines } = req.body || {};
+
+        if (!from_location_id) return res.status(400).json({ error: 'from_location_id é obrigatório' });
+        if (!to_location_id)   return res.status(400).json({ error: 'to_location_id é obrigatório' });
+        if (from_location_id === to_location_id)
+            return res.status(400).json({ error: 'Localizações origem e destino não podem ser iguais' });
+        if (!Array.isArray(lines) || lines.length === 0)
+            return res.status(400).json({ error: 'Pelo menos uma linha é obrigatória' });
+
+        for (const [i, l] of lines.entries()) {
+            if (!l.item_id)        return res.status(400).json({ error: `Linha ${i + 1}: item é obrigatório` });
+            if (!(l.quantity > 0)) return res.status(400).json({ error: `Linha ${i + 1}: quantidade deve ser > 0` });
+        }
+
+        // Fronteira de macro: todas as linhas precisam ser de CONSUMO.
+        const ids = [...new Set(lines.map(l => l.item_id))];
+        const { data: metas } = await supabaseAdmin
+            .from('inv_items').select('id, name, macro_category').in('id', ids);
+        const byId = new Map((metas || []).map(m => [m.id, m]));
+        for (const [i, l] of lines.entries()) {
+            const m = byId.get(l.item_id);
+            if (!m) return res.status(400).json({ error: `Linha ${i + 1}: item não encontrado` });
+            if (m.macro_category !== 'consumo')
+                return res.status(400).json({ error: `Linha ${i + 1}: "${m.name}" é patrimonial — use Patrimônio › Movimentação` });
+        }
+
+        const cleanLines = lines.map(l => ({
+            item_id: l.item_id, quantity: l.quantity, lot_id: l.lot_id || null
+        }));
+
+        const { data, error } = await supabaseAdmin.rpc('fn_inv_transfer_batch', {
+            p_from: from_location_id,
+            p_to: to_location_id,
+            p_lines: cleanLines,
+            p_justification: justification || null,
+            p_user: req.user?.id || null
+        });
+
+        if (error) {
+            if (error.code === 'P0002') return res.status(400).json({ error: error.message, code: 'INSUFFICIENT_STOCK' });
+            if (error.code === 'P0001') return res.status(400).json({ error: error.message });
+            throw error;
+        }
+
+        res.status(201).json({ success: true, data: { count: Array.isArray(data) ? data.length : 0, results: data } });
+    } catch (err) {
+        console.error('POST transfers/batch error:', err);
+        res.status(500).json({ error: err.message || 'Erro ao executar transferência' });
+    }
+});
+
 module.exports = router;

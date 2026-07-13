@@ -152,8 +152,6 @@ function addLine() {
 
 async function onLineItemChange(sel, idx) {
     const line = sel.closest('[data-line]');
-    const controlsLot = sel.selectedOptions[0]?.dataset.controlsLot === 'true';
-    line.querySelector('.line-lot-area').classList.toggle('hidden', !controlsLot);
     line.querySelector('.line-avail').textContent = '';
     lineStock[idx] = [];
     if (sel.value) {
@@ -168,17 +166,19 @@ async function onLineItemChange(sel, idx) {
 function onLineLocationChange(sel, idx) { rebuildLineLot(sel.closest('[data-line]'), idx); }
 
 function rebuildLineLot(line, idx) {
-    const itemOpt = line.querySelector('.line-item').selectedOptions[0];
-    const controlsLot = itemOpt?.dataset.controlsLot === 'true';
     const locId = line.querySelector('.line-location').value;
     const here = (lineStock[idx] || []).filter(s => s.location_id === locId);
     const total = here.reduce((a, s) => a + parseFloat(s.quantity || 0), 0);
     const avail = line.querySelector('.line-avail');
     if (avail) avail.textContent = locId ? `· disp ${total.toFixed(2)}` : '';
-    if (!controlsLot) return;
-    const lotSel = line.querySelector('.line-lot');
+
+    // Mostra o dropdown de lote sempre que houver estoque em LOTE nesta
+    // localização (vale mesmo para item que não controla lote — a saída faz
+    // FEFO). Sem lote em estoque → esconde (abate direto do saldo).
     const lots = here.filter(s => s.lot).sort((a, b) =>
         (a.lot.expiry_date || '9999-12-31').localeCompare(b.lot.expiry_date || '9999-12-31'));
+    const lotSel = line.querySelector('.line-lot');
+    line.querySelector('.line-lot-area').classList.toggle('hidden', lots.length === 0);
     lotSel.innerHTML = '<option value="">— FEFO automático —</option>' +
         lots.map((s, i) => `<option value="${s.lot.id}">${escapeHtml(s.lot.lot_number)} · ${parseFloat(s.quantity).toFixed(2)}${s.lot.expiry_date ? ' · val ' + s.lot.expiry_date : ''}${i === 0 ? ' 🟢' : ''}</option>`).join('');
 }

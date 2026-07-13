@@ -163,7 +163,7 @@ document.getElementById('pageContent').innerHTML = `
                     <input type="checkbox" name="controls_lot" id="controlsLotCheck" checked class="mt-0.5 w-4 h-4 accent-sky-600">
                     <span class="text-sm text-gray-700">
                         <strong>Este item controla lote / validade</strong>
-                        <span class="help-tip" tabindex="0" data-tip="Marcado: a entrada exige o nº de lote (validade opcional) e a saída usa FEFO pela validade. Desmarque para itens sem rastreio de lote — a saída abate direto do saldo.">?</span>
+                        <span class="help-tip" tabindex="0" data-tip="Marcado: o nº de lote é OBRIGATÓRIO na entrada. Desmarcado: o lote fica OPCIONAL — o campo continua existindo e, se houver estoque em lote, a saída ainda usa FEFO pela validade. Pode desmarcar mesmo em itens que já têm lotes lançados.">?</span>
                     </span>
                 </label>
             </section>

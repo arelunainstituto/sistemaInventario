@@ -34,7 +34,26 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e
 
 ## [Unreleased]
 
-_Nenhuma alteração pendente._
+> **Em validação (beta).** Versão exibida no header: `v1.18.0-beta-02`. Entregue por partes (`-beta-NN`), consolida na `1.18.0` no último commit.
+
+### Adicionado
+- **Transferência de vários itens de uma vez** (`requer migração`: [123-transfer-batch.sql](database/inventory-refactor/123-transfer-batch.sql)): a tela de Transferências ([transfers.html](public/inventory/transfers.html)) passa a mover **múltiplos itens** numa única transferência, todos da mesma **origem → destino** (escolhidos uma vez), com linhas de item + qtd + lote — igual à saída multi-linha. Nova função `fn_inv_transfer_batch` processa as linhas em **uma transação** (atômico: se uma linha falhar, nada é movido), reutilizando `fn_inv_transfer` por linha. Novo endpoint `POST /transfers/batch` ([transfers.js](api/inventory/transfers.js)); o `POST /transfers` single permanece. Disponibilidade e lotes (FEFO) por linha vêm da origem escolhida.
+
+### Alterado
+- **Controle de lote agora é opcional (não trava mais com lotes lançados)** (`requer migração`: [122-lote-opcional.sql](database/inventory-refactor/122-lote-opcional.sql)): "não controla lote" passou a significar apenas que o lote **não é obrigatório** — o campo continua existindo. Agora é possível **desmarcar "controla lote" mesmo em item que já tem lotes lançados** (a API deixou de bloquear com 409, [items.js](api/inventory/items.js)). Na **entrada** ([entries.html](public/inventory/entries.html)) o campo de lote fica sempre visível (obrigatório só quando controla) e o trigger `fn_inv_process_entry_line` cria/usa o lote sempre que ele for informado. Na **saída** ([exits.html](public/inventory/exits.html)) o `fn_inv_consume` faz **FEFO se houver estoque em lote** na localização, mesmo que o item não controle — sem deixar estoque em lote preso; sem lote em estoque, abate direto do saldo.
+
+### Notas
+- [_layout.js:5](public/inventory/_layout.js#L5) bump para `v1.18.0-beta-02`.
+- **Migrações**: [122-lote-opcional.sql](database/inventory-refactor/122-lote-opcional.sql) (redefine `fn_inv_process_entry_line` e `fn_inv_consume`) e [123-transfer-batch.sql](database/inventory-refactor/123-transfer-batch.sql) (`fn_inv_transfer_batch`).
+
+---
+
+## [1.17.1] — 2026-07-06
+
+> Corrige erro de check constraint no custo médio ao dar entrada com item de saldo negativo (modo seeding).
+
+### Corrigido
+- **Entrada travava com `inv_items_cmp_check`** (`requer migração`: [121-cmp-nonnegative-seeding.sql](database/inventory-refactor/121-cmp-nonnegative-seeding.sql)): ao registrar uma entrada de item com **saldo negativo** (permitido pelo seeding), o recálculo do custo médio (`fn_inv_recalc_cmp`) fazia média ponderada usando o saldo negativo e podia produzir um **CMP negativo**, violando `CHECK (cmp >= 0)`. Correção: saldo negativo não entra na média (`base = GREATEST(saldo, 0)`) — enquanto o saldo estiver negativo, o novo CMP é o custo da própria entrada; ao normalizar, volta à média ponderada. Guarda final garante `cmp >= 0`. A entrada em si é atômica: nada era gravado no erro.
 
 ---
 

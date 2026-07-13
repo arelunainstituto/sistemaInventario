@@ -31,54 +31,41 @@ document.getElementById('pageContent').innerHTML = `
     </div>
 
     <div id="modal" class="hidden fixed inset-0 bg-gray-900/40 backdrop-blur-[2px] z-50 flex items-center justify-center p-4">
-        <div class="bg-white rounded-xl border border-gray-200 shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+        <div class="bg-white rounded-xl border border-gray-200 shadow-2xl max-w-5xl w-full max-h-[90vh] overflow-y-auto">
             <div class="flex justify-between items-center p-4 border-b">
                 <h3 class="font-bold text-gray-800">Nova transferência</h3>
                 <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600"><i class="fas fa-times"></i></button>
             </div>
-            <form id="form" class="p-6 grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div class="md:col-span-3">
-                    <label class="text-xs text-gray-500">Item *</label>
-                    <select name="item_id" required onchange="onItemChange()" id="itemSelect" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
-                        <option value="">— selecione —</option>
-                    </select>
-                </div>
-
-                <div id="stockPanel" class="md:col-span-3 hidden border border-indigo-200 bg-indigo-50 rounded-lg p-3 text-xs">
-                    <p class="font-bold text-indigo-700 mb-2"><i class="fas fa-info-circle"></i> Stock disponível:</p>
-                    <div id="stockList"></div>
-                </div>
-
-                <div>
-                    <label class="text-xs text-gray-500">Origem *</label>
-                    <select name="from_location_id" id="fromSelect" required onchange="onFromChange()" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
-                        <option value="">—</option>
-                    </select>
+            <form id="form" class="p-6 space-y-4">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div>
+                        <label class="text-xs text-gray-500">Origem *</label>
+                        <select name="from_location_id" id="fromSelect" required onchange="onOriginChange()" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                            <option value="">—</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="text-xs text-gray-500">Destino *</label>
+                        <select name="to_location_id" id="toSelect" required class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                            <option value="">—</option>
+                        </select>
+                    </div>
                 </div>
                 <div>
-                    <label class="text-xs text-gray-500">Destino *</label>
-                    <select name="to_location_id" id="toSelect" required class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
-                        <option value="">—</option>
-                    </select>
-                </div>
-                <div>
-                    <label class="text-xs text-gray-500">Quantidade *</label>
-                    <input name="quantity" type="number" step="0.0001" required class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
-                    <p id="maxAvailable" class="text-[10px] text-gray-500 mt-1"></p>
-                </div>
-
-                <div class="md:col-span-2">
-                    <label class="text-xs text-gray-500">Lote</label>
-                    <select name="lot_id" id="lotSelect" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
-                        <option value="">— Sugestão FEFO automática —</option>
-                    </select>
-                </div>
-                <div class="md:col-span-3">
                     <label class="text-xs text-gray-500">Justificação (recomendada)</label>
                     <textarea name="justification" rows="2" placeholder="Motivo da transferência…" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"></textarea>
                 </div>
 
-                <div class="md:col-span-3 flex justify-end gap-2 border-t pt-4">
+                <div class="border border-gray-200 rounded-lg p-4">
+                    <div class="flex justify-between items-center mb-3">
+                        <h4 class="font-bold text-gray-800">Itens</h4>
+                        <button type="button" onclick="addLine()" class="text-sm bg-gray-100 hover:bg-gray-200 px-3 py-1.5 rounded-lg"><i class="fas fa-plus"></i> Adicionar linha</button>
+                    </div>
+                    <div id="lines" class="space-y-2"></div>
+                    <p class="text-[11px] text-gray-400 mt-2">Disponibilidade e lotes são da <b>origem</b> escolhida. Lote por <b>FEFO automático</b> — ou escolha um específico quando houver.</p>
+                </div>
+
+                <div class="flex justify-end gap-2 border-t pt-4">
                     <button type="button" onclick="closeModal()" class="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">Cancelar</button>
                     <button type="submit" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium shadow-sm shadow-indigo-500/20 transition flex items-center gap-2"><i class="fas fa-save"></i> Executar transferência</button>
                 </div>
@@ -87,7 +74,9 @@ document.getElementById('pageContent').innerHTML = `
     </div>
 `;
 
-let items = [], allLocations = [], currentStock = [];
+let items = [], locations = [];
+const lineStock = {};   // idx -> stock-by-item (linhas de stock)
+let lineCounter = 0;
 
 async function bootstrap() {
     try {
@@ -96,10 +85,13 @@ async function bootstrap() {
             apiCall('/api/inventory/locations')
         ]);
         items = it.data || [];
-        allLocations = lo.data || [];
-        document.getElementById('itemSelect').innerHTML = '<option value="">— selecione —</option>' +
-            items.map(i => `<option value="${i.id}" data-controls-lot="${i.controls_lot}" data-macro="${i.macro_category}">${escapeHtml(i.internal_code)} · ${escapeHtml(i.name)}${i.subcategory?.name ? ' · ' + escapeHtml(i.subcategory.name) : ''}</option>`).join('');
-        makeSearchable('itemSelect', { placeholder: 'Buscar item por nome, código ou categoria…' });
+        locations = (lo.data || []).filter(l => l.is_active !== false);
+        document.getElementById('fromSelect').innerHTML = '<option value="">—</option>' +
+            locations.filter(l => l.can_send !== false).map(l => `<option value="${l.id}">${escapeHtml(l.unit?.name || '')} · ${escapeHtml(l.name)}</option>`).join('');
+        document.getElementById('toSelect').innerHTML = '<option value="">—</option>' +
+            locations.filter(l => l.can_receive !== false).map(l => `<option value="${l.id}">${escapeHtml(l.unit?.name || '')} · ${escapeHtml(l.name)}</option>`).join('');
+        makeSearchable('fromSelect', { placeholder: 'Buscar origem…' });
+        makeSearchable('toSelect',   { placeholder: 'Buscar destino…' });
     } catch (err) { toast(err.message, 'error'); }
 }
 
@@ -122,98 +114,99 @@ async function load() {
     } catch (err) { toast(err.message, 'error'); }
 }
 
+function addLine() {
+    const idx = lineCounter++;
+    const div = document.createElement('div');
+    div.className = 'grid grid-cols-12 gap-2 items-end p-2 border border-gray-100 rounded-lg';
+    div.dataset.line = idx;
+    div.innerHTML = `
+        <div class="col-span-5"><label class="text-xs text-gray-500">Item</label>
+            <select required onchange="onLineItemChange(this, ${idx})" class="line-item w-full px-2 py-1.5 border border-gray-300 rounded text-xs" id="trItem-${idx}">
+                <option value="">—</option>
+                ${items.map(i => `<option value="${i.id}" data-controls-lot="${i.controls_lot}">${escapeHtml(i.internal_code)} · ${escapeHtml(i.name)}${i.subcategory?.name ? ' · ' + escapeHtml(i.subcategory.name) : ''}</option>`).join('')}
+            </select>
+        </div>
+        <div class="col-span-3"><label class="text-xs text-gray-500 flex items-center gap-1">Qtd <span class="line-avail text-[10px] text-gray-400"></span></label>
+            <input type="number" step="0.0001" required class="line-qty w-full px-2 py-1.5 border border-gray-300 rounded text-xs"></div>
+        <div class="col-span-3 line-lot-area hidden"><label class="text-xs text-gray-500">Lote</label>
+            <select class="line-lot w-full px-2 py-1.5 border border-gray-300 rounded text-xs"><option value="">— FEFO automático —</option></select></div>
+        <div class="col-span-1 flex items-center justify-center"><button type="button" onclick="this.closest('[data-line]').remove()" class="text-red-500 hover:text-red-700" title="Remover linha"><i class="fas fa-trash"></i></button></div>`;
+    document.getElementById('lines').appendChild(div);
+    makeSearchable(`trItem-${idx}`, { placeholder: 'Buscar item por nome, código ou categoria…' });
+}
+
+async function onLineItemChange(sel, idx) {
+    const line = sel.closest('[data-line]');
+    line.querySelector('.line-avail').textContent = '';
+    lineStock[idx] = [];
+    if (sel.value) {
+        try {
+            const r = await apiCall(`/api/inventory/exits/stock-by-item/${sel.value}`);
+            lineStock[idx] = r.data || [];
+        } catch (_) { /* sem stock: seeding permite negativo; backend valida no submit */ }
+    }
+    rebuildLineLot(line, idx);
+}
+
+// Origem mudou → recalcula disponibilidade/lotes de TODAS as linhas.
+function onOriginChange() {
+    const fromId = document.getElementById('fromSelect').value;
+    const toSel = document.getElementById('toSelect');
+    if (toSel.value && toSel.value === fromId) { toSel.value = ''; toSel.dispatchEvent(new Event('change', { bubbles: true })); }
+    for (const line of document.querySelectorAll('[data-line]')) {
+        rebuildLineLot(line, parseInt(line.dataset.line, 10));
+    }
+}
+
+function rebuildLineLot(line, idx) {
+    const fromId = document.getElementById('fromSelect').value;
+    const here = (lineStock[idx] || []).filter(s => s.location_id === fromId);
+    const total = here.reduce((a, s) => a + parseFloat(s.quantity || 0), 0);
+    const avail = line.querySelector('.line-avail');
+    if (avail) avail.textContent = fromId ? `· disp ${total.toFixed(2)}` : '';
+
+    const lots = here.filter(s => s.lot).sort((a, b) =>
+        (a.lot.expiry_date || '9999-12-31').localeCompare(b.lot.expiry_date || '9999-12-31'));
+    const lotSel = line.querySelector('.line-lot');
+    line.querySelector('.line-lot-area').classList.toggle('hidden', lots.length === 0);
+    lotSel.innerHTML = '<option value="">— FEFO automático —</option>' +
+        lots.map((s, i) => `<option value="${s.lot.id}">${escapeHtml(s.lot.lot_number)} · ${parseFloat(s.quantity).toFixed(2)}${s.lot.expiry_date ? ' · val ' + s.lot.expiry_date : ''}${i === 0 ? ' 🟢' : ''}</option>`).join('');
+}
+
 function openModal() {
     document.getElementById('form').reset();
-    document.getElementById('stockPanel').classList.add('hidden');
-    document.getElementById('fromSelect').innerHTML = '<option value="">—</option>';
-    document.getElementById('toSelect').innerHTML = '<option value="">—</option>';
-    document.getElementById('lotSelect').innerHTML = '<option value="">— Sugestão FEFO automática —</option>';
-    document.getElementById('maxAvailable').textContent = '';
+    document.getElementById('lines').innerHTML = '';
+    for (const k in lineStock) delete lineStock[k];
+    addLine();
     document.getElementById('modal').classList.remove('hidden');
 }
 
 function closeModal() { document.getElementById('modal').classList.add('hidden'); }
 
-async function onItemChange() {
-    const itemId = document.getElementById('itemSelect').value;
-    if (!itemId) return;
-
-    try {
-        const r = await apiCall(`/api/inventory/exits/stock-by-item/${itemId}`);
-        currentStock = r.data || [];
-        if (!currentStock.length) {
-            document.getElementById('stockPanel').classList.remove('hidden');
-            document.getElementById('stockList').innerHTML = '<p class="text-red-600">Sem stock disponível.</p>';
-            return;
-        }
-        document.getElementById('stockPanel').classList.remove('hidden');
-        document.getElementById('stockList').innerHTML = currentStock.map(s => `
-            <div class="flex justify-between py-1 border-b border-indigo-100 last:border-0">
-                <span>${escapeHtml(s.location?.unit?.name || '')} · ${escapeHtml(s.location?.name || '')} ${s.lot ? `· lote ${escapeHtml(s.lot.lot_number)}` : ''}</span>
-                <span class="font-bold">${parseFloat(s.quantity).toFixed(2)}</span>
-            </div>`).join('');
-
-        const fromMap = new Map();
-        for (const s of currentStock) {
-            if (s.location?.can_send !== false) fromMap.set(s.location_id, s.location);
-        }
-        document.getElementById('fromSelect').innerHTML = '<option value="">—</option>' +
-            Array.from(fromMap.values()).map(l => `<option value="${l.id}">${escapeHtml(l.unit?.name || '')} · ${escapeHtml(l.name)}</option>`).join('');
-
-        // Destino: TODAS as localizações can_receive (item pode ir para uma localização sem stock prévio)
-        document.getElementById('toSelect').innerHTML = '<option value="">—</option>' +
-            allLocations.filter(l => l.can_receive !== false)
-                .map(l => `<option value="${l.id}">${escapeHtml(l.unit?.name || '')} · ${escapeHtml(l.name)}</option>`).join('');
-
-        makeSearchable('fromSelect', { placeholder: 'Buscar origem…' });
-        makeSearchable('toSelect',   { placeholder: 'Buscar destino…' });
-    } catch (err) { toast(err.message, 'error'); }
-}
-
-function onFromChange() {
-    const fromId = document.getElementById('fromSelect').value;
-    const itemOpt = document.getElementById('itemSelect').selectedOptions[0];
-    const controlsLot = itemOpt?.dataset?.controlsLot === 'true';
-
-    const lotsHere = currentStock.filter(s => s.location_id === fromId);
-    const total = lotsHere.reduce((a, s) => a + parseFloat(s.quantity), 0);
-    document.getElementById('maxAvailable').textContent = `Disponível na origem: ${total.toFixed(2)}`;
-
-    // Filtra destino para excluir a origem
-    const toSelect = document.getElementById('toSelect');
-    for (const opt of toSelect.options) {
-        opt.hidden = opt.value === fromId;
-    }
-    if (toSelect.value === fromId) toSelect.value = '';
-
-    if (controlsLot) {
-        const sorted = [...lotsHere].filter(s => s.lot).sort((a, b) =>
-            (a.lot.expiry_date || '9999').localeCompare(b.lot.expiry_date || '9999'));
-        document.getElementById('lotSelect').innerHTML = '<option value="">— Sugestão FEFO automática —</option>' +
-            sorted.map((s, idx) => `<option value="${s.lot.id}">${escapeHtml(s.lot.lot_number)} · qty ${parseFloat(s.quantity).toFixed(2)} · val ${s.lot.expiry_date || 'sem'}${idx === 0 ? ' 🟢 FEFO' : ''}</option>`).join('');
-    } else {
-        document.getElementById('lotSelect').innerHTML = '<option value="">— item não controla lote —</option>';
-    }
-}
-
 document.getElementById('form').addEventListener('submit', async e => {
     e.preventDefault();
     const f = e.target;
-    if (f.from_location_id.value === f.to_location_id.value) {
-        toast('Origem e destino não podem ser iguais', 'error');
-        return;
+    const from_location_id = f.from_location_id.value;
+    const to_location_id   = f.to_location_id.value;
+    if (!from_location_id || !to_location_id) { toast('Escolha origem e destino', 'error'); return; }
+    if (from_location_id === to_location_id) { toast('Origem e destino não podem ser iguais', 'error'); return; }
+
+    const lines = [];
+    for (const div of document.querySelectorAll('[data-line]')) {
+        const item_id = div.querySelector('.line-item').value;
+        if (!item_id) continue;
+        lines.push({
+            item_id,
+            quantity: parseFloat(div.querySelector('.line-qty').value),
+            lot_id:   div.querySelector('.line-lot')?.value || null
+        });
     }
-    const payload = {
-        item_id: f.item_id.value,
-        from_location_id: f.from_location_id.value,
-        to_location_id: f.to_location_id.value,
-        quantity: parseFloat(f.quantity.value),
-        lot_id: f.lot_id.value || null,
-        justification: f.justification.value || null
-    };
+    if (!lines.length) { toast('Adicione pelo menos uma linha', 'error'); return; }
+
+    const payload = { from_location_id, to_location_id, justification: f.justification.value || null, lines };
     try {
-        await apiCall('/api/inventory/transfers', { method: 'POST', body: JSON.stringify(payload) });
-        toast('Transferência executada');
+        const r = await apiCall('/api/inventory/transfers/batch', { method: 'POST', body: JSON.stringify(payload) });
+        toast(`${r.data.count} transferência(s) executada(s)`);
         closeModal();
         load();
     } catch (err) { toast(err.message, 'error'); }

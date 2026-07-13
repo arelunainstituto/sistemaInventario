@@ -327,25 +327,15 @@ router.put('/:id', requirePermission('inventory', 'update_item'), async (req, re
             patch.base_uom_id = patch.purchase_uom_id;
         }
 
-        // controls_lot: editável só para CONSUMO e só enquanto o item não tiver
-        // lotes (mudar o controle com lotes existentes deixaria o saldo
-        // inconsistente entre o bucket por-lote e o sem-lote). Patrimonial
-        // ignora (controla sempre por nº de série).
+        // controls_lot é editável livremente para CONSUMO (inclusive com lotes já
+        // lançados): "não controla lote" apenas deixa o lote OPCIONAL — o campo
+        // continua existindo e o estoque em lote segue consumível via FEFO na
+        // saída. Patrimonial ignora (controla sempre por nº de série).
         if (Object.prototype.hasOwnProperty.call(patch, 'controls_lot')) {
             const { data: itemRow } = await supabaseAdmin
                 .from('inv_items').select('macro_category').eq('id', id).single();
-            if (itemRow?.macro_category !== 'consumo') {
-                delete patch.controls_lot;
-            } else {
-                const { count: lotCount } = await supabaseAdmin
-                    .from('inv_lots').select('id', { count: 'exact', head: true }).eq('item_id', id);
-                if ((lotCount || 0) > 0) {
-                    return res.status(409).json({
-                        error: 'Não é possível alterar o controle de lote: o item já possui lotes registrados.'
-                    });
-                }
-                patch.controls_lot = !!patch.controls_lot;
-            }
+            if (itemRow?.macro_category !== 'consumo') delete patch.controls_lot;
+            else patch.controls_lot = !!patch.controls_lot;
         }
 
         // Categoria precisa ser folha. Grandfather: se o valor não mudou em
