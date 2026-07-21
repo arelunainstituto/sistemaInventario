@@ -57,6 +57,14 @@ document.getElementById('pageContent').innerHTML = `
             </div>
             <div class="flex gap-2" id="sessionActions"></div>
         </div>
+        <div class="flex items-center gap-2 mb-3">
+            <div class="relative flex-1 md:max-w-md">
+                <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs"></i>
+                <input id="countSearch" type="text" placeholder="Buscar item por nome ou código…" oninput="filterCounts()"
+                       class="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 focus:outline-none transition">
+            </div>
+            <span id="countSearchInfo" class="text-[11px] text-gray-400 whitespace-nowrap"></span>
+        </div>
         <div class="overflow-x-auto max-h-[600px] overflow-y-auto">
             <table class="w-full text-sm">
                 <thead class="bg-gray-50/50 text-[10px] uppercase tracking-wider text-gray-500 sticky top-0 border-b border-gray-200">
@@ -147,7 +155,7 @@ function renderSession() {
     ` : '';
 
     document.getElementById('countsTbody').innerHTML = s.counts.map(c => `
-        <tr class="hover:bg-sky-50/30 transition">
+        <tr class="hover:bg-sky-50/30 transition" data-search="${escapeHtml([c.item?.name, c.item?.internal_code, c.lot?.lot_number].filter(Boolean).join(' ').toLowerCase())}">
             <td class="p-2 font-medium">${escapeHtml(c.item?.name || '')}<br><span class="text-[10px] font-mono text-gray-400">${escapeHtml(c.item?.internal_code || '')}</span></td>
             <td class="p-2 text-xs">${c.lot ? escapeHtml(c.lot.lot_number) : '—'}</td>
             <td class="p-2 text-right">${parseFloat(c.expected_qty).toFixed(2)}</td>
@@ -161,6 +169,27 @@ function renderSession() {
             </td>
             <td class="p-2 text-xs text-gray-600">${escapeHtml(c.notes || '')}</td>
         </tr>`).join('') || '<tr><td colspan="6" class="p-6 text-center text-gray-400">Sem itens nesta localização.</td></tr>';
+
+    // Reseta o filtro de busca ao (re)carregar a sessão.
+    const search = document.getElementById('countSearch');
+    if (search) search.value = '';
+    const info = document.getElementById('countSearchInfo');
+    if (info) info.textContent = '';
+}
+
+// Filtra as linhas de contagem por nome/código/lote SEM re-renderizar (preserva
+// os valores já digitados nos inputs). Mostra/oculta cada linha.
+function filterCounts() {
+    const q = (document.getElementById('countSearch')?.value || '').toLowerCase().trim();
+    const rows = document.querySelectorAll('#countsTbody tr[data-search]');
+    let shown = 0;
+    rows.forEach(tr => {
+        const match = !q || tr.dataset.search.includes(q);
+        tr.hidden = !match;
+        if (match) shown++;
+    });
+    const info = document.getElementById('countSearchInfo');
+    if (info) info.textContent = q ? `${shown} de ${rows.length}` : '';
 }
 
 function onCountChange(countId, value) {
