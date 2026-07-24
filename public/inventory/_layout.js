@@ -2,7 +2,7 @@
 // Each page calls renderInventoryLayout({ activePage, title, subtitle }).
 
 // Versão exibida no sidebar — manter em sync com CHANGELOG.md
-const INVENTORY_VERSION = 'v1.18.0-beta-03';
+const INVENTORY_VERSION = 'v1.18.0-beta-04';
 
 // Operações separadas por macro_category como "módulos" (Consumo / Patrimônio).
 // Itens com type:'group' viram um cabeçalho + sub-itens indentados (ver
@@ -29,7 +29,7 @@ const INVENTORY_NAV = [
     { id: 'movements',   label: 'Histórico',         icon: 'fa-history',     href: 'movements.html' },
     { id: 'access-log',  label: 'Log de Acesso',     icon: 'fa-shield-halved', href: 'access-log.html' },
     { id: 'scan',        label: 'Ler QR Code',       icon: 'fa-qrcode',      href: 'scan.html' },
-    { id: 'docs-patrimonio', label: 'Documentação',  icon: 'fa-book',        href: 'docs-patrimonio.html' },
+    { id: 'docs',        label: 'Documentação',      icon: 'fa-book',        href: 'docs.html' },
 ];
 
 const INVENTORY_NAV_SETUP = [

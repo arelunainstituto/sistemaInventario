@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Inventário · Documentação</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/marked@12/marked.min.js"></script>
+    <script>if (!localStorage.getItem('access_token')) { const r = encodeURIComponent(location.pathname + location.search); window.location.href = '/login.html?redirect=' + r; }</script>
+    <style>
+        /* Estilo de leitura do manual (marked gera HTML puro) */
+        #docContent { color: #1f2937; font-size: 15px; line-height: 1.65; }
+        #docContent h1 { font-size: 1.7rem; font-weight: 700; margin: 0 0 .8rem; color: #0f172a; }
+        #docContent h2 { font-size: 1.3rem; font-weight: 700; margin: 1.6rem 0 .6rem; color: #0f172a; border-bottom: 1px solid #eef2f7; padding-bottom: .3rem; }
+        #docContent h3 { font-size: 1.08rem; font-weight: 600; margin: 1.2rem 0 .4rem; color: #0f172a; }
+        #docContent p { margin: .6rem 0; }
+        #docContent ul, #docContent ol { margin: .5rem 0 .5rem 1.4rem; }
+        #docContent li { margin: .25rem 0; }
+        #docContent ul { list-style: disc; } #docContent ol { list-style: decimal; }
+        #docContent a { color: #0284c7; text-decoration: none; } #docContent a:hover { text-decoration: underline; }
+        #docContent code { background: #f1f5f9; padding: .1rem .35rem; border-radius: .25rem; font-family: 'Courier New', monospace; font-size: .88em; }
+        #docContent pre { background: #0f172a; color: #e2e8f0; padding: 1rem; border-radius: .5rem; overflow-x: auto; }
+        #docContent pre code { background: transparent; color: inherit; padding: 0; }
+        #docContent blockquote { border-left: 3px solid #38bdf8; background: #f0f9ff; padding: .5rem .9rem; margin: .8rem 0; border-radius: 0 .4rem .4rem 0; color: #075985; }
+        #docContent table { border-collapse: collapse; width: 100%; margin: .8rem 0; display: block; overflow-x: auto; }
+        #docContent th, #docContent td { border: 1px solid #e5e7eb; padding: .45rem .7rem; text-align: left; font-size: .9em; }
+        #docContent th { background: #f8fafc; font-weight: 600; }
+        #docContent img { max-width: 100%; border: 1px solid #e5e7eb; border-radius: .5rem; margin: .6rem 0; }
+        #docContent hr { border: 0; border-top: 1px solid #eef2f7; margin: 1.4rem 0; }
+    </style>
+</head>
+<body class="bg-white">
+<div id="layoutRoot"></div>
+<script src="_layout.js"></script>
+<script>
+renderInventoryLayout({ activePage: 'docs', title: 'Documentação', subtitle: 'Manual do utilizador do módulo Inventário' });
+
+document.getElementById('pageContent').innerHTML = `
+    <div class="mb-3 flex items-center gap-3 text-sm">
+        <a href="docs.html?doc=user/index.md" class="text-sky-600 hover:text-sky-700"><i class="fas fa-book"></i> Índice do manual</a>
+        <span id="docCrumb" class="text-gray-400"></span>
+    </div>
+    <div class="bg-white rounded-xl border border-gray-200/70 shadow-sm p-6 md:p-8 max-w-4xl">
+        <div id="docContent" class="text-gray-500">Carregando…</div>
+    </div>
+`;
+
+// Resolve um caminho relativo (rel) a partir da pasta do doc atual (baseDir).
+function resolvePath(baseDir, rel) {
+    const parts = baseDir ? baseDir.split('/') : [];
+    for (const seg of rel.split('/')) {
+        if (seg === '..') parts.pop();
+        else if (seg !== '.' && seg !== '') parts.push(seg);
+    }
+    return parts.join('/');
+}
+
+async function loadDoc(docPath) {
+    // Sanitiza: só o manual do utilizador, sem path traversal.
+    docPath = (docPath || 'user/index.md').replace(/^\/+/, '');
+    if (docPath.includes('..') || !/^user\/[\w./-]+\.md$/.test(docPath)) docPath = 'user/index.md';
+
+    const content = document.getElementById('docContent');
+    try {
+        const res = await fetch('/docs/' + docPath, { cache: 'no-store' });
+        if (!res.ok) throw new Error('Documento não encontrado (' + res.status + ')');
+        const md = await res.text();
+        const dir = docPath.split('/').slice(0, -1).join('/');
+
+        const tmp = document.createElement('div');
+        tmp.innerHTML = marked.parse(md);
+
+        // Imagens relativas → /docs/<resolvido>
+        tmp.querySelectorAll('img').forEach(img => {
+            const src = img.getAttribute('src') || '';
+            if (!/^(https?:)?\//.test(src)) img.setAttribute('src', '/docs/' + resolvePath(dir, src));
+        });
+        // Links .md relativos → navegação dentro do visualizador
+        tmp.querySelectorAll('a').forEach(a => {
+            const href = a.getAttribute('href') || '';
+            if (/^https?:/.test(href) || href.startsWith('#')) return;
+            const clean = href.replace(/[?#].*$/, '');
+            if (/\.md$/.test(clean)) {
+                a.setAttribute('href', 'docs.html?doc=' + encodeURIComponent(resolvePath(dir, clean)));
+            }
+        });
+
+        content.innerHTML = tmp.innerHTML;
+        document.getElementById('docCrumb').textContent = '· ' + docPath.replace(/^user\//, '').replace(/\.md$/, '');
+        window.scrollTo(0, 0);
+    } catch (err) {
+        content.innerHTML = `<p class="text-red-500">${err.message}</p>
+            <p class="text-xs text-gray-400 mt-2">Se acabou de publicar, confirme que a pasta <code>docs/</code> está a ser servida (ver vercel.json).</p>`;
+    }
+}
+
+loadDoc(new URLSearchParams(location.search).get('doc'));
+</script>
+</body>
+</html>

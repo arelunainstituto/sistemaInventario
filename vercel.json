@@ -9,12 +9,20 @@
     {
       "src": "public/**/*",
       "use": "@vercel/static"
+    },
+    {
+      "src": "docs/**/*",
+      "use": "@vercel/static"
     }
   ],
   "routes": [
     {
       "src": "/api/(.*)",
       "dest": "/api/index.js"
+    },
+    {
+      "src": "/docs/(.*)",
+      "dest": "/docs/$1"
     },
     {
       "src": "/(.*\\.(js|css|html|png|jpg|jpeg|gif|svg|ico|json|woff|woff2|ttf|eot))",

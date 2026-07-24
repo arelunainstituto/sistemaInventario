@@ -34,18 +34,22 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e
 
 ## [Unreleased]
 
-> **Em validação (beta).** Versão exibida no header: `v1.18.0-beta-03`. Entregue por partes (`-beta-NN`), consolida na `1.18.0` no último commit.
+> **Em validação (beta).** Versão exibida no header: `v1.18.0-beta-04`. Entregue por partes (`-beta-NN`), consolida na `1.18.0` no último commit.
 
 ### Adicionado
+- **Manual do utilizador dentro do sistema** ([docs.html](public/inventory/docs.html)): a aba **Documentação** passou a abrir um **visualizador** que renderiza o manual em `docs/user/*.md` (fonte canónica única) — a própria `docs/user/index.md` é a navegação (clicar num link carrega o documento; imagens de `_img/` resolvidas). O `docs/` passou a ser servido estaticamente ([vercel.json](vercel.json)).
 - **Busca na tela de Inventário Físico** ([inventory-session.html](public/inventory/inventory-session.html)): a lista de contagem da sessão ganhou um campo de **busca por nome, código (ou lote)** que filtra as linhas em tempo real — útil em sessões grandes (ex.: 196 linhas). Filtra por mostrar/ocultar, sem re-renderizar, então **preserva as contagens já digitadas** e ainda não salvas; mostra "N de total".
 - **Transferência de vários itens de uma vez** (`requer migração`: [123-transfer-batch.sql](database/inventory-refactor/123-transfer-batch.sql)): a tela de Transferências ([transfers.html](public/inventory/transfers.html)) passa a mover **múltiplos itens** numa única transferência, todos da mesma **origem → destino** (escolhidos uma vez), com linhas de item + qtd + lote — igual à saída multi-linha. Nova função `fn_inv_transfer_batch` processa as linhas em **uma transação** (atômico: se uma linha falhar, nada é movido), reutilizando `fn_inv_transfer` por linha. Novo endpoint `POST /transfers/batch` ([transfers.js](api/inventory/transfers.js)); o `POST /transfers` single permanece. Disponibilidade e lotes (FEFO) por linha vêm da origem escolhida.
 
 ### Alterado
 - **Controle de lote agora é opcional (não trava mais com lotes lançados)** (`requer migração`: [122-lote-opcional.sql](database/inventory-refactor/122-lote-opcional.sql)): "não controla lote" passou a significar apenas que o lote **não é obrigatório** — o campo continua existindo. Agora é possível **desmarcar "controla lote" mesmo em item que já tem lotes lançados** (a API deixou de bloquear com 409, [items.js](api/inventory/items.js)). Na **entrada** ([entries.html](public/inventory/entries.html)) o campo de lote fica sempre visível (obrigatório só quando controla) e o trigger `fn_inv_process_entry_line` cria/usa o lote sempre que ele for informado. Na **saída** ([exits.html](public/inventory/exits.html)) o `fn_inv_consume` faz **FEFO se houver estoque em lote** na localização, mesmo que o item não controle — sem deixar estoque em lote preso; sem lote em estoque, abate direto do saldo.
 
+### Removido
+- **`docs-patrimonio.html`** (duplicado): a página embutia uma cópia do markdown de património. O conteúdo agora vive no manual (`docs/user/patrimonio/*`), sem duplicação.
+
 ### Notas
-- [_layout.js:5](public/inventory/_layout.js#L5) bump para `v1.18.0-beta-03`.
-- **Migrações**: [122-lote-opcional.sql](database/inventory-refactor/122-lote-opcional.sql) (redefine `fn_inv_process_entry_line` e `fn_inv_consume`) e [123-transfer-batch.sql](database/inventory-refactor/123-transfer-batch.sql) (`fn_inv_transfer_batch`).
+- [_layout.js:5](public/inventory/_layout.js#L5) bump para `v1.18.0-beta-04`.
+- **Migrações**: [122-lote-opcional.sql](database/inventory-refactor/122-lote-opcional.sql) (redefine `fn_inv_process_entry_line` e `fn_inv_consume`) e [123-transfer-batch.sql](database/inventory-refactor/123-transfer-batch.sql) (`fn_inv_transfer_batch`). *(A doc/visualizador não exige migração.)*
 
 ---
 
