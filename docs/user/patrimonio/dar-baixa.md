@@ -13,7 +13,7 @@ Confirme **qual unidade** (número de série) será baixada e o **motivo**. Uma 
 1. Menu **Património › Saída** → **Nova baixa**.
 2. Escolha a **unidade** a baixar (busca por número de série/item).
 3. Informe o **motivo** da baixa (obrigatório para rastreio) e, se aplicável, a data.
-   > 📸 [captura: baixa de unidade com motivo]
+   ![Baixa de unidade com motivo](../_img/patrimonio/baixa-unidade-motivo.png)
 4. Confirme.
 
 ## Resultado esperado

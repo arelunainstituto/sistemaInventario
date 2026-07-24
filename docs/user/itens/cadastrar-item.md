@@ -17,7 +17,7 @@ Tenha cadastrados (ou crie na hora, pelos atalhos):
 ## Passo a passo
 1. Menu lateral → **Itens** → botão **Novo item**.
 2. Escolha o **tipo**: **Consumo** ou **Património**.
-   > 📸 [captura: escolha do tipo Consumo/Património]
+   ![Escolha do Tipo](../_img/itens/escolha-tipo.png)
 3. Preencha a **Identificação**:
    - **Nome** (obrigatório) e Descrição;
    - **Categoria** — comece a digitar para buscar; só aparecem as categorias **finais** (uma categoria-pai não é selecionável);
@@ -25,6 +25,7 @@ Tenha cadastrados (ou crie na hora, pelos atalhos):
    - Ref. fabricante, Código de barras;
    - **Fornecedor padrão** (opcional).
    - O **Código interno** (ex.: `1000123` para consumo, `2000123` para património) e o **QR Code** são gerados **automaticamente**.
+   ![Identificação](../_img/itens/identificacao.png)
 4. **Unidades e conversão** — informe a **UM de compra** (obrigatória) e, se aplicável, a UM de consumo e o fator de conversão.
 5. **(Consumo) Controle de lote** — a caixa **"Este item controla lote / validade"** vem marcada:
    - **Marcada** → o nº de lote passa a ser **obrigatório** na entrada e a saída usa **FEFO** (validade mais próxima primeiro).

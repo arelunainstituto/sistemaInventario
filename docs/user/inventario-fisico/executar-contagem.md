@@ -14,7 +14,7 @@ Escolha a **localização (sublocal)** a contar. A sessão "fotografa" o saldo e
 2. A sessão abre no estado **em contagem**, listando cada **item/lote** com a coluna **Esperado**.
 3. **Conte** fisicamente e digite o valor na coluna **Contado**. A coluna **Δ** mostra a diferença (verde = sobra, vermelho = falta).
    - Use a **busca** (por **nome, código ou lote**) para achar rapidamente um item numa lista grande. O filtro **preserva** o que já digitou.
-   > 📸 [captura: sessão em contagem com a busca e a coluna Δ]
+   ![Sessão em Contagem](../_img/inventario-fisico/sessao-contagem.png)
 4. Clique em **Salvar contagens** sempre que quiser guardar o progresso (pode voltar depois).
 5. Quando terminar, clique em **Validar e gerar ajustes**.
 

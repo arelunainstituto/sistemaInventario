@@ -15,7 +15,7 @@ A atribuição é feita **na movimentação** da unidade:
 1. Menu **Património › Movimentação** → **Nova movimentação**.
 2. Escolha a **unidade**.
 3. No **Colaborador de destino**, selecione o novo responsável (pode manter a localização).
-   > 📸 [captura: campo Colaborador de destino]
+   ![Atribuir Colaborador](../_img/patrimonio/atribuir-colaborador.png)
 4. Justifique (recomendado) e confirme.
 
 > Também é possível definir o colaborador logo na **[aquisição](cadastrar-aquisicao.md)** (campo "Colaborador" do cabeçalho).

@@ -46,7 +46,9 @@ Guia prático das tarefas do módulo de Inventário. Cada página segue o mesmo 
 Onde aparecer `> 📸 [captura: descrição]`, substitua pela imagem:
 1. Tire o print da tela indicada (destacando o campo/botão/aviso mencionado).
 2. Guarde em `docs/user/_img/<pasta-da-tarefa>/<nome>.png` (ex.: `docs/user/_img/itens/cadastrar-macro.png`).
-3. Troque o marcador por: `![descrição](../_img/itens/cadastrar-macro.png)` (ajuste o caminho relativo à página).
+3. Troque o marcador pela imagem, **ajustando o caminho à profundidade da página**:
+   - páginas em **subpasta** (`itens/`, `consumo/`, `patrimonio/`, `cadastros/`…): use `../_img/…` — ex.: `![descrição](../_img/itens/cadastrar-macro.png)`;
+   - páginas na **raiz** de `user/` (`index`, `primeiros-passos`, `perfis-e-permissoes`): use `_img/…` **sem `../`** — ex.: `![descrição](_img/primeiros-passos/login.png)`.
 4. Anote no rodapé "Controle" a versão em que a captura foi tirada — a interface muda.
 
 > **Controle:** versão do sistema 1.18+ · última validação 2026-07-22 · responsável: equipa de Inventário.

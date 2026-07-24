@@ -15,7 +15,7 @@ A unidade (número de série) deve estar **ativa** (não baixada). Tenha em ment
 3. Informe o **destino** — pode alterar **a localização, o colaborador, ou ambos**:
    - **Localização de destino** (para onde vai o bem);
    - **Colaborador de destino** (quem passa a ser responsável).
-   > 📸 [captura: movimentação com localização e/ou colaborador de destino]
+   ![Movimentação](../_img/patrimonio/movimentacao.png)
 4. Adicione uma **justificação** (recomendada) e confirme.
 
 ## Resultado esperado

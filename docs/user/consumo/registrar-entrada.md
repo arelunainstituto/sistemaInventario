@@ -23,7 +23,7 @@ Utilizadores com a permissão **entrada** (`inventory:entry`).
    - **Lote** e **Validade**:
      - se o item **controla lote**, o **Lote é obrigatório** (marcado com `*`);
      - se **não controla**, o lote é **opcional** — pode preencher (fica rastreado) ou deixar em branco.
-   > 📸 [captura: linhas da entrada com Lote/Validade]
+   ![linhas da entrada com Lote/Validade](../_img/consumo/linhas-entrada.png)
 4. Confira o **Total** e clique em **Registar entrada**.
 
 ## Resultado esperado

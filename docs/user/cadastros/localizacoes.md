@@ -11,7 +11,7 @@ Utilizadores com permissão de **editar item/cadastros** (`inventory:update_item
 2. **Nova** → informe a **unidade**, o **nome** do sublocal e os indicadores de fluxo:
    - **Permite envio** (pode ser **origem** de saídas/transferências);
    - **Permite receção** (pode ser **destino** de entradas/transferências).
-   > 📸 [captura: cadastro de localização com envio/receção]
+   ![Nova Localização](../_img/cadastros/nova-localizacao.png)
 3. Salve.
 
 ## Atenção

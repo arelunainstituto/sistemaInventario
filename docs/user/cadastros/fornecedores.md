@@ -10,7 +10,7 @@ Cadastrar os **fornecedores** usados nas entradas de consumo e nas aquisições 
 ## Passo a passo
 1. Menu **Cadastros › Fornecedores** → **Novo** (ou edite um existente).
 2. Preencha: **Nome** (obrigatório), **NIF/Tax ID**, email, telefone, morada, notas e **Ativo**.
-   > 📸 [captura: cadastro de fornecedor]
+   ![Novo Fornecedor](../_img/cadastros/novo-fornecedor.png)
 3. Salve.
 
 > **Atalho:** durante uma **entrada**, dá para cadastrar um fornecedor novo pelo botão **+** ao lado do campo, sem sair da tela.

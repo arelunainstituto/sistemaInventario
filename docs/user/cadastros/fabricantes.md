@@ -10,7 +10,7 @@ Cadastrar os **fabricantes** (marcas) usados nos itens. O fabricante é uma **en
 ## Passo a passo
 1. Menu **Cadastros › Fabricantes** → **Novo** (ou edite).
 2. Preencha: **Nome** (obrigatório), **Website**, **Notas** e **Ativo**.
-   > 📸 [captura: cadastro de fabricante]
+   ![Novo Fabricante](../_img/cadastros/novo-fabricante.png)
 3. Salve.
 
 > **Atalho:** no cadastro do **item**, o campo **Fabricante** é uma busca; o botão **+** ao lado cria um fabricante novo na hora e já o seleciona.

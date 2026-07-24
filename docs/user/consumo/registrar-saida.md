@@ -16,7 +16,7 @@ Os itens devem ter stock (ou o **modo seeding** deve estar ativo, se for necess�
    - **Item** (busca) e **Localização** de origem;
    - **Qtd**; ao lado aparece a **disponibilidade** ("disp X") na localização;
    - **Lote** — se houver stock em lote, aparece um seletor com sugestão **FEFO** (🟢 = validade mais próxima). Deixe em **FEFO automático** para o sistema escolher, ou selecione um lote específico.
-   > 📸 [captura: linhas da saída com disponibilidade e FEFO]
+   ![linhas da saída com disponibilidade e FEFO](../_img/consumo/linhas-saida.png)
 4. Clique em **Registar saída**.
 
 ## Resultado esperado
@@ -37,7 +37,7 @@ Os itens devem ter stock (ou o **modo seeding** deve estar ativo, se for necess�
 | Aviso "abaixo do mínimo" | A saída cruza o stock mínimo | Confirme se estiver correto |
 
 ## Como corrigir
-Saída lançada a mais/errada: um **Admin** pode **inativar o movimento** (gera estorno) ou faça um **[Ajuste](../ajustes/corrigir-quantidade.md)**.
+Saída lançada a mais/errada: um **Admin** pode **inativar o movimento** (gera estorno).
 
 ## Auditoria
 Movimentos de saída ficam no **Histórico** e no **Kardex** do item.

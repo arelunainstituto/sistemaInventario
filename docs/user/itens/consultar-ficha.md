@@ -17,7 +17,7 @@ Nada — basta o item existir.
    - **(Consumo) Custo Médio (CMP)** e parâmetros de stock (mínimo/máximo/reposição).
    - **(Património) Unidades** — cada número de série com estado (em uso / inativo / **baixado**), localização e colaborador atuais, valor contábil.
    - **(Património) Anexos (fotos)** — galeria; clique para abrir em tamanho cheio.
-   > 📸 [captura: ficha do item com stock por localização]
+   ![Ficha do Item](../_img/itens/ficha-item.png)
 3. Ações disponíveis na ficha: **Editar**, **Kardex** do item, **Etiqueta QR**, **Histórico**.
 
 ## Resultado esperado

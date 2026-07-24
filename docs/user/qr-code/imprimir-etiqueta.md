@@ -16,8 +16,9 @@ Utilizadores com acesso de **leitura** (`inventory:read`).
    - **Consumo com lote** → escolha o **lote**;
    - **Património** → escolha a **unidade (número de série)**;
    - **Consumo sem lote** → vai direto à etiqueta do **item**.
-   > 📸 [captura: seletor "escolha o lote / a unidade"]
+   ![Seletor](../_img/qr-code/seletor.png)
 3. Na tela da etiqueta, escolha o **tamanho do QR**: **P (50%)**, **M (75%)** ou **G (100%)** — a largura é sempre 62 mm.
+   ![Tamanho do QR](../_img/qr-code/tamanho-qr.png)
 4. Clique em **Imprimir**.
 
 ## Resultado esperado

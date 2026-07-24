@@ -10,7 +10,7 @@ Utilizadores com permissão de **editar item/cadastros** (`inventory:update_item
 1. Menu **Cadastros › Categorias** — a árvore aparece separada em **Consumo** e **Património**.
 2. Para criar: escolha o **macro** e a **categoria-pai** (ou raiz) → **Adicionar** → nome.
 3. Pode criar **subcategorias** (níveis): Consumo até 2 níveis; Património mais profundo.
-   > 📸 [captura: árvore de categorias com pai/filha]
+   ![Arvore de categoria](../_img/cadastros/arvore-categoria.png)
 
 ## Atenção — regra importante
 - No **item**, só se pode escolher uma categoria **final (folha)** — ou seja, **sem subcategorias**. Uma categoria-pai serve só para organizar; não é selecionável no item.

@@ -15,7 +15,7 @@ As localizações de **origem** e **destino** devem existir e permitir envio/rec
 3. **Itens** — **Adicionar linha** para cada material:
    - **Item** (busca), **Qtd**;
    - a **disponibilidade** e o seletor de **Lote (FEFO 🟢)** vêm da **origem** escolhida; deixe em FEFO automático ou escolha um lote.
-   > 📸 [captura: transferência multi-item com origem/destino no topo]
+   ![Transferência](../_img/consumo/transferencia.png)
 4. Clique em **Executar transferência**.
 
 ## Resultado esperado

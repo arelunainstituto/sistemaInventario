@@ -5,8 +5,9 @@ Apresentar o módulo Inventory a quem está a começar: como entrar, como navega
 
 ## Entrar no sistema
 1. Aceda ao endereço do ERP e faça **login** com o seu utilizador (email e palavra-passe).
+   ![Login](_img/primeiros-passos/login.png)
 2. Abra o módulo **Inventário**.
-   > 📸 [captura: ecrã de login e entrada no Inventário]
+   ![Inventário](_img/primeiros-passos/inventario.png)
 
 > **Sessão:** perto de expirar, aparece um aviso **"Sua sessão vai expirar — continuar conectado?"**. Clique em **Continuar conectado** para renovar **sem perder o trabalho**.
 >
@@ -22,7 +23,7 @@ A barra lateral organiza o módulo em grupos:
 - **Relatórios**, **Kardex**, **Histórico**, **Log de Acesso**.
 - **Ler QR Code** e a **Documentação**.
 - **Cadastros** — Localizações, Categorias, Fornecedores, Fabricantes, Unidades de medida.
-   > 📸 [captura: barra lateral do Inventário]
+   ![Barra Lateral](_img/primeiros-passos/barra-lateral.png)
 
 **Dicas de produtividade:**
 - Há uma **busca global** no topo (item, lote, fornecedor).

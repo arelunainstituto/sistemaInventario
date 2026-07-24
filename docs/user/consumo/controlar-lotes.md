@@ -13,7 +13,7 @@ Entender o que é "controlar lote", como funciona a validade e o **FEFO**, e qua
 ## Como ligar/desligar
 1. **Itens** → **Editar** o item → secção **Controle de lote**.
 2. Marque/desmarque **"Este item controla lote / validade"** → **Salvar**.
-   > 📸 [captura: caixa "Este item controla lote / validade"]
+  ![Controle de Lote](../_img/consumo/controle-lote.png)
 
 > Pode desligar o controlo **mesmo que o item já tenha lotes lançados** — os lotes **não são apagados** e o stock em lote **continua consumível** por FEFO. Apenas deixa de ser **obrigatório** informar o lote nas próximas entradas.
 

@@ -12,7 +12,6 @@ Tenha a etiqueta impressa (ver [Imprimir uma etiqueta QR](imprimir-etiqueta.md))
 ## Passo a passo
 1. Menu **Ler QR Code** (ou aponte a câmera do telemóvel para a etiqueta).
 2. O QR abre a **ficha do item**; se for um QR de **lote** ou **série**, a ficha mostra um aviso **"Etiqueta lida: Lote X / Série Y"** e **realça a linha** correspondente.
-   > 📸 [captura: ficha aberta por QR com a linha do lote realçada]
 
 ## Resultado esperado
 Você chega diretamente ao item e ao **lote/unidade** específico da etiqueta, sem procurar na lista.

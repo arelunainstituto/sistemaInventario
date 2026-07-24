@@ -18,7 +18,7 @@ Utilizadores com a permissão **entrada** (`inventory:entry`).
 3. **Unidades (números de série)** — **Adicionar unidade** para cada equipamento:
    - **Número de série** — pode **deixar em branco**: o sistema gera automaticamente **`<código do item>-NN`** (ex.: `2000123-01`, `2000123-02`, …). Ou informe a série real.
    - **Data de aquisição** e **Valor** (por unidade).
-   > 📸 [captura: unidades com nº de série auto e valor por unidade]
+   ![Unidades](../_img/patrimonio/unidades.png)
 4. Clique em **Cadastrar unidades**.
 
 ## Resultado esperado

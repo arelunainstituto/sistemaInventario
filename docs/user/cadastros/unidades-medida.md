@@ -10,7 +10,7 @@ Cadastrar as **unidades de medida (UM)** usadas nos itens — de **compra** e de
 ## Passo a passo
 1. Menu **Cadastros › Unidades de medida** → **Nova** (ou edite).
 2. Preencha o **código** (ex.: `UN`, `CX`, `ML`) e o **nome**.
-   > 📸 [captura: cadastro de unidade de medida]
+   ![Nova Unidade](../_img/cadastros/nova-unidade.png)
 3. Salve.
 
 ## Como se usa no item

@@ -15,7 +15,7 @@ Saiba que **o tipo (Consumo/Património) e o código interno não mudam** — s�
 3. **Controle de lote** — pode **marcar ou desmarcar** a caixa **"Este item controla lote / validade"** a qualquer momento, **mesmo que o item já tenha lotes lançados**:
    - Desmarcar **não apaga** os lotes existentes — apenas deixa de **exigir** o lote nas próximas entradas. O stock que está em lote **continua a ser consumido** normalmente (por FEFO). Ver [Controlar lotes](../consumo/controlar-lotes.md).
 4. **(Património) Anexos (fotos)** — na secção **Anexos**, adicione até **6 fotos** (botão **+**) ou remova (ícone de lixo). As fotos aparecem na ficha.
-   > 📸 [captura: secção de anexos do item de património]
+   ![Anexos](../_img/itens/anexos-item.png)
 5. Clique em **Salvar alterações**.
 
 ## Resultado esperado

@@ -13,7 +13,7 @@ Utilizadores com a permissão **financeira** (`inventory:financial`) — tipicam
 ## Passo a passo
 1. Menu **Depreciação**.
 2. Informe o **ano a executar**.
-   > 📸 [captura: tela de Depreciação com o ano]
+   ![Depreciação](../_img/patrimonio/depreciacao.png)
 3. Execute. O sistema aplica a taxa a cada unidade ativa, reduzindo o **valor contábil**.
 
 ## Resultado esperado

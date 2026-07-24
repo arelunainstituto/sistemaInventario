@@ -11,14 +11,15 @@ Saiba **qual item, localização, lote** e o **motivo** do ajuste. Para ajustes 
 
 ## Passo a passo
 1. Menu **Ajustes**.
-2. Escolha o **item**, a **localização** (e **lote**, se aplicável).
-3. Escolha o **sentido**:
+2. Selecione a opção **+Novo ajuste**.
+3. Escolha o **item**, a **localização** (e **lote**, se aplicável).
+4. Escolha o **sentido**:
    - **Positivo** (entrada de acerto / sobra);
    - **Negativo** (perda) — informe o **motivo** (avaria, extravio, perda, quebra…).
-4. Informe a **quantidade** e a **justificação** (obrigatória).
+5. Informe a **quantidade** e a **justificação** (obrigatória).
    - Se o saldo final ficar **negativo**, é necessário ser Admin e confirmar (dupla confirmação).
-   > 📸 [captura: tela de Ajustes com sentido e motivo]
-5. Confirme.
+   ![Novo Ajuste](../_img/ajustes/novo-ajuste.png)
+6. Confirme.
 
 ## Resultado esperado
 O saldo do item é corrigido na localização/lote; gera-se um **movimento de ajuste** (com motivo e justificação) no **Histórico**/**Kardex**.

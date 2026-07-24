@@ -11,7 +11,7 @@ Consultar e interpretar as visões de acompanhamento do inventário: **Relatóri
 
 ### Relatórios
 Menu **Relatórios** — visões consolidadas: stock atual por localização, itens **abaixo do mínimo**, valor de inventário (com base no **custo médio**), lotes a vencer, etc. Use os **filtros** (localização, categoria, datas) e exporte quando disponível.
-> 📸 [captura: tela de Relatórios com filtros]
+![Relatórios](../_img/relatorios/relatorios.png)
 
 ### Kardex
 Menu **Kardex** — o **extrato de um item**: cada entrada, saída, transferência e ajuste em ordem cronológica, com o **saldo acumulado** linha a linha. Ideal para explicar "por que o saldo está assim".
