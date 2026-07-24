@@ -38,14 +38,19 @@
 renderInventoryLayout({ activePage: 'docs', title: 'Documentação', subtitle: 'Manual do utilizador do módulo Inventário' });
 
 document.getElementById('pageContent').innerHTML = `
-    <div class="mb-3 flex items-center gap-3 text-sm">
-        <a href="docs.html?doc=user/index.md" class="text-sky-600 hover:text-sky-700"><i class="fas fa-book"></i> Índice do manual</a>
-        <span id="docCrumb" class="text-gray-400"></span>
-    </div>
-    <div class="bg-white rounded-xl border border-gray-200/70 shadow-sm p-6 md:p-8 max-w-4xl">
-        <div id="docContent" class="text-gray-500">Carregando…</div>
+    <div class="flex flex-col lg:flex-row gap-6 items-start">
+        <!-- Barra lateral de guias (agrupada pelas pastas do manual) -->
+        <nav id="docNav" class="w-full lg:w-64 flex-shrink-0 bg-white rounded-xl border border-gray-200/70 shadow-sm p-3 lg:sticky lg:top-4 lg:max-h-[85vh] overflow-y-auto text-sm">
+            <p class="text-xs text-gray-400 px-2 py-3">A carregar guias…</p>
+        </nav>
+        <!-- Conteúdo do documento -->
+        <div class="flex-1 min-w-0 bg-white rounded-xl border border-gray-200/70 shadow-sm p-6 md:p-8">
+            <div id="docContent" class="text-gray-500">Carregando…</div>
+        </div>
     </div>
 `;
+
+function esc(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
 // Resolve um caminho relativo (rel) a partir da pasta do doc atual (baseDir).
 function resolvePath(baseDir, rel) {
@@ -57,10 +62,47 @@ function resolvePath(baseDir, rel) {
     return parts.join('/');
 }
 
+// A barra lateral é montada a partir da própria docs/user/index.md (fonte única):
+// cada "## Título" vira um grupo; cada link [label](x.md) vira um item.
+async function buildNav(activePath) {
+    const nav = document.getElementById('docNav');
+    try {
+        const md = await (await fetch('/docs/user/index.md', { cache: 'no-store' })).text();
+        const groups = [];
+        let cur = null;
+        for (const raw of md.split('\n')) {
+            const line = raw.trim();
+            const h = line.match(/^##\s+(.+)/);
+            if (h) { cur = { title: h[1].replace(/[*_`#]/g, '').trim(), items: [] }; groups.push(cur); continue; }
+            if (!cur) continue;
+            const linkRe = /\[([^\]]+)\]\(([^)]+\.md)\)/g;
+            let m;
+            while ((m = linkRe.exec(line))) {
+                const rel = m[2].replace(/[?#].*$/, '');
+                if (/^https?:/.test(rel)) continue;
+                cur.items.push({ label: m[1], path: resolvePath('user', rel) });
+            }
+        }
+        const withItems = groups.filter(g => g.items.length);
+        if (!withItems.length) { nav.innerHTML = ''; return; }
+        nav.innerHTML = `<a href="docs.html?doc=user/index.md" class="block px-2 py-1.5 mb-2 rounded text-sky-600 hover:bg-sky-50 font-medium"><i class="fas fa-book text-xs mr-1"></i> Índice do manual</a>`
+            + withItems.map(g => `
+                <div class="mb-3">
+                    <p class="text-[10px] uppercase tracking-wider font-bold text-gray-400 px-2 mb-1">${esc(g.title)}</p>
+                    ${g.items.map(it => `
+                        <a href="docs.html?doc=${encodeURIComponent(it.path)}"
+                           class="block px-2 py-1.5 rounded ${it.path === activePath ? 'bg-sky-50 text-sky-700 font-medium' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'}">${esc(it.label)}</a>`).join('')}
+                </div>`).join('');
+    } catch (_) {
+        nav.innerHTML = '<a href="docs.html?doc=user/index.md" class="block px-2 py-1.5 text-sky-600">Índice do manual</a>';
+    }
+}
+
 async function loadDoc(docPath) {
-    // Sanitiza: só o manual do utilizador, sem path traversal.
     docPath = (docPath || 'user/index.md').replace(/^\/+/, '');
     if (docPath.includes('..') || !/^user\/[\w./-]+\.md$/.test(docPath)) docPath = 'user/index.md';
+
+    buildNav(docPath); // (re)monta a barra lateral com o item ativo
 
     const content = document.getElementById('docContent');
     try {
@@ -71,27 +113,20 @@ async function loadDoc(docPath) {
 
         const tmp = document.createElement('div');
         tmp.innerHTML = marked.parse(md);
-
-        // Imagens relativas → /docs/<resolvido>
         tmp.querySelectorAll('img').forEach(img => {
             const src = img.getAttribute('src') || '';
             if (!/^(https?:)?\//.test(src)) img.setAttribute('src', '/docs/' + resolvePath(dir, src));
         });
-        // Links .md relativos → navegação dentro do visualizador
         tmp.querySelectorAll('a').forEach(a => {
             const href = a.getAttribute('href') || '';
             if (/^https?:/.test(href) || href.startsWith('#')) return;
             const clean = href.replace(/[?#].*$/, '');
-            if (/\.md$/.test(clean)) {
-                a.setAttribute('href', 'docs.html?doc=' + encodeURIComponent(resolvePath(dir, clean)));
-            }
+            if (/\.md$/.test(clean)) a.setAttribute('href', 'docs.html?doc=' + encodeURIComponent(resolvePath(dir, clean)));
         });
-
         content.innerHTML = tmp.innerHTML;
-        document.getElementById('docCrumb').textContent = '· ' + docPath.replace(/^user\//, '').replace(/\.md$/, '');
         window.scrollTo(0, 0);
     } catch (err) {
-        content.innerHTML = `<p class="text-red-500">${err.message}</p>
+        content.innerHTML = `<p class="text-red-500">${esc(err.message)}</p>
             <p class="text-xs text-gray-400 mt-2">Se acabou de publicar, confirme que a pasta <code>docs/</code> está a ser servida (ver vercel.json).</p>`;
     }
 }
