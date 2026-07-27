@@ -124,8 +124,7 @@ function locHolder(loc, emp) {
 function populateModalSelects() {
     document.getElementById('unitSelect').innerHTML = '<option value="">— selecione —</option>' +
         units.map(u => `<option value="${u.id}">${escapeHtml(u.serial_number)} · ${escapeHtml(u.item?.internal_code || '')} ${escapeHtml(u.item?.name || '')}</option>`).join('');
-    document.getElementById('toLocationSelect').innerHTML = '<option value="">—</option>' +
-        locations.filter(l => l.can_receive !== false).map(l => `<option value="${l.id}">${escapeHtml(l.unit?.name || '')} · ${escapeHtml(l.name)}</option>`).join('');
+    document.getElementById('toLocationSelect').innerHTML = locationOptionsHTML(locations, { filter: l => l.can_receive !== false });
     document.getElementById('toHolderSelect').innerHTML = '<option value="">— sem colaborador —</option>' +
         employees.map(e => `<option value="${e.id}">${escapeHtml(e.name)}${e.department ? ' · ' + escapeHtml(e.department) : ''}</option>`).join('');
 }

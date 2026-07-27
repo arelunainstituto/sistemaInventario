@@ -2,7 +2,7 @@
 // Each page calls renderInventoryLayout({ activePage, title, subtitle }).
 
 // Versão exibida no sidebar — manter em sync com CHANGELOG.md
-const INVENTORY_VERSION = 'v1.18.0-beta-04';
+const INVENTORY_VERSION = 'v1.18.0';
 
 // Operações separadas por macro_category como "módulos" (Consumo / Patrimônio).
 // Itens com type:'group' viram um cabeçalho + sub-itens indentados (ver
@@ -122,6 +122,44 @@ function helpTip(text) {
     return `<span class="help-tip" tabindex="0" role="img" aria-label="Ajuda" data-tip="${t}">?</span>`;
 }
 window.helpTip = helpTip;
+
+// Monta as <option>s de um <select> de LOCALIZAÇÃO agrupadas por UNIDADE:
+// um cabeçalho não-selecionável por unidade (disabled, data-depth=0) e cada
+// sublocalização indentada abaixo (data-depth=1). Para o combobox
+// _searchable-select: data-label mostra só o nome curto ao navegar; data-search
+// inclui a unidade para a busca; o texto completo "Unidade · Sublocal" fica no
+// textContent (exibido quando selecionado ou ao filtrar — sem ambiguidade entre
+// sublocais homónimos, ex.: "Estoque Central" em duas unidades).
+//   locationOptionsHTML(locations, { filter, selectedId, placeholder })
+function locationOptionsHTML(locations, opts = {}) {
+    const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+    const filter = opts.filter || (() => true);
+    const groups = new Map();
+    for (const l of (locations || [])) {
+        if (!filter(l)) continue;
+        const uName = l.unit?.name || 'Sem unidade';
+        const uId   = l.unit?.id || uName;
+        if (!groups.has(uId)) groups.set(uId, { name: uName, items: [] });
+        groups.get(uId).items.push(l);
+    }
+    const head = opts.placeholder !== false
+        ? `<option value="">${esc(opts.placeholder || '—')}</option>` : '';
+    const body = [...groups.values()]
+        .sort((a, b) => a.name.localeCompare(b.name, 'pt'))
+        .map(g => {
+            const header = `<option disabled data-depth="0">${esc(g.name)}</option>`;
+            const kids = g.items
+                .slice().sort((a, b) => (a.name || '').localeCompare(b.name || '', 'pt'))
+                .map(l => {
+                    const full = `${g.name} · ${l.name || ''}`;
+                    const sel  = opts.selectedId && l.id === opts.selectedId ? ' selected' : '';
+                    return `<option value="${esc(l.id)}"${sel} data-depth="1" data-label="${esc(l.name || '')}" data-search="${esc(full.toLowerCase())}">${esc(full)}</option>`;
+                }).join('');
+            return header + kids;
+        }).join('');
+    return head + body;
+}
+window.locationOptionsHTML = locationOptionsHTML;
 
 function injectHelpTipStyle() {
     if (document.getElementById('helpTipStyle')) return;

@@ -136,8 +136,7 @@ function addLine() {
         </div>
         <div class="col-span-3"><label class="text-xs text-gray-500">Localização</label>
             <select required onchange="onLineLocationChange(this, ${idx})" class="line-location w-full px-2 py-1.5 border border-gray-300 rounded text-xs" id="lineLoc-${idx}">
-                <option value="">—</option>
-                ${locations.map(l => `<option value="${l.id}">${escapeHtml(l.unit?.name || '')} · ${escapeHtml(l.name)}</option>`).join('')}
+                ${locationOptionsHTML(locations)}
             </select>
         </div>
         <div class="col-span-2"><label class="text-xs text-gray-500 flex items-center gap-1">Qtd <span class="line-avail text-[10px] text-gray-400"></span></label>

@@ -232,8 +232,7 @@ function openModal() {
     document.getElementById('warnNegative').classList.add('hidden');
     document.getElementById('pctIndicator').textContent = '';
     // Carrega todas as localizações por padrão (item pode estar em qualquer uma)
-    document.getElementById('locationSelect').innerHTML = '<option value="">—</option>' +
-        allLocations.map(l => `<option value="${l.id}">${escapeHtml(l.unit?.name || '')} · ${escapeHtml(l.name)}</option>`).join('');
+    document.getElementById('locationSelect').innerHTML = locationOptionsHTML(allLocations);
     document.getElementById('modal').classList.remove('hidden');
     makeSearchable('locationSelect', { placeholder: 'Buscar localização…' });
 }
@@ -388,8 +387,7 @@ async function onAdminExitItemChange() {
         adminExitStock.forEach(s => {
             if (s.location?.can_send !== false) locMap.set(s.location_id, s.location);
         });
-        document.getElementById('adminExitLocation').innerHTML = '<option value="">—</option>' +
-            Array.from(locMap.values()).map(l => `<option value="${l.id}">${escapeHtml(l.unit?.name || '')} · ${escapeHtml(l.name)}</option>`).join('');
+        document.getElementById('adminExitLocation').innerHTML = locationOptionsHTML(Array.from(locMap.values()));
         makeSearchable('adminExitLocation', { placeholder: 'Buscar localização…' });
     } catch (err) { toast(err.message, 'error'); }
 }

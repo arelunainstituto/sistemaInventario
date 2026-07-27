@@ -144,8 +144,7 @@ async function openReport(key) {
 
     if (r.supportsLocation) {
         const locs = await loadLocations();
-        document.getElementById('filterLocation').innerHTML = '<option value="">Todas (visão global)</option>' +
-            locs.map(l => `<option value="${l.id}">${escapeHtml(l.unit?.name || '')} · ${escapeHtml(l.name)}</option>`).join('');
+        document.getElementById('filterLocation').innerHTML = locationOptionsHTML(locs, { placeholder: 'Todas (visão global)' });
         document.getElementById('filterLocation').value = '';
     }
     if (r.supportsDateRange) {

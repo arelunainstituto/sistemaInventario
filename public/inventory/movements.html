@@ -132,8 +132,7 @@ async function bootstrap() {
         ]);
         document.getElementById('itemSelect').innerHTML = '<option value="">Todos</option>' +
             it.data.map(i => `<option value="${i.id}">${escapeHtml(i.internal_code)} · ${escapeHtml(i.name)}</option>`).join('');
-        document.getElementById('locationSelect').innerHTML = '<option value="">Todas</option>' +
-            lo.data.map(l => `<option value="${l.id}">${escapeHtml(l.unit?.name || '')} · ${escapeHtml(l.name)}</option>`).join('');
+        document.getElementById('locationSelect').innerHTML = locationOptionsHTML(lo.data, { placeholder: 'Todas' });
         makeSearchable('itemSelect',     { placeholder: 'Buscar item…' });
         makeSearchable('locationSelect', { placeholder: 'Buscar localização…' });
         // userSelect: deixar vazio por enquanto (lista de utilizadores não está acessível via API neste módulo)

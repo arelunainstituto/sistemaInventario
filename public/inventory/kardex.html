@@ -90,9 +90,8 @@ async function bootstrap() {
         ]);
         document.getElementById('itemSelect').innerHTML = '<option value="">— selecione —</option>' +
             items.data.map(i => `<option value="${i.id}">${escapeHtml(i.internal_code)} · ${escapeHtml(i.name)}</option>`).join('');
-        document.getElementById('locationFilter').innerHTML = '<option value="">Todas (saldo global)</option>' +
-            (locs.data || []).filter(l => l.is_active)
-                .map(l => `<option value="${l.id}">${escapeHtml(l.unit?.name || '')} · ${escapeHtml(l.name)}</option>`).join('');
+        document.getElementById('locationFilter').innerHTML =
+            locationOptionsHTML((locs.data || []).filter(l => l.is_active), { placeholder: 'Todas (saldo global)' });
         makeSearchable('itemSelect',     { placeholder: 'Buscar item por nome ou código…' });
         makeSearchable('locationFilter', { placeholder: 'Buscar localização…' });
 

@@ -86,10 +86,8 @@ async function bootstrap() {
         ]);
         items = it.data || [];
         locations = (lo.data || []).filter(l => l.is_active !== false);
-        document.getElementById('fromSelect').innerHTML = '<option value="">—</option>' +
-            locations.filter(l => l.can_send !== false).map(l => `<option value="${l.id}">${escapeHtml(l.unit?.name || '')} · ${escapeHtml(l.name)}</option>`).join('');
-        document.getElementById('toSelect').innerHTML = '<option value="">—</option>' +
-            locations.filter(l => l.can_receive !== false).map(l => `<option value="${l.id}">${escapeHtml(l.unit?.name || '')} · ${escapeHtml(l.name)}</option>`).join('');
+        document.getElementById('fromSelect').innerHTML = locationOptionsHTML(locations, { filter: l => l.can_send    !== false });
+        document.getElementById('toSelect').innerHTML   = locationOptionsHTML(locations, { filter: l => l.can_receive !== false });
         makeSearchable('fromSelect', { placeholder: 'Buscar origem…' });
         makeSearchable('toSelect',   { placeholder: 'Buscar destino…' });
     } catch (err) { toast(err.message, 'error'); }
@@ -130,7 +128,8 @@ function addLine() {
             <input type="number" step="0.0001" required class="line-qty w-full px-2 py-1.5 border border-gray-300 rounded text-xs"></div>
         <div class="col-span-3 line-lot-area hidden"><label class="text-xs text-gray-500">Lote</label>
             <select class="line-lot w-full px-2 py-1.5 border border-gray-300 rounded text-xs"><option value="">— FEFO automático —</option></select></div>
-        <div class="col-span-1 flex items-center justify-center"><button type="button" onclick="this.closest('[data-line]').remove()" class="text-red-500 hover:text-red-700" title="Remover linha"><i class="fas fa-trash"></i></button></div>`;
+        <div class="col-span-1 flex items-center justify-center"><button type="button" onclick="this.closest('[data-line]').remove()" class="text-red-500 hover:text-red-700" title="Remover linha"><i class="fas fa-trash"></i></button></div>
+        <p class="line-hint col-span-12 text-[11px] text-gray-400 mt-0.5 leading-snug"></p>`;
     document.getElementById('lines').appendChild(div);
     makeSearchable(`trItem-${idx}`, { placeholder: 'Buscar item por nome, código ou categoria…' });
 }
@@ -142,10 +141,34 @@ async function onLineItemChange(sel, idx) {
     if (sel.value) {
         try {
             const r = await apiCall(`/api/inventory/exits/stock-by-item/${sel.value}`);
-            lineStock[idx] = r.data || [];
+            lineStock[idx] = (r.data || []).filter(s => !r.seeding_mode); // ignora localizações sintéticas (seeding)
         } catch (_) { /* sem stock: seeding permite negativo; backend valida no submit */ }
     }
     rebuildLineLot(line, idx);
+}
+
+// Mostra ONDE o item tem stock (todas as localizações com saldo > 0), realçando
+// a origem escolhida. Guia o operador a escolher a origem certa — a causa nº 1 de
+// "não aparece o lote" é escolher uma origem que não tem stock deste item.
+function renderLineHint(line, idx) {
+    const hint = line.querySelector('.line-hint');
+    if (!hint) return;
+    const fromId = document.getElementById('fromSelect').value;
+    const all = lineStock[idx] || [];
+    if (!all.length) { hint.innerHTML = ''; return; }
+
+    const byLoc = {};
+    for (const s of all) {
+        const g = byLoc[s.location_id] || (byLoc[s.location_id] = {
+            name: `${s.location?.unit?.name ? s.location.unit.name + ' · ' : ''}${s.location?.name || ''}`,
+            qty: 0, lots: []
+        });
+        g.qty += parseFloat(s.quantity || 0);
+        if (s.lot) g.lots.push(s.lot.lot_number);
+    }
+    const parts = Object.entries(byLoc).map(([id, v]) =>
+        `<span class="${id === fromId ? 'text-sky-600 font-semibold' : ''}">${escapeHtml(v.name)} (${v.qty.toFixed(2)}${v.lots.length ? ' · lote ' + v.lots.map(escapeHtml).join('/') : ''})</span>`);
+    hint.innerHTML = '<i class="fas fa-boxes-stacked text-gray-300 mr-1"></i>Em stock: ' + parts.join(' &nbsp;·&nbsp; ');
 }
 
 // Origem mudou → recalcula disponibilidade/lotes de TODAS as linhas.
@@ -160,10 +183,19 @@ function onOriginChange() {
 
 function rebuildLineLot(line, idx) {
     const fromId = document.getElementById('fromSelect').value;
+    const itemChosen = !!line.querySelector('.line-item')?.value;
     const here = (lineStock[idx] || []).filter(s => s.location_id === fromId);
     const total = here.reduce((a, s) => a + parseFloat(s.quantity || 0), 0);
     const avail = line.querySelector('.line-avail');
-    if (avail) avail.textContent = fromId ? `· disp ${total.toFixed(2)}` : '';
+    if (avail) {
+        avail.textContent = fromId ? `· disp ${total.toFixed(2)}` : '';
+        // Origem escolhida + item escolhido, mas sem saldo aqui → avisa (a causa
+        // comum de "não aparece o lote"): o stock está noutra localização.
+        avail.className = 'line-avail text-[10px] ' +
+            (fromId && itemChosen && total <= 0 ? 'text-red-500 font-semibold' : 'text-gray-400');
+    }
+
+    renderLineHint(line, idx);
 
     const lots = here.filter(s => s.lot).sort((a, b) =>
         (a.lot.expiry_date || '9999-12-31').localeCompare(b.lot.expiry_date || '9999-12-31'));

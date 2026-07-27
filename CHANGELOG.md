@@ -32,9 +32,9 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e
 
 ---
 
-## [Unreleased]
+## [1.18.0] — 2026-07-27
 
-> **Em validação (beta).** Versão exibida no header: `v1.18.0-beta-04`. Entregue por partes (`-beta-NN`), consolida na `1.18.0` no último commit.
+> Manual do utilizador dentro do sistema (visualizador + barra lateral), busca no inventário físico, transferência multi-item, controle de lote opcional, listas de localização agrupadas por unidade e correções de UX de lote/stock. Consolida o ciclo `1.18.0-beta-01…05`.
 
 ### Adicionado
 - **Manual do utilizador dentro do sistema** ([docs.html](public/inventory/docs.html)): a aba **Documentação** passou a abrir um **visualizador** que renderiza o manual em `docs/user/*.md` (fonte canónica única), com uma **barra lateral de guias agrupada pelas pastas** (montada a partir da própria `docs/user/index.md` — os `##` viram grupos e os links `.md` viram itens, com destaque do item ativo). Clicar num link carrega o documento; imagens de `_img/` resolvidas. O `docs/` passou a ser servido estaticamente ([vercel.json](vercel.json)).
@@ -43,13 +43,17 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e
 
 ### Alterado
 - **Controle de lote agora é opcional (não trava mais com lotes lançados)** (`requer migração`: [122-lote-opcional.sql](database/inventory-refactor/122-lote-opcional.sql)): "não controla lote" passou a significar apenas que o lote **não é obrigatório** — o campo continua existindo. Agora é possível **desmarcar "controla lote" mesmo em item que já tem lotes lançados** (a API deixou de bloquear com 409, [items.js](api/inventory/items.js)). Na **entrada** ([entries.html](public/inventory/entries.html)) o campo de lote fica sempre visível (obrigatório só quando controla) e o trigger `fn_inv_process_entry_line` cria/usa o lote sempre que ele for informado. Na **saída** ([exits.html](public/inventory/exits.html)) o `fn_inv_consume` faz **FEFO se houver estoque em lote** na localização, mesmo que o item não controle — sem deixar estoque em lote preso; sem lote em estoque, abate direto do saldo.
+- **Listas de localização agrupadas por unidade** (todas as telas): os seletores de localização deixaram de ser uma lista plana e desordenada (`Marquês · X`, `Palácio · Y`, `Palácio · Z`…) e passaram a **agrupar por unidade** — um **cabeçalho não-selecionável por unidade** e as **sublocalizações indentadas** por baixo, em ordem. Novo helper partilhado `locationOptionsHTML()` em [_layout.js](public/inventory/_layout.js); o combobox [_searchable-select.js](public/inventory/_searchable-select.js) ganhou `data-search` (busca inclui o nome da unidade mesmo mostrando só o nome curto) e `data-label` (nome curto ao navegar, nome completo `Unidade · Sublocal` ao filtrar/selecionar — sem ambiguidade entre sublocais homónimos). Aplicado em transferências, saídas, entradas, ajustes, património (entrada/movimentação), inventário físico, kardex, movimentos e relatórios.
+
+### Corrigido
+- **Transferência "não aparece o lote" quando a origem não tem stock** ([transfers.html](public/inventory/transfers.html)): o seletor de lote só surge onde há saldo **> 0** — se o operador escolhia uma origem sem stock do item (o saldo estava noutra localização), o campo ficava escondido e parecia bug. Cada linha passou a mostrar um aviso **"Em stock: <localização> (qtd · lote …)"** listando **onde** o item tem saldo (realçando a origem escolhida), e a **disponibilidade fica em vermelho** quando a origem escolhida está a zero. *Diagnóstico confirmado: o backend já levava o lote em conta corretamente* — `fn_inv_transfer` consome por FEFO e credita o destino (stock + movimento) com o **mesmo lote**; patrimônio (nº de série) move-se por **Patrimônio › Movimentação**, por unidade. Sem migração.
 
 ### Removido
 - **`docs-patrimonio.html`** (duplicado): a página embutia uma cópia do markdown de património. O conteúdo agora vive no manual (`docs/user/patrimonio/*`), sem duplicação.
 
 ### Notas
-- [_layout.js:5](public/inventory/_layout.js#L5) bump para `v1.18.0-beta-04`.
-- **Migrações**: [122-lote-opcional.sql](database/inventory-refactor/122-lote-opcional.sql) (redefine `fn_inv_process_entry_line` e `fn_inv_consume`) e [123-transfer-batch.sql](database/inventory-refactor/123-transfer-batch.sql) (`fn_inv_transfer_batch`). *(A doc/visualizador não exige migração.)*
+- [_layout.js:5](public/inventory/_layout.js#L5) versão estável `v1.18.0` (fecha o ciclo beta `-beta-01…05`).
+- **Migrações**: [122-lote-opcional.sql](database/inventory-refactor/122-lote-opcional.sql) (redefine `fn_inv_process_entry_line` e `fn_inv_consume`) e [123-transfer-batch.sql](database/inventory-refactor/123-transfer-batch.sql) (`fn_inv_transfer_batch`) — **já aplicadas em produção**. *(A doc/visualizador e as listas agrupadas não exigem migração.)*
 
 ---
 

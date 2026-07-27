@@ -144,8 +144,7 @@ function statusBadge(s) {
 function populateModalSelects() {
     document.getElementById('itemSelect').innerHTML = '<option value="">— selecione o produto —</option>' +
         items.map(i => `<option value="${i.id}">${escapeHtml(i.internal_code)} · ${escapeHtml(i.name)}${i.subcategory?.name ? ' · ' + escapeHtml(i.subcategory.name) : ''}</option>`).join('');
-    document.getElementById('locationSelect').innerHTML = '<option value="">— selecione —</option>' +
-        locations.map(l => `<option value="${l.id}">${escapeHtml(l.unit?.name || '')} · ${escapeHtml(l.name)}</option>`).join('');
+    document.getElementById('locationSelect').innerHTML = locationOptionsHTML(locations, { placeholder: '— selecione —' });
     document.getElementById('holderSelect').innerHTML = '<option value="">— sem colaborador —</option>' +
         employees.map(e => `<option value="${e.id}">${escapeHtml(e.name)}${e.department ? ' · ' + escapeHtml(e.department) : ''}</option>`).join('');
     document.getElementById('supplierSelect').innerHTML = '<option value="">— sem fornecedor —</option>' +

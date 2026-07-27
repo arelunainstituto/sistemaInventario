@@ -36,7 +36,10 @@
         select.dataset.searchable = '1';
 
         const placeholder    = opts.placeholder    || 'Buscar…';
-        const getSearchText  = opts.getSearchText  || (opt => opt.textContent);
+        // Por padrão indexa data-search (quando presente) e cai no texto visível.
+        // data-search permite enriquecer a busca de opções agrupadas (ex.: incluir
+        // o nome da unidade numa sublocalização exibida só com o nome curto).
+        const getSearchText  = opts.getSearchText  || (opt => opt.dataset.search || opt.textContent);
         const maxResults     = opts.maxResults     || 50;
 
         // Wrapper relativo para posicionar o dropdown
@@ -112,8 +115,13 @@
                     return `<div class="py-1.5 pr-3 text-[11px] font-semibold text-gray-400 cursor-default select-none" style="padding-left:${padL}px">${escapeHtml(opt.textContent.trim())}</div>`;
                 }
                 selIdx++;
+                // Ao NAVEGAR (sem filtro), mostra o rótulo curto data-label (ex.: só a
+                // sublocalização, indentada sob o cabeçalho da unidade). Ao FILTRAR,
+                // mostra o texto completo (ex.: "Unidade · Sublocal") para não ficar
+                // ambíguo quando o cabeçalho do grupo sai do resultado.
+                const disp = (!lower && opt.dataset.label) ? opt.dataset.label : opt.textContent.trim();
                 return `<div class="py-2 pr-3 hover:bg-sky-50 cursor-pointer text-sm ${selIdx === highlighted ? 'bg-sky-50' : ''}"
-                     style="padding-left:${padL}px" data-value="${escapeHtml(opt.value)}" data-idx="${selIdx}">${escapeHtml(opt.textContent.trim())}</div>`;
+                     style="padding-left:${padL}px" data-value="${escapeHtml(opt.value)}" data-idx="${selIdx}">${escapeHtml(disp)}</div>`;
             }).join('');
             [...dropdown.querySelectorAll('[data-value]')].forEach(el => {
                 el.addEventListener('mousedown', e => {
